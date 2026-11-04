@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { Application, ApplicationDraftUpdate } from '../../types/application';
 import { apiSubmitApplication } from '../../api/applications';
+import { ValidationFindingsCard } from './ValidationFindingsCard';
 import {
   AlertTriangle,
   Send,
@@ -304,6 +305,9 @@ export const StepReviewSubmit: React.FC<StepProps> = ({
           ))}
         </div>
       </div>
+
+      {/* Deterministic Validation & Consistency Results */}
+      <ValidationFindingsCard token={token} applicationId={application.id} />
 
       {/* Section 6: Declarations & Consent */}
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-2xs space-y-4">

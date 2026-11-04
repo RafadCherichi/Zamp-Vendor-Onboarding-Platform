@@ -2,7 +2,7 @@ import uuid
 from enum import Enum
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Text, Boolean, Integer, Float, DateTime, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from app.database import Base
 from app.models.base import TimestampMixin, utc_now
 
@@ -68,7 +68,7 @@ class DocumentExtractionResult(Base, TimestampMixin):
     review_flags_json = Column(Text, nullable=True)  # JSON array of warning/flag strings
 
     # Relationships
-    document_version = relationship("DocumentVersion", backref="extraction_result")
+    document_version = relationship("DocumentVersion", backref=backref("extraction_result", uselist=False))
     document = relationship("Document", backref="extractions")
     application = relationship("Application", backref="document_extractions")
     fields = relationship("ExtractedField", back_populates="extraction_result", cascade="all, delete-orphan", order_by="ExtractedField.field_name")

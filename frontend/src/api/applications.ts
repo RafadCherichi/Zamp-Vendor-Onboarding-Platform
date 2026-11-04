@@ -161,6 +161,22 @@ export async function apiSubmitApplication(
   return res.json();
 }
 
+export async function apiListApplications(token: string): Promise<Application[]> {
+  const res = await fetch(`${API_BASE}/applications`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || 'Failed to list applications');
+  }
+
+  return res.json();
+}
+
 export async function apiAcceptInvitation(
   rawToken: string,
   password: string,

@@ -15,6 +15,17 @@ from app.models.extraction import (
     ProcessingStatusEnum,
     ExtractionMethodEnum,
 )
+from app.models.validation import (
+    ValidationRun,
+    ValidationFinding,
+    ExternalVerificationRecord,
+    DuplicateSignal,
+    ValidationStatusEnum,
+    ValidationSeverityEnum,
+    ValidationLayerEnum,
+    VerificationStatusEnum,
+)
+from app.models.audit import AuditEvent
 
 __all__ = [
     "Base",
@@ -37,4 +48,13 @@ __all__ = [
     "ExtractedField",
     "ProcessingStatusEnum",
     "ExtractionMethodEnum",
+    "ValidationRun",
+    "ValidationFinding",
+    "ExternalVerificationRecord",
+    "DuplicateSignal",
+    "ValidationStatusEnum",
+    "ValidationSeverityEnum",
+    "ValidationLayerEnum",
+    "VerificationStatusEnum",
+    "AuditEvent",
 ]

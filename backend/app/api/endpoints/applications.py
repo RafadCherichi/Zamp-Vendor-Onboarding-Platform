@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import os
 import secrets
 from datetime import datetime, timezone
@@ -43,6 +44,7 @@ from app.schemas.extraction import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def mask_account_number(acc: Optional[str]) -> Optional[str]:
@@ -189,6 +191,29 @@ def get_scoped_application(application_id: str, member: OrganisationMember, db: 
             detail="Application not found or you do not have permission to access it.",
         )
     return app
+
+
+@router.get(
+    "/",
+    response_model=List[ApplicationResponse],
+    summary="List Organisation Applications",
+    description="Retrieve all applications belonging to the authenticated member's organisation.",
+)
+def list_organisation_applications(
+    db: Session = Depends(get_db),
+    member: OrganisationMember = Depends(require_roles([
+        RoleEnum.PROCUREMENT_OFFICER,
+        RoleEnum.REVIEWER,
+        RoleEnum.ADMIN,
+    ])),
+) -> List[ApplicationResponse]:
+    apps = (
+        db.query(Application)
+        .filter(Application.organisation_id == member.organisation_id)
+        .order_by(Application.created_at.desc())
+        .all()
+    )
+    return [build_application_response(a, db) for a in apps]
 
 
 @router.get(
@@ -460,6 +485,13 @@ async def upload_document(
     doc.current_version_id = version.id
     db.commit()
     db.refresh(doc)
+
+    # Invalidate existing validation findings that depended on this document
+    try:
+        from app.services.validation.orchestrator import ValidationOrchestrator
+        ValidationOrchestrator(db).mark_stale_findings_for_document(doc.id, reason="Document re-uploaded")
+    except Exception as e:
+        logger.warning(f"Error marking stale findings for document {doc.id}: {e}")
 
     # 9. Trigger processing pipeline
     # Process synchronously so upload response has instant extraction insights; background task ensures async resilience
@@ -769,6 +801,18 @@ def submit_application(
         app.vendor.trade_name = app.trade_name
         app.vendor.constitution = app.constitution
         app.vendor.pan = app.pan
+
+    # Automatically execute deterministic validation run upon submission
+    try:
+        from app.services.validation.orchestrator import ValidationOrchestrator
+        ValidationOrchestrator(db).run_full_validation(
+            application_id=app.id,
+            user_id=member.user_id,
+            run_type="SUBMISSION_RUN",
+            trigger_reason="Automatic submission evaluation",
+        )
+    except Exception as e:
+        logger.warning(f"Error running validation on submission: {e}")
 
     db.commit()
     db.refresh(app)
