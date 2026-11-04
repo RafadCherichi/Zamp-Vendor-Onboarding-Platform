@@ -106,13 +106,13 @@ All seeded accounts use password: **`Password123!`** (stored as bcrypt hash).
 
 ## 5. Verification & Testing
 
-### Running All Backend Tests (Auth, RBAC, Scoping, Vendor Onboarding & Checklist Engine)
+### Running All Backend Tests (Auth, RBAC, Scoping, Vendor Onboarding, OCR & Document Extraction)
 From the project root:
 ```powershell
 $env:PYTHONPATH='backend'
 backend\.venv\Scripts\pytest.exe backend/tests -v
 ```
-*Current test suite: 24 passing unit & integration tests.*
+*Current test suite: 36 passing unit & integration tests.*
 
 ### Running Frontend Type-Check & Production Build
 From the `frontend` directory:
@@ -122,22 +122,38 @@ npm.cmd run build
 
 ---
 
-## 6. Increment 2 Features: Vendor Onboarding & Dynamic Checklist
+## 6. Increment 2 & 3 Features: Vendor Onboarding, OCR & Document Understanding
 
-### 1. Complete Vendor Onboarding Wizard
-- **6-Step Progress Stepper**:
-  1. **Business Identity**: Legal name, trade name, constitution (Proprietorship, Partnership, LLP, Pvt Ltd, Public Ltd), incorporation date, CIN/LLPIN.
-  2. **Tax & Compliance**: PAN format validation (`[A-Z]{5}[0-9]{4}[A-Z]{1}`), PAN 4th character vs. constitution matching check, GST registration toggle & GSTIN (`22AAAAA0000A1Z5`), MSME/Udyam status & registration number (`UDYAM-XX-00-0000000`).
-  3. **Authorised Signatory / Contact**: Name, designation, mobile number (`+91` 10-digit), business email address.
-  4. **Banking Details**: Account holder name, bank name, account number, IFSC code (`[A-Z]{4}0[A-Z0-9]{6}`), account type (Current, Savings, Cash Credit).
-  5. **Business Classification**: MSME enterprise classification (Micro, Small, Medium, None), primary activity, multi-select commercial categories (with dynamic licence triggers such as Food Catering, Logistics, etc.), turnover range.
-  6. **Document Upload Checklist**: Dynamic checklist computed strictly from constitution, GST, Udyam, and category choices. Shows requirement tags (`Mandatory` vs `Optional`), accepts PDF/PNG/JPEG files up to 10 MB, provides instant in-modal preview, and maintains immutable version history.
-- **Review & Submit Screen**: Section-by-section audit review, checklist completeness validator (blocks submission if mandatory documents or fields are missing), legal declaration checkbox, and confirmation screen displaying unique application reference (`APP-YYYYMMDD-XXXXXX`).
-- **Draft Persistence**: Auto-save on section transition and manual "Save & Exit" button to resume anytime. Submitted applications are securely locked to prevent further edits.
+### 1. Vendor Onboarding Wizard & Dynamic Checklist
+- **6-Step Progress Stepper**: Business Identity, Tax & Compliance (with PAN 4th character validation against constitution), Authorised Contact, Banking Details (IFSC validation), Business Classification, and Dynamic Document Checklist.
+- **Conditional Document Checklist**: Evaluates mandatory vs optional documents based on legal constitution (Proprietorship, Partnership, LLP, Company), GST status, Udyam MSME status, and commercial activity categories.
+- **Draft Persistence & Locking**: Auto-save on section transition; submitted applications are locked against edits.
 
-### 2. Seeded Demo Onboarding Scenarios
-- **Scenario A (Proprietorship)**: Apex Components (`vendor@apexcomponents.com`, Password: `Password123!`), Sole Proprietorship with GST and MSME Udyam registration. Checklist automatically requires Proprietor PAN, Shop & Establishment / Trade Licence, Bank Proof, GST Certificate, and Udyam Certificate.
-- **Scenario B (Private Limited Company)**: Zenith Cloud Systems (`vendor@zenithcloud.com`, Password: `Password123!`), Private Limited Company with Board Resolution / Authorised Signatory proof, Certificate of Incorporation / MOA, Corporate PAN, Bank Proof, GST Certificate, and FSSAI licence requirement triggered by Food Catering category.
+### 2. Document Processing Pipeline, OCR & AI Extraction (Increment 3)
+- **Dual-Path Text & OCR Engine**:
+  - Digital PDFs: Extracts selectable text and page layout via `pypdf` for pristine accuracy.
+  - Scanned Documents & Images (JPEG, PNG): Neural visual OCR via `rapidocr-onnxruntime` running locally offline with zero external C++ dependencies.
+- **Statutory Document Classifier**:
+  - Automatically identifies document type (`PAN_PROOF`, `GST_CERTIFICATE`, `BANK_PROOF`, `UDYAM_CERTIFICATE`, `CONSTITUTION_PROOF`, `SIGNATORY_PROOF`, `INDUSTRY_LICENCE`).
+  - Evaluates matching confidence and detects mismatches (e.g. uploading a GST certificate to a PAN card slot flags `is_type_match == False` and transitions status to `NEEDS_REVIEW`).
+- **Structured Field Extraction**:
+  - Dedicated extractors per statutory document extracting compliance fields with field-level confidence (0.0 to 1.0), normalization, page numbers, and evidence text context.
+- **Pluggable AI & Fallback Architecture**:
+  - Provider interface (`BaseExtractionProvider`) with `LocalDeterministicProvider` (offline, instant, deterministic regex & layout heuristics) and `GeminiExtractionProvider` (activated if `GEMINI_API_KEY` is present; protected with delimiter safeguards against prompt injection; transparent local fallback).
+- **Security & Privacy Safeguards**:
+  - All files stored in private object storage (`./storage_uploads`).
+  - Sensitive identifiers (PAN and Bank Account Number) are masked in API summaries (`AA*****8L`, `****1234`) with a client-side unmask toggle in the inspection drawer.
+  - Never logs or exposes raw file contents or secret keys.
+- **UI Inspection Modal**:
+  - Side-by-side view with visual document streaming on the left and extracted compliance metadata, classification evidence, review flags, and reprocess actions on the right.
+
+### 3. Seeded Synthetic Demo Documents (`./demo_documents/`)
+1. `synthetic_pan_card.pdf` & `synthetic_pan_card.png` (PAN `AAPFU0938L`, Vikram Malhotra)
+2. `synthetic_gst_certificate.pdf` (Form GST REG-06, GSTIN `27AAPFU0938L1ZV`)
+3. `synthetic_cancelled_cheque.png` (HDFC Bank, IFSC `HDFC0000123`, A/c `9876543210123`)
+4. `synthetic_udyam_certificate.pdf` (Udyam `UDYAM-MH-02-0012345`, Micro Manufacturing)
+5. `synthetic_coi_certificate.pdf` (MCA COI, CIN `U72200KA2020PTC123456`, Zenith Cloud Systems)
+6. `synthetic_unreadable_noise.png` (Noisy pixel blur verifying `NEEDS_REVIEW` / `is_unreadable: true`)
 
 ---
 
@@ -148,8 +164,8 @@ npm.cmd run build
 | **0** | **Foundation** | Workspace inspection, FastAPI, React + Vite, Alembic, Storage Adapter, Health verification | **Complete** |
 | **1** | **App Shell & Identity** | Multi-role RBAC, organisation scoping, secure expiring invitation tokens, demo switcher | **Complete** |
 | **2** | **Vendor Onboarding** | 6-section dynamic form, activity/constitution conditional checklist, save/resume, document uploads & preview | **Complete** |
-| **3** | **Document Processing** | Private storage versions, background worker, OCR & vision extraction adapter | *Next* |
-| **4** | **Validation & Verification**| Deterministic rules, PAN-GST matching, duplicate detection, simulated verification | *Upcoming* |
+| **3** | **Document Processing** | Private storage versions, dual-path OCR & vision, classification, structured field extraction, evidence inspector | **Complete** |
+| **4** | **Validation & Verification**| Deterministic rules, PAN-GST matching, duplicate detection, simulated verification | *Next* |
 | **5** | **Exception Lifecycle** | Vendor-explainable corrections, versioned replacements, selective revalidation | *Upcoming* |
 | **6** | **Internal Workspace** | Reviewer dashboard, evidence side-by-side inspection, human decision recording | *Upcoming* |
 | **7** | **Hardening & Demo Data** | Append-only audit timeline, quarantine guards, acceptance test suite, synthetic demo data | *Upcoming* |

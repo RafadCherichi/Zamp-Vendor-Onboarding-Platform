@@ -50,6 +50,25 @@ class LocalStorageAdapter(StorageAdapter):
         except ValueError:
             return False
 
+    def get_file(self, storage_key: str) -> Optional[BinaryIO]:
+        try:
+            path = self._resolve_path(storage_key)
+            if path.is_file():
+                return open(path, "rb")
+            return None
+        except ValueError:
+            return None
+
+    def get_file_bytes(self, storage_key: str) -> Optional[bytes]:
+        try:
+            path = self._resolve_path(storage_key)
+            if path.is_file():
+                with open(path, "rb") as f:
+                    return f.read()
+            return None
+        except ValueError:
+            return None
+
     def delete_file(self, storage_key: str) -> bool:
         try:
             path = self._resolve_path(storage_key)

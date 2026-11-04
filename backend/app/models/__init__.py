@@ -8,6 +8,13 @@ from app.models.invitation import Invitation, InvitationStatusEnum
 from app.models.vendor import Vendor
 from app.models.application import Application, ApplicationStatusEnum, ConstitutionEnum
 from app.models.document import Document, DocumentVersion, DocumentTypeEnum
+from app.models.extraction import (
+    DocumentProcessingJob,
+    DocumentExtractionResult,
+    ExtractedField,
+    ProcessingStatusEnum,
+    ExtractionMethodEnum,
+)
 
 __all__ = [
     "Base",
@@ -25,4 +32,9 @@ __all__ = [
     "Document",
     "DocumentVersion",
     "DocumentTypeEnum",
+    "DocumentProcessingJob",
+    "DocumentExtractionResult",
+    "ExtractedField",
+    "ProcessingStatusEnum",
+    "ExtractionMethodEnum",
 ]

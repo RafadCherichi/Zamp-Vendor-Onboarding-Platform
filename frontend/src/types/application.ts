@@ -2,6 +2,35 @@ export type Constitution = 'PROPRIETORSHIP' | 'PARTNERSHIP' | 'LLP' | 'PVT_LTD' 
 
 export type ApplicationStatus = 'DRAFT' | 'IN_PROGRESS' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
 
+export type ProcessingStatus = 'QUEUED' | 'PROCESSING' | 'EXTRACTED' | 'NEEDS_REVIEW' | 'FAILED';
+
+export interface ExtractedFieldDetail {
+  id: string;
+  field_name: string;
+  extracted_value: string;
+  normalized_value?: string | null;
+  confidence_score: number;
+  page_number: number;
+  evidence_text?: string | null;
+  extraction_method: string;
+}
+
+export interface DocumentExtractionDetail {
+  id: string;
+  document_id: string;
+  document_version_id: string;
+  status: ProcessingStatus;
+  detected_document_type?: string | null;
+  classification_confidence?: number | null;
+  classification_reason?: string | null;
+  is_type_match: boolean;
+  page_count: number;
+  provider_used: string;
+  review_flags: string[];
+  fields: ExtractedFieldDetail[];
+  created_at: string;
+}
+
 export interface DocumentVersion {
   id: string;
   version_number: number;
@@ -22,6 +51,12 @@ export interface DocumentSlot {
   versions_count: number;
   accepted_extensions: string[];
   max_size_mb: number;
+  // Extraction & OCR Insights
+  processing_status?: ProcessingStatus | null;
+  detected_document_type?: string | null;
+  is_type_match?: boolean | null;
+  review_flags?: string[];
+  extracted_fields_summary?: Record<string, string>;
 }
 
 export interface Application {

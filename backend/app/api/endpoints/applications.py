@@ -3,10 +3,10 @@ import json
 import os
 import secrets
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, BackgroundTasks
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -19,11 +19,16 @@ from app.models.role import RoleEnum
 from app.models.vendor import Vendor
 from app.models.application import Application, ApplicationStatusEnum, ConstitutionEnum
 from app.models.document import Document, DocumentVersion, DocumentTypeEnum
+from app.models.extraction import DocumentExtractionResult, ExtractedField, ProcessingStatusEnum
 from app.storage.local import get_storage_adapter
 from app.services.checklist import (
     evaluate_checklist_rules,
     sync_application_documents,
     parse_categories,
+)
+from app.services.extraction.pipeline import (
+    background_process_document,
+    run_pipeline_for_document_version,
 )
 from app.schemas.application import (
     ApplicationDraftUpdate,
@@ -31,6 +36,10 @@ from app.schemas.application import (
     ApplicationSubmitResponse,
     DocumentSlotResponse,
     DocumentVersionResponse,
+)
+from app.schemas.extraction import (
+    DocumentExtractionResponse,
+    ExtractedFieldResponse,
 )
 
 router = APIRouter()
@@ -46,11 +55,28 @@ def mask_account_number(acc: Optional[str]) -> Optional[str]:
     return ("*" * (len(clean) - 4)) + clean[-4:]
 
 
-def build_application_response(app: Application) -> ApplicationResponse:
+def mask_sensitive_value(field_name: str, val: Optional[str]) -> str:
+    """Mask sensitive compliance values like PAN and Bank Account numbers."""
+    if not val:
+        return ""
+    if field_name == "pan_number" and len(val) >= 5:
+        return val[:2] + "*****" + val[-2:]
+    if field_name in ["bank_account_number", "account_number"]:
+        return mask_account_number(val) or val
+    return val
+
+
+def build_application_response(app: Application, db: Optional[Session] = None) -> ApplicationResponse:
     categories = parse_categories(app.categories_json)
     doc_slots = []
     for d in app.documents:
         current_v = None
+        proc_status = None
+        detected_type = None
+        is_type_match = None
+        review_flags: List[str] = []
+        fields_summary: Dict[str, str] = {}
+
         if d.versions:
             latest = d.versions[0]
             current_v = DocumentVersionResponse(
@@ -61,6 +87,27 @@ def build_application_response(app: Application) -> ApplicationResponse:
                 content_type=latest.content_type,
                 created_at=latest.created_at,
             )
+
+            # Retrieve extraction insights if db session available
+            if db:
+                extraction = (
+                    db.query(DocumentExtractionResult)
+                    .filter(DocumentExtractionResult.document_version_id == latest.id)
+                    .first()
+                )
+                if extraction:
+                    proc_status = extraction.status
+                    detected_type = extraction.detected_document_type
+                    is_type_match = extraction.is_type_match
+                    if extraction.review_flags_json:
+                        try:
+                            review_flags = json.loads(extraction.review_flags_json)
+                        except Exception:
+                            review_flags = []
+                    for f in extraction.fields:
+                        fields_summary[f.field_name] = mask_sensitive_value(f.field_name, f.normalized_value or f.extracted_value)
+                else:
+                    proc_status = "QUEUED"
 
         doc_slots.append(
             DocumentSlotResponse(
@@ -74,6 +121,11 @@ def build_application_response(app: Application) -> ApplicationResponse:
                 versions_count=len(d.versions),
                 accepted_extensions=[".pdf", ".jpg", ".jpeg", ".png"],
                 max_size_mb=15,
+                processing_status=proc_status,
+                detected_document_type=detected_type,
+                is_type_match=is_type_match,
+                review_flags=review_flags,
+                extracted_fields_summary=fields_summary,
             )
         )
 
@@ -200,7 +252,7 @@ def get_current_application(
     db.commit()
     db.refresh(application)
 
-    return build_application_response(application)
+    return build_application_response(application, db)
 
 
 @router.get(
@@ -216,7 +268,7 @@ def get_application(
 ) -> ApplicationResponse:
     app = get_scoped_application(application_id, member, db)
     sync_application_documents(db, app)
-    return build_application_response(app)
+    return build_application_response(app, db)
 
 
 @router.patch(
@@ -258,7 +310,7 @@ def update_application_draft(
     db.commit()
     db.refresh(app)
 
-    return build_application_response(app)
+    return build_application_response(app, db)
 
 
 @router.get(
@@ -274,7 +326,7 @@ def get_application_checklist(
 ) -> List[DocumentSlotResponse]:
     app = get_scoped_application(application_id, member, db)
     sync_application_documents(db, app)
-    full_resp = build_application_response(app)
+    full_resp = build_application_response(app, db)
     return full_resp.documents
 
 
@@ -291,11 +343,12 @@ ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png"}
     "/{application_id}/documents/{document_type}/upload",
     response_model=DocumentSlotResponse,
     summary="Upload or Replace Application Document",
-    description="Upload a document file to an application slot. Automatically increments version number.",
+    description="Upload a document file to an application slot. Automatically increments version number and triggers extraction pipeline.",
 )
 async def upload_document(
     application_id: str,
     document_type: str,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     member: OrganisationMember = Depends(get_current_member),
@@ -408,6 +461,26 @@ async def upload_document(
     db.commit()
     db.refresh(doc)
 
+    # 9. Trigger processing pipeline
+    # Process synchronously so upload response has instant extraction insights; background task ensures async resilience
+    background_tasks.add_task(background_process_document, version.id)
+    extraction = run_pipeline_for_document_version(version.id, db)
+
+    proc_status = extraction.status if extraction else "PROCESSING"
+    det_type = extraction.detected_document_type if extraction else None
+    is_match = extraction.is_type_match if extraction else None
+    flags: List[str] = []
+    fields_summary: Dict[str, str] = {}
+
+    if extraction:
+        if extraction.review_flags_json:
+            try:
+                flags = json.loads(extraction.review_flags_json)
+            except Exception:
+                flags = []
+        for f in extraction.fields:
+            fields_summary[f.field_name] = mask_sensitive_value(f.field_name, f.normalized_value or f.extracted_value)
+
     return DocumentSlotResponse(
         id=doc.id,
         document_type=doc.document_type,
@@ -426,6 +499,136 @@ async def upload_document(
         versions_count=len(doc.versions),
         accepted_extensions=[".pdf", ".jpg", ".jpeg", ".png"],
         max_size_mb=15,
+        processing_status=proc_status,
+        detected_document_type=det_type,
+        is_type_match=is_match,
+        review_flags=flags,
+        extracted_fields_summary=fields_summary,
+    )
+
+
+@router.get(
+    "/{application_id}/documents/{document_id}/extraction",
+    response_model=DocumentExtractionResponse,
+    summary="Get Document Extraction Result",
+    description="Retrieve detailed OCR extraction results, detected document type, and structured fields with confidence scores.",
+)
+def get_document_extraction(
+    application_id: str,
+    document_id: str,
+    db: Session = Depends(get_db),
+    member: OrganisationMember = Depends(get_current_member),
+) -> DocumentExtractionResponse:
+    app = get_scoped_application(application_id, member, db)
+    doc = db.query(Document).filter(Document.id == document_id, Document.application_id == app.id).first()
+    if not doc or not doc.current_version_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document or uploaded version not found.")
+
+    extraction = (
+        db.query(DocumentExtractionResult)
+        .filter(DocumentExtractionResult.document_version_id == doc.current_version_id)
+        .first()
+    )
+    if not extraction:
+        extraction = run_pipeline_for_document_version(doc.current_version_id, db)
+
+    if not extraction:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Extraction result not available.")
+
+    flags: List[str] = []
+    if extraction.review_flags_json:
+        try:
+            flags = json.loads(extraction.review_flags_json)
+        except Exception:
+            flags = []
+
+    fields_resp = [
+        ExtractedFieldResponse(
+            id=f.id,
+            field_name=f.field_name,
+            extracted_value=mask_sensitive_value(f.field_name, f.extracted_value),
+            normalized_value=mask_sensitive_value(f.field_name, f.normalized_value) if f.normalized_value else None,
+            confidence_score=f.confidence_score,
+            page_number=f.page_number,
+            evidence_text=f.evidence_text,
+            extraction_method=f.extraction_method,
+        )
+        for f in extraction.fields
+    ]
+
+    return DocumentExtractionResponse(
+        id=extraction.id,
+        document_id=doc.id,
+        document_version_id=extraction.document_version_id,
+        status=extraction.status,
+        detected_document_type=extraction.detected_document_type,
+        classification_confidence=extraction.classification_confidence,
+        classification_reason=extraction.classification_reason,
+        is_type_match=extraction.is_type_match,
+        page_count=extraction.page_count,
+        provider_used=extraction.provider_used,
+        review_flags=flags,
+        fields=fields_resp,
+        created_at=extraction.created_at,
+    )
+
+
+@router.post(
+    "/{application_id}/documents/{document_id}/reprocess",
+    response_model=DocumentExtractionResponse,
+    summary="Reprocess Document Version",
+    description="Manually re-run OCR extraction and document classification on the current version.",
+)
+def reprocess_document(
+    application_id: str,
+    document_id: str,
+    db: Session = Depends(get_db),
+    member: OrganisationMember = Depends(get_current_member),
+) -> DocumentExtractionResponse:
+    app = get_scoped_application(application_id, member, db)
+    doc = db.query(Document).filter(Document.id == document_id, Document.application_id == app.id).first()
+    if not doc or not doc.current_version_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document or uploaded version not found.")
+
+    extraction = run_pipeline_for_document_version(doc.current_version_id, db, force_reprocess=True)
+    if not extraction:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Reprocessing failed.")
+
+    flags: List[str] = []
+    if extraction.review_flags_json:
+        try:
+            flags = json.loads(extraction.review_flags_json)
+        except Exception:
+            flags = []
+
+    fields_resp = [
+        ExtractedFieldResponse(
+            id=f.id,
+            field_name=f.field_name,
+            extracted_value=mask_sensitive_value(f.field_name, f.extracted_value),
+            normalized_value=mask_sensitive_value(f.field_name, f.normalized_value) if f.normalized_value else None,
+            confidence_score=f.confidence_score,
+            page_number=f.page_number,
+            evidence_text=f.evidence_text,
+            extraction_method=f.extraction_method,
+        )
+        for f in extraction.fields
+    ]
+
+    return DocumentExtractionResponse(
+        id=extraction.id,
+        document_id=doc.id,
+        document_version_id=extraction.document_version_id,
+        status=extraction.status,
+        detected_document_type=extraction.detected_document_type,
+        classification_confidence=extraction.classification_confidence,
+        classification_reason=extraction.classification_reason,
+        is_type_match=extraction.is_type_match,
+        page_count=extraction.page_count,
+        provider_used=extraction.provider_used,
+        review_flags=flags,
+        fields=fields_resp,
+        created_at=extraction.created_at,
     )
 
 

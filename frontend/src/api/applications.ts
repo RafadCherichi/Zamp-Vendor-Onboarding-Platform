@@ -3,6 +3,7 @@ import type {
   ApplicationDraftUpdate,
   ApplicationSubmitResponse,
   DocumentSlot,
+  DocumentExtractionDetail,
 } from '../types/application';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -90,6 +91,47 @@ export async function apiUploadDocument(
 
 export function getDocumentPreviewUrl(applicationId: string, documentId: string): string {
   return `${API_BASE}/applications/${applicationId}/documents/${documentId}/preview`;
+}
+
+export async function apiFetchDocumentExtraction(
+  token: string,
+  applicationId: string,
+  documentId: string
+): Promise<DocumentExtractionDetail> {
+  const res = await fetch(`${API_BASE}/applications/${applicationId}/documents/${documentId}/extraction`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || 'Failed to fetch document extraction details');
+  }
+
+  return res.json();
+}
+
+export async function apiReprocessDocument(
+  token: string,
+  applicationId: string,
+  documentId: string
+): Promise<DocumentExtractionDetail> {
+  const res = await fetch(`${API_BASE}/applications/${applicationId}/documents/${documentId}/reprocess`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || 'Failed to reprocess document');
+  }
+
+  return res.json();
 }
 
 export async function apiSubmitApplication(

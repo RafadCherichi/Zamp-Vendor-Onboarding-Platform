@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field
 
@@ -25,6 +25,12 @@ class DocumentSlotResponse(BaseModel):
     versions_count: int = 0
     accepted_extensions: List[str] = [".pdf", ".jpg", ".jpeg", ".png"]
     max_size_mb: int = 15
+    # Processing & Extraction Insights
+    processing_status: Optional[str] = None
+    detected_document_type: Optional[str] = None
+    is_type_match: Optional[bool] = None
+    review_flags: List[str] = []
+    extracted_fields_summary: Dict[str, str] = {}
 
     model_config = {"from_attributes": True}
 

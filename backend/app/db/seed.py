@@ -1,4 +1,8 @@
+import io
 import json
+import hashlib
+import secrets
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
@@ -10,8 +14,61 @@ from app.models.role import RoleEnum
 from app.models.invitation import Invitation, InvitationStatusEnum
 from app.models.vendor import Vendor
 from app.models.application import Application, ApplicationStatusEnum, ConstitutionEnum
+from app.models.document import Document, DocumentVersion
 from app.core.security import hash_password, generate_invitation_token
 from app.services.checklist import sync_application_documents
+from app.storage.local import get_storage_adapter
+from app.utils.synthetic_docs import generate_all_demo_documents
+from app.services.extraction.pipeline import run_pipeline_for_document_version
+
+
+def seed_document_for_slot(
+    db: Session,
+    app: Application,
+    doc_type: str,
+    file_path: str,
+    content_type: str,
+    filename: str,
+    user_id: str,
+):
+    doc = db.query(Document).filter(Document.application_id == app.id, Document.document_type == doc_type).first()
+    if not doc:
+        return
+    if doc.versions:
+        # Already has version, ensure extraction pipeline has run
+        latest = doc.versions[0]
+        run_pipeline_for_document_version(latest.id, db)
+        return
+
+    if not Path(file_path).is_file():
+        return
+
+    with open(file_path, "rb") as f:
+        content = f.read()
+
+    checksum = hashlib.sha256(content).hexdigest()
+    storage = get_storage_adapter()
+    dest_path = f"org_{app.organisation_id}/app_{app.id}/{doc_type}_v1_{secrets.token_hex(4)}{Path(file_path).suffix}"
+    storage_key = storage.save_file(io.BytesIO(content), dest_path, content_type)
+
+    version = DocumentVersion(
+        document_id=doc.id,
+        version_number=1,
+        storage_key=storage_key,
+        original_filename=filename,
+        file_size_bytes=len(content),
+        content_type=content_type,
+        file_checksum=checksum,
+        uploaded_by_user_id=user_id,
+    )
+    db.add(version)
+    db.flush()
+
+    doc.status = "UPLOADED"
+    doc.current_version_id = version.id
+    db.commit()
+
+    run_pipeline_for_document_version(version.id, db)
 
 
 def seed_database():
@@ -260,7 +317,33 @@ def seed_database():
             db.add(test_inv)
 
         db.commit()
-        print("[Seed] Successfully seeded organisations, staff, Scenario A (Proprietorship), Scenario B (Company), and test invitations.")
+
+        # 6. Generate and Seed Synthetic Compliance Documents for Live Demo
+        demo_docs = generate_all_demo_documents("./demo_documents")
+
+        # Scenario A compliance document uploads
+        seed_document_for_slot(
+            db, app_a, "PAN_PROOF", demo_docs["pan_pdf"], "application/pdf", "pan_card_apex.pdf", vendor_a_user.id
+        )
+        seed_document_for_slot(
+            db, app_a, "GST_CERTIFICATE", demo_docs["gst_pdf"], "application/pdf", "form_gst_reg06_apex.pdf", vendor_a_user.id
+        )
+        seed_document_for_slot(
+            db, app_a, "BANK_PROOF", demo_docs["bank_png"], "image/png", "cancelled_cheque_apex.png", vendor_a_user.id
+        )
+        seed_document_for_slot(
+            db, app_a, "UDYAM_CERTIFICATE", demo_docs["udyam_pdf"], "application/pdf", "udyam_certificate_apex.pdf", vendor_a_user.id
+        )
+
+        # Scenario B compliance document uploads
+        seed_document_for_slot(
+            db, app_b, "CONSTITUTION_PROOF", demo_docs["coi_pdf"], "application/pdf", "coi_zenith.pdf", vendor_b_user.id
+        )
+        seed_document_for_slot(
+            db, app_b, "BANK_PROOF", demo_docs["bank_png"], "image/png", "bank_proof_zenith.png", vendor_b_user.id
+        )
+
+        print("[Seed] Successfully seeded organisations, staff, Scenario A (Proprietorship), Scenario B (Company), demo compliance documents, and test invitations.")
     finally:
         db.close()
 

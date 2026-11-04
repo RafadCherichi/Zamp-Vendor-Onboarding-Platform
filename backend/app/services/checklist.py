@@ -190,13 +190,13 @@ def evaluate_checklist_rules(application: Application) -> List[Dict[str, Any]]:
             "max_size_mb": 15,
         })
 
-    # 8. Buyer Specific Policy Document
+    # 8. Buyer Specific Policy Document (Configurable Buyer Policy)
     rules.append({
         "document_type": DocumentTypeEnum.BUYER_SPECIFIC.value,
         "title": "Buyer Code of Conduct & Compliance Acknowledgement",
         "description": "Signed copy of the buyer organization's anti-bribery, ethics, and ESG compliance declaration.",
-        "is_required": True,
-        "condition_explanation": f"Mandatory buyer onboarding requirement for {application.organization.name if application.organization else 'buyer'}.",
+        "is_required": False,
+        "condition_explanation": f"Buyer Onboarding Policy: Recommended compliance acknowledgement for {application.organization.name if application.organization else 'buyer'}.",
         "accepted_extensions": [".pdf", ".jpg", ".jpeg", ".png"],
         "max_size_mb": 15,
     })

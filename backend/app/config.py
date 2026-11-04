@@ -1,5 +1,5 @@
 import os
-from typing import List, Union
+from typing import List, Union, Optional
 from pydantic import AnyHttpUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -37,6 +37,9 @@ class Settings(BaseSettings):
         "image/jpeg",
         "image/png",
     ]
+
+    # AI Integration (Optional)
+    GEMINI_API_KEY: Optional[str] = None
 
     model_config = SettingsConfigDict(
         env_file=".env",

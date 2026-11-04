@@ -13,6 +13,10 @@ from app.schemas.application import (
     DocumentSlotResponse,
     DocumentVersionResponse,
 )
+from app.schemas.extraction import (
+    DocumentExtractionResponse,
+    ExtractedFieldResponse,
+)
 
 __all__ = [
     "HealthResponse",
@@ -31,4 +35,6 @@ __all__ = [
     "ApplicationSubmitResponse",
     "DocumentSlotResponse",
     "DocumentVersionResponse",
+    "DocumentExtractionResponse",
+    "ExtractedFieldResponse",
 ]

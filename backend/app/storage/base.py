@@ -37,6 +37,16 @@ class StorageAdapter(ABC):
         pass
 
     @abstractmethod
+    def get_file(self, storage_key: str) -> Optional[BinaryIO]:
+        """Retrieve a file stream from storage."""
+        pass
+
+    @abstractmethod
+    def get_file_bytes(self, storage_key: str) -> Optional[bytes]:
+        """Retrieve file raw bytes from storage."""
+        pass
+
+    @abstractmethod
     def delete_file(self, storage_key: str) -> bool:
         """Delete a file from storage."""
         pass
