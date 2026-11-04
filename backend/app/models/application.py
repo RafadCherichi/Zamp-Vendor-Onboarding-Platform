@@ -10,9 +10,11 @@ class ApplicationStatusEnum(str, Enum):
     DRAFT = "DRAFT"
     IN_PROGRESS = "IN_PROGRESS"
     SUBMITTED = "SUBMITTED"
+    ACTION_REQUIRED = "ACTION_REQUIRED"
     UNDER_REVIEW = "UNDER_REVIEW"
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
+    ESCALATED = "ESCALATED"
 
 
 class ConstitutionEnum(str, Enum):
@@ -40,6 +42,15 @@ class Application(Base, TimestampMixin):
 
     status = Column(String(30), default=ApplicationStatusEnum.DRAFT.value, nullable=False, index=True)
     submitted_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Reviewer Assignment & Decision Tracking
+    assigned_reviewer_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    assigned_at = Column(DateTime(timezone=True), nullable=True)
+    reviewed_by_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    decision_notes = Column(Text, nullable=True)
+    rejection_reason = Column(Text, nullable=True)
+    clarification_requested_at = Column(DateTime(timezone=True), nullable=True)
 
     # Section 1: Business Identity
     legal_name = Column(String(255), nullable=False)
@@ -87,5 +98,7 @@ class Application(Base, TimestampMixin):
     organization = relationship("Organization")
     vendor = relationship("Vendor", back_populates="applications")
     invitation = relationship("Invitation")
-    created_by = relationship("User")
+    created_by = relationship("User", foreign_keys=[created_by_user_id])
+    assigned_reviewer = relationship("User", foreign_keys=[assigned_reviewer_id])
+    reviewed_by = relationship("User", foreign_keys=[reviewed_by_user_id])
     documents = relationship("Document", back_populates="application", cascade="all, delete-orphan")

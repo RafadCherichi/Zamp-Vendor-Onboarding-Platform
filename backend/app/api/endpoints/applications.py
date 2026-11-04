@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, BackgroundTasks, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -31,6 +31,8 @@ from app.services.extraction.pipeline import (
     background_process_document,
     run_pipeline_for_document_version,
 )
+from app.services.review.decision_service import ReviewerDecisionService
+from app.services.review.queue_service import QueueAndDashboardService
 from app.schemas.application import (
     ApplicationDraftUpdate,
     ApplicationResponse,
@@ -41,6 +43,16 @@ from app.schemas.application import (
 from app.schemas.extraction import (
     DocumentExtractionResponse,
     ExtractedFieldResponse,
+)
+from app.schemas.review import (
+    DashboardMetricsResponse,
+    QueueResponse,
+    ReviewerUserResponse,
+    ReviewerAssignRequest,
+    DecisionApproveRequest,
+    DecisionRejectRequest,
+    DecisionClarificationRequest,
+    DecisionEscalateRequest,
 )
 
 router = APIRouter()
@@ -281,6 +293,109 @@ def get_current_application(
 
 
 @router.get(
+    "/dashboard/metrics",
+    response_model=DashboardMetricsResponse,
+    summary="Get Operational Dashboard Metrics",
+    description="Calculate verified operational counts and recent activity for the organisation.",
+)
+def get_dashboard_metrics(
+    db: Session = Depends(get_db),
+    member: OrganisationMember = Depends(require_roles([
+        RoleEnum.PROCUREMENT_OFFICER,
+        RoleEnum.REVIEWER,
+        RoleEnum.ADMIN,
+    ])),
+) -> DashboardMetricsResponse:
+    service = QueueAndDashboardService(db)
+    return service.get_dashboard_metrics(member.organisation_id)
+
+
+@router.get(
+    "/queue",
+    response_model=QueueResponse,
+    summary="Query Application Queue",
+    description="Search, filter, sort, and paginate through applications in the authenticated organisation.",
+)
+def query_application_queue(
+    search: Optional[str] = Query(None, description="Search legal name, trade name, reference, or email"),
+    status: Optional[str] = Query(None, description="Filter by lifecycle status"),
+    exception_severity: Optional[str] = Query(None, description="Filter by active exception severity"),
+    exception_category: Optional[str] = Query(None, description="Filter by active exception category"),
+    assigned_reviewer_id: Optional[str] = Query(None, description="Filter by assigned reviewer"),
+    unassigned_only: bool = Query(False, description="Filter unassigned applications"),
+    ready_for_approval_only: bool = Query(False, description="Filter applications with 0 open exceptions"),
+    submitted_from: Optional[datetime] = Query(None, description="Filter by submitted date start"),
+    submitted_to: Optional[datetime] = Query(None, description="Filter by submitted date end"),
+    sort_by: str = Query("submitted_at", description="Field to sort by"),
+    sort_order: str = Query("desc", description="Sort order: asc or desc"),
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(10, ge=1, le=100, description="Items per page"),
+    db: Session = Depends(get_db),
+    member: OrganisationMember = Depends(require_roles([
+        RoleEnum.PROCUREMENT_OFFICER,
+        RoleEnum.REVIEWER,
+        RoleEnum.ADMIN,
+    ])),
+) -> QueueResponse:
+    service = QueueAndDashboardService(db)
+    result = service.query_queue(
+        organisation_id=member.organisation_id,
+        search=search,
+        status=status,
+        exception_severity=exception_severity,
+        exception_category=exception_category,
+        assigned_reviewer_id=assigned_reviewer_id,
+        unassigned_only=unassigned_only,
+        ready_for_approval_only=ready_for_approval_only,
+        submitted_from=submitted_from,
+        submitted_to=submitted_to,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        page=page,
+        page_size=page_size,
+    )
+    return result
+
+
+@router.get(
+    "/reviewers",
+    response_model=List[ReviewerUserResponse],
+    summary="List Organisation Reviewers",
+    description="Retrieve all reviewers and procurement officers eligible for application assignment.",
+)
+def list_organisation_reviewers(
+    db: Session = Depends(get_db),
+    member: OrganisationMember = Depends(require_roles([
+        RoleEnum.PROCUREMENT_OFFICER,
+        RoleEnum.REVIEWER,
+        RoleEnum.ADMIN,
+    ])),
+) -> List[ReviewerUserResponse]:
+    members = (
+        db.query(OrganisationMember)
+        .filter(
+            OrganisationMember.organisation_id == member.organisation_id,
+            OrganisationMember.role.in_([
+                RoleEnum.REVIEWER.value,
+                RoleEnum.PROCUREMENT_OFFICER.value,
+                RoleEnum.ADMIN.value,
+            ]),
+        )
+        .all()
+    )
+    return [
+        ReviewerUserResponse(
+            id=m.user_id,
+            full_name=m.user.full_name or m.user.email,
+            email=m.user.email,
+            role=m.role,
+        )
+        for m in members
+        if m.user
+    ]
+
+
+@router.get(
     "/{application_id}",
     response_model=ApplicationResponse,
     summary="Get Application by ID",
@@ -294,6 +409,164 @@ def get_application(
     app = get_scoped_application(application_id, member, db)
     sync_application_documents(db, app)
     return build_application_response(app, db)
+
+
+@router.get(
+    "/{application_id}/details",
+    summary="Get Comprehensive Application Details Workspace",
+    description="Retrieve all 7 evidence sections: overview, business details, documents, validation, exceptions, registries, and audit trail.",
+)
+def get_comprehensive_application_details(
+    application_id: str,
+    db: Session = Depends(get_db),
+    member: OrganisationMember = Depends(get_current_member),
+):
+    service = QueueAndDashboardService(db)
+    return service.get_application_details_comprehensive(application_id, member)
+
+
+@router.post(
+    "/{application_id}/assign",
+    summary="Assign Reviewer to Application",
+    description="Assign or reassign an application to an internal reviewer within the same organisation.",
+)
+def assign_application_reviewer(
+    application_id: str,
+    payload: ReviewerAssignRequest,
+    db: Session = Depends(get_db),
+    member: OrganisationMember = Depends(require_roles([
+        RoleEnum.PROCUREMENT_OFFICER,
+        RoleEnum.REVIEWER,
+        RoleEnum.ADMIN,
+    ])),
+):
+    service = ReviewerDecisionService(db)
+    app = service.assign_reviewer(
+        application_id=application_id,
+        reviewer_user_id=payload.reviewer_user_id,
+        actor_member=member,
+    )
+    return {"success": True, "application_id": app.id, "assigned_reviewer_id": app.assigned_reviewer_id, "status": app.status}
+
+
+@router.post(
+    "/{application_id}/approve",
+    summary="Approve Application",
+    description="Verify statutory policy requirements, ensure no blocking exceptions exist, and record formal approval.",
+)
+def approve_application(
+    application_id: str,
+    payload: DecisionApproveRequest,
+    db: Session = Depends(get_db),
+    member: OrganisationMember = Depends(require_roles([
+        RoleEnum.REVIEWER,
+        RoleEnum.ADMIN,
+    ])),
+):
+    service = ReviewerDecisionService(db)
+    app = service.approve_application(
+        application_id=application_id,
+        actor_member=member,
+        notes=payload.notes,
+    )
+    return {
+        "success": True,
+        "application_id": app.id,
+        "status": app.status,
+        "reviewed_at": app.reviewed_at.isoformat() if app.reviewed_at else None,
+        "message": "Application has been approved successfully.",
+    }
+
+
+@router.post(
+    "/{application_id}/reject",
+    summary="Reject Application",
+    description="Reject an application with a mandatory, explainable rejection reason.",
+)
+def reject_application(
+    application_id: str,
+    payload: DecisionRejectRequest,
+    db: Session = Depends(get_db),
+    member: OrganisationMember = Depends(require_roles([
+        RoleEnum.REVIEWER,
+        RoleEnum.ADMIN,
+    ])),
+):
+    service = ReviewerDecisionService(db)
+    app = service.reject_application(
+        application_id=application_id,
+        actor_member=member,
+        reason=payload.reason,
+        notes=payload.notes,
+    )
+    return {
+        "success": True,
+        "application_id": app.id,
+        "status": app.status,
+        "rejection_reason": app.rejection_reason,
+        "message": "Application has been rejected.",
+    }
+
+
+@router.post(
+    "/{application_id}/request-clarification",
+    summary="Request Vendor Clarification",
+    description="Transition application to ACTION_REQUIRED and notify the vendor with clear instructions.",
+)
+def request_application_clarification(
+    application_id: str,
+    payload: DecisionClarificationRequest,
+    db: Session = Depends(get_db),
+    member: OrganisationMember = Depends(require_roles([
+        RoleEnum.REVIEWER,
+        RoleEnum.PROCUREMENT_OFFICER,
+        RoleEnum.ADMIN,
+    ])),
+):
+    service = ReviewerDecisionService(db)
+    app = service.request_clarification(
+        application_id=application_id,
+        actor_member=member,
+        instructions=payload.instructions,
+        related_exception_id=payload.related_exception_id,
+        related_field=payload.related_field,
+    )
+    return {
+        "success": True,
+        "application_id": app.id,
+        "status": app.status,
+        "message": "Clarification request dispatched to vendor.",
+    }
+
+
+@router.post(
+    "/{application_id}/escalate",
+    summary="Escalate Application",
+    description="Escalate an application for administrative or higher-level compliance intervention.",
+)
+def escalate_application(
+    application_id: str,
+    payload: DecisionEscalateRequest,
+    db: Session = Depends(get_db),
+    member: OrganisationMember = Depends(require_roles([
+        RoleEnum.REVIEWER,
+        RoleEnum.PROCUREMENT_OFFICER,
+        RoleEnum.ADMIN,
+    ])),
+):
+    service = ReviewerDecisionService(db)
+    app = service.escalate_application(
+        application_id=application_id,
+        actor_member=member,
+        reason=payload.reason,
+        target_role=payload.target_role or "ADMIN",
+    )
+    return {
+        "success": True,
+        "application_id": app.id,
+        "status": app.status,
+        "message": "Application escalated successfully.",
+    }
 
 
 @router.patch(
