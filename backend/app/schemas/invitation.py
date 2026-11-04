@@ -39,3 +39,9 @@ class InvitationPublicResponse(BaseModel):
     buyer_organisation_name: str
     expires_at: datetime
     message: Optional[str] = None
+
+
+class InvitationAcceptRequest(BaseModel):
+    password: str = Field(..., min_length=8, description="Set a secure password for the vendor account")
+    full_name: Optional[str] = Field(None, min_length=2, max_length=255, description="Full name of vendor representative")
+

@@ -106,13 +106,13 @@ All seeded accounts use password: **`Password123!`** (stored as bcrypt hash).
 
 ## 5. Verification & Testing
 
-### Running All Backend Tests (Auth, RBAC, Scoping, Health)
+### Running All Backend Tests (Auth, RBAC, Scoping, Vendor Onboarding & Checklist Engine)
 From the project root:
 ```powershell
 $env:PYTHONPATH='backend'
 backend\.venv\Scripts\pytest.exe backend/tests -v
 ```
-*Current test suite: 14 passing unit & integration tests.*
+*Current test suite: 24 passing unit & integration tests.*
 
 ### Running Frontend Type-Check & Production Build
 From the `frontend` directory:
@@ -122,14 +122,33 @@ npm.cmd run build
 
 ---
 
-## 6. Build Sequence & Progress
+## 6. Increment 2 Features: Vendor Onboarding & Dynamic Checklist
+
+### 1. Complete Vendor Onboarding Wizard
+- **6-Step Progress Stepper**:
+  1. **Business Identity**: Legal name, trade name, constitution (Proprietorship, Partnership, LLP, Pvt Ltd, Public Ltd), incorporation date, CIN/LLPIN.
+  2. **Tax & Compliance**: PAN format validation (`[A-Z]{5}[0-9]{4}[A-Z]{1}`), PAN 4th character vs. constitution matching check, GST registration toggle & GSTIN (`22AAAAA0000A1Z5`), MSME/Udyam status & registration number (`UDYAM-XX-00-0000000`).
+  3. **Authorised Signatory / Contact**: Name, designation, mobile number (`+91` 10-digit), business email address.
+  4. **Banking Details**: Account holder name, bank name, account number, IFSC code (`[A-Z]{4}0[A-Z0-9]{6}`), account type (Current, Savings, Cash Credit).
+  5. **Business Classification**: MSME enterprise classification (Micro, Small, Medium, None), primary activity, multi-select commercial categories (with dynamic licence triggers such as Food Catering, Logistics, etc.), turnover range.
+  6. **Document Upload Checklist**: Dynamic checklist computed strictly from constitution, GST, Udyam, and category choices. Shows requirement tags (`Mandatory` vs `Optional`), accepts PDF/PNG/JPEG files up to 10 MB, provides instant in-modal preview, and maintains immutable version history.
+- **Review & Submit Screen**: Section-by-section audit review, checklist completeness validator (blocks submission if mandatory documents or fields are missing), legal declaration checkbox, and confirmation screen displaying unique application reference (`APP-YYYYMMDD-XXXXXX`).
+- **Draft Persistence**: Auto-save on section transition and manual "Save & Exit" button to resume anytime. Submitted applications are securely locked to prevent further edits.
+
+### 2. Seeded Demo Onboarding Scenarios
+- **Scenario A (Proprietorship)**: Apex Components (`vendor@apexcomponents.com`, Password: `Password123!`), Sole Proprietorship with GST and MSME Udyam registration. Checklist automatically requires Proprietor PAN, Shop & Establishment / Trade Licence, Bank Proof, GST Certificate, and Udyam Certificate.
+- **Scenario B (Private Limited Company)**: Zenith Cloud Systems (`vendor@zenithcloud.com`, Password: `Password123!`), Private Limited Company with Board Resolution / Authorised Signatory proof, Certificate of Incorporation / MOA, Corporate PAN, Bank Proof, GST Certificate, and FSSAI licence requirement triggered by Food Catering category.
+
+---
+
+## 7. Build Sequence & Progress
 
 | Increment | Title | Scope | Status |
 | :--- | :--- | :--- | :--- |
 | **0** | **Foundation** | Workspace inspection, FastAPI, React + Vite, Alembic, Storage Adapter, Health verification | **Complete** |
 | **1** | **App Shell & Identity** | Multi-role RBAC, organisation scoping, secure expiring invitation tokens, demo switcher | **Complete** |
-| **2** | **Vendor Onboarding** | 6-section dynamic form, activity/constitution conditional checklist, save/resume | *Next* |
-| **3** | **Document Processing** | Private storage versions, background worker, OCR & vision extraction adapter | *Upcoming* |
+| **2** | **Vendor Onboarding** | 6-section dynamic form, activity/constitution conditional checklist, save/resume, document uploads & preview | **Complete** |
+| **3** | **Document Processing** | Private storage versions, background worker, OCR & vision extraction adapter | *Next* |
 | **4** | **Validation & Verification**| Deterministic rules, PAN-GST matching, duplicate detection, simulated verification | *Upcoming* |
 | **5** | **Exception Lifecycle** | Vendor-explainable corrections, versioned replacements, selective revalidation | *Upcoming* |
 | **6** | **Internal Workspace** | Reviewer dashboard, evidence side-by-side inspection, human decision recording | *Upcoming* |

@@ -14,6 +14,7 @@ from app.schemas.invitation import (
     InvitationCreate,
     InvitationResponse,
     InvitationPublicResponse,
+    InvitationAcceptRequest,
 )
 
 router = APIRouter()
@@ -232,3 +233,173 @@ def validate_invitation_token(
         expires_at=invitation.expires_at,
         message=invitation.custom_message,
     )
+
+
+@router.post(
+    "/token/{token}/accept",
+    response_model=dict,
+    summary="Accept Vendor Invitation",
+    description="Accept an invitation, establish the vendor user account, and initialize the onboarding application.",
+)
+def accept_invitation(
+    token: str,
+    data: InvitationAcceptRequest,
+    db: Session = Depends(get_db),
+):
+    import secrets
+    from app.core.security import hash_password, create_access_token
+    from app.models.user import User
+    from app.models.vendor import Vendor
+    from app.models.application import Application, ApplicationStatusEnum, ConstitutionEnum
+    from app.services.checklist import sync_application_documents
+
+    token_hash = hash_invitation_token(token)
+    invitation = (
+        db.query(Invitation)
+        .join(Organization)
+        .filter(Invitation.token_hash == token_hash)
+        .first()
+    )
+
+    if not invitation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invitation token not recognized or invalid.",
+        )
+
+    if invitation.status == InvitationStatusEnum.REVOKED.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This invitation has been revoked by the issuing buyer.",
+        )
+
+    if invitation.is_expired:
+        invitation.status = InvitationStatusEnum.EXPIRED.value
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This invitation link has expired. Please contact the buyer for a new invitation.",
+        )
+
+    if invitation.status == InvitationStatusEnum.ACCEPTED.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This invitation has already been accepted.",
+        )
+
+    now = datetime.now(timezone.utc)
+
+    # 1. Create or retrieve User
+    user = db.query(User).filter(User.email == invitation.vendor_email.lower()).first()
+    if not user:
+        user = User(
+            email=invitation.vendor_email.lower(),
+            hashed_password=hash_password(data.password),
+            full_name=data.full_name or invitation.vendor_name,
+            is_active=True,
+        )
+        db.add(user)
+        db.flush()
+    else:
+        # Update password if accepting fresh invite
+        user.hashed_password = hash_password(data.password)
+        if data.full_name:
+            user.full_name = data.full_name
+
+    # 2. Establish Organisation Membership as Vendor
+    member = (
+        db.query(OrganisationMember)
+        .filter(
+            OrganisationMember.user_id == user.id,
+            OrganisationMember.organisation_id == invitation.organisation_id,
+        )
+        .first()
+    )
+    if not member:
+        member = OrganisationMember(
+            user_id=user.id,
+            organisation_id=invitation.organisation_id,
+            role=RoleEnum.VENDOR.value,
+            is_active=True,
+        )
+        db.add(member)
+        db.flush()
+
+    # 3. Mark Invitation Accepted
+    invitation.status = InvitationStatusEnum.ACCEPTED.value
+    invitation.accepted_at = now
+
+    # 4. Create or retrieve Vendor legal identity
+    vendor = (
+        db.query(Vendor)
+        .filter(
+            Vendor.organisation_id == invitation.organisation_id,
+            Vendor.created_by_user_id == user.id,
+        )
+        .first()
+    )
+    if not vendor:
+        vendor = Vendor(
+            organisation_id=invitation.organisation_id,
+            created_by_user_id=user.id,
+            legal_name=invitation.vendor_name,
+            constitution=ConstitutionEnum.PROPRIETORSHIP.value,
+        )
+        db.add(vendor)
+        db.flush()
+
+    # 5. Create or retrieve active Application draft
+    application = (
+        db.query(Application)
+        .filter(
+            Application.vendor_id == vendor.id,
+            Application.organisation_id == invitation.organisation_id,
+            Application.status.in_([ApplicationStatusEnum.DRAFT.value, ApplicationStatusEnum.IN_PROGRESS.value]),
+        )
+        .first()
+    )
+    if not application:
+        ref_num = f"APP-{now.year}-{secrets.token_hex(3).upper()}"
+        application = Application(
+            organisation_id=invitation.organisation_id,
+            vendor_id=vendor.id,
+            invitation_id=invitation.id,
+            created_by_user_id=user.id,
+            reference_number=ref_num,
+            legal_name=invitation.vendor_name,
+            contact_email=invitation.vendor_email,
+            status=ApplicationStatusEnum.IN_PROGRESS.value,
+            categories_json="[]",
+        )
+        db.add(application)
+        db.flush()
+        sync_application_documents(db, application)
+
+    db.commit()
+
+    # Issue JWT token for immediate authenticated login
+    token_payload = {
+        "sub": user.id,
+        "email": user.email,
+        "org_id": invitation.organisation_id,
+        "role": RoleEnum.VENDOR.value,
+    }
+    access_token = create_access_token(token_payload)
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "full_name": user.full_name,
+            "role": RoleEnum.VENDOR.value,
+            "organisation": {
+                "id": invitation.organization.id,
+                "name": invitation.organization.name,
+                "slug": invitation.organization.slug,
+            },
+        },
+        "application_id": application.id,
+        "reference_number": application.reference_number,
+    }

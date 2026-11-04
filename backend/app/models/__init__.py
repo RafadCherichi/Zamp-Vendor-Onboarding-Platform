@@ -5,6 +5,9 @@ from app.models.role import RoleEnum
 from app.models.user import User
 from app.models.member import OrganisationMember
 from app.models.invitation import Invitation, InvitationStatusEnum
+from app.models.vendor import Vendor
+from app.models.application import Application, ApplicationStatusEnum, ConstitutionEnum
+from app.models.document import Document, DocumentVersion, DocumentTypeEnum
 
 __all__ = [
     "Base",
@@ -15,4 +18,11 @@ __all__ = [
     "OrganisationMember",
     "Invitation",
     "InvitationStatusEnum",
+    "Vendor",
+    "Application",
+    "ApplicationStatusEnum",
+    "ConstitutionEnum",
+    "Document",
+    "DocumentVersion",
+    "DocumentTypeEnum",
 ]
