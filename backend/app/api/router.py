@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.endpoints import health, auth, invitations, applications, validation, exceptions, notifications
+from app.api.endpoints import health, auth, invitations, applications, validation, exceptions, notifications, demo
 
 api_router = APIRouter()
 api_router.include_router(health.router, tags=["Health"])
@@ -9,3 +9,4 @@ api_router.include_router(applications.router, prefix="/applications", tags=["Ap
 api_router.include_router(validation.router, prefix="/applications", tags=["Validation"])
 api_router.include_router(exceptions.router, prefix="/exceptions", tags=["Exceptions"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])
+api_router.include_router(demo.router, prefix="/demo", tags=["Demo Environment"])

@@ -100,7 +100,7 @@ class ExceptionCreateRequest(BaseModel):
 
 
 class ExceptionTransitionRequest(BaseModel):
-    target_status: str
+    target_status: Optional[str] = "RESOLVED"
     reason: Optional[str] = None
     notes: Optional[str] = None
     resolution_type: Optional[str] = None

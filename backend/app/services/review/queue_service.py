@@ -1,6 +1,7 @@
 import json
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any, Tuple
+from fastapi import HTTPException, status
 from sqlalchemy import or_, and_, func, desc, asc
 from sqlalchemy.orm import Session, joinedload
 

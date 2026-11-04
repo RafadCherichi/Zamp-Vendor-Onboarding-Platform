@@ -3,7 +3,7 @@ import type { Notification } from '../types/exception';
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 function getAuthHeaders(token?: string): HeadersInit {
-  const t = token || localStorage.getItem('token') || '';
+  const t = token || localStorage.getItem('vop_auth_token') || localStorage.getItem('token') || '';
   return {
     Authorization: `Bearer ${t}`,
     'Content-Type': 'application/json',

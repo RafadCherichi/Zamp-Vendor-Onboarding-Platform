@@ -583,11 +583,17 @@ def update_application_draft(
 ) -> ApplicationResponse:
     app = get_scoped_application(application_id, member, db)
 
-    # Locked if already submitted
-    if app.status == ApplicationStatusEnum.SUBMITTED.value:
+    # Locked if already submitted or finalized
+    if app.status in [
+        ApplicationStatusEnum.SUBMITTED.value,
+        ApplicationStatusEnum.UNDER_REVIEW.value,
+        ApplicationStatusEnum.APPROVED.value,
+        ApplicationStatusEnum.REJECTED.value,
+        ApplicationStatusEnum.ESCALATED.value,
+    ]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Application has already been submitted and cannot be modified.",
+            detail="Application has already been submitted and is locked for direct modification.",
         )
 
     # Update provided fields
@@ -601,7 +607,8 @@ def update_application_draft(
         if hasattr(app, field) and val is not None:
             setattr(app, field, val)
 
-    app.status = ApplicationStatusEnum.IN_PROGRESS.value
+    if app.status != ApplicationStatusEnum.ACTION_REQUIRED.value:
+        app.status = ApplicationStatusEnum.IN_PROGRESS.value
 
     # Recalculate dynamic checklist based on updated fields
     sync_application_documents(db, app)
@@ -653,9 +660,14 @@ async def upload_document(
 ) -> DocumentSlotResponse:
     app = get_scoped_application(application_id, member, db)
 
-    # 0. Check active exception if application is already submitted
+    # 0. Check active exception if application is already submitted or in review
     active_exc = None
-    if app.status == ApplicationStatusEnum.SUBMITTED.value:
+    if app.status in [
+        ApplicationStatusEnum.SUBMITTED.value,
+        ApplicationStatusEnum.UNDER_REVIEW.value,
+        ApplicationStatusEnum.ACTION_REQUIRED.value,
+        ApplicationStatusEnum.ESCALATED.value,
+    ]:
         doc_slot = db.query(Document).filter(
             Document.application_id == app.id,
             Document.document_type == document_type,
@@ -671,11 +683,20 @@ async def upload_document(
                 )
                 .first()
             )
-        if not active_exc and member.role == RoleEnum.VENDOR.value:
+        if (
+            not active_exc
+            and member.role == RoleEnum.VENDOR.value
+            and app.status != ApplicationStatusEnum.ACTION_REQUIRED.value
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot upload documents to an already submitted application unless requested by an active exception.",
             )
+    elif app.status in [ApplicationStatusEnum.APPROVED.value, ApplicationStatusEnum.REJECTED.value]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot upload documents to a finalized application.",
+        )
 
     # 1. Validate filename and extension
     filename = file.filename or "uploaded_file"
@@ -1105,6 +1126,24 @@ def submit_application(
         app.vendor.trade_name = app.trade_name
         app.vendor.constitution = app.constitution
         app.vendor.pan = app.pan
+
+    # Record submission milestone in immutable audit trail
+    from app.models.audit import AuditEvent
+    audit_event = AuditEvent(
+        organisation_id=member.organisation_id,
+        application_id=app.id,
+        actor_user_id=member.user_id,
+        actor_role=member.role,
+        event_type="APPLICATION_SUBMITTED",
+        entity_type="APPLICATION",
+        entity_id=app.id,
+        details_json=json.dumps({
+            "reference_number": app.reference_number,
+            "legal_name": app.legal_name,
+            "submitted_at": now.isoformat(),
+        }),
+    )
+    db.add(audit_event)
 
     # Automatically execute deterministic validation run upon submission
     try:

@@ -104,6 +104,10 @@ class ExceptionResolutionService:
         prev_status = exc.status
         exc.status = ExceptionStatusEnum.RESPONSE_SUBMITTED.value
 
+        # If application was in ACTION_REQUIRED, return it to UNDER_REVIEW for reviewer reassessment
+        if app.status == "ACTION_REQUIRED":
+            app.status = "UNDER_REVIEW"
+
         transition = ExceptionTransition(
             exception_id=exc.id,
             from_status=prev_status,
@@ -204,6 +208,9 @@ class ExceptionResolutionService:
         prev_status = exc.status
         exc.related_version_id = document_version_id
         exc.status = ExceptionStatusEnum.RESPONSE_SUBMITTED.value
+
+        if exc.application and exc.application.status == "ACTION_REQUIRED":
+            exc.application.status = "UNDER_REVIEW"
 
         trans = ExceptionTransition(
             exception_id=exc.id,

@@ -8,6 +8,7 @@ import { StepBankingDetails } from './StepBankingDetails';
 import { StepBusinessClassification } from './StepBusinessClassification';
 import { StepDocumentChecklist } from './StepDocumentChecklist';
 import { StepReviewSubmit } from './StepReviewSubmit';
+import { VendorExceptionsBanner } from './VendorExceptionsBanner';
 import {
   Building,
   FileCheck2,
@@ -131,6 +132,12 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Priority Vendor Exception Clarifications & Corrections */}
+      <VendorExceptionsBanner
+        applicationId={application.id}
+        onCorrectionSubmitted={onRefresh}
+      />
+
       {/* Top Wizard Navigation Card */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-2xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">

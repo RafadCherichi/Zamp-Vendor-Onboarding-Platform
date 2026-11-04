@@ -1,6 +1,14 @@
 export type Constitution = 'PROPRIETORSHIP' | 'PARTNERSHIP' | 'LLP' | 'PVT_LTD' | 'PUB_LTD' | 'OTHER';
 
-export type ApplicationStatus = 'DRAFT' | 'IN_PROGRESS' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
+export type ApplicationStatus =
+  | 'DRAFT'
+  | 'IN_PROGRESS'
+  | 'SUBMITTED'
+  | 'UNDER_REVIEW'
+  | 'ACTION_REQUIRED'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'ESCALATED';
 
 export type ProcessingStatus = 'QUEUED' | 'PROCESSING' | 'EXTRACTED' | 'NEEDS_REVIEW' | 'FAILED';
 
@@ -66,6 +74,9 @@ export interface Application {
   vendor_id: string;
   status: ApplicationStatus;
   submitted_at?: string | null;
+  reviewed_at?: string | null;
+  rejection_reason?: string | null;
+  decision_notes?: string | null;
   created_at: string;
   updated_at: string;
 

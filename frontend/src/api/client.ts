@@ -16,3 +16,20 @@ export async function fetchHealth(): Promise<HealthResponse> {
 
   return response.json();
 }
+
+export async function apiResetDemo(): Promise<any> {
+  const response = await fetch(`${API_BASE_URL}/demo/reset`, {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || 'Demo reset failed.');
+  }
+
+  return response.json();
+}
