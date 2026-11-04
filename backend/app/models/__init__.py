@@ -26,6 +26,17 @@ from app.models.validation import (
     VerificationStatusEnum,
 )
 from app.models.audit import AuditEvent
+from app.models.exception import (
+    OnboardingException,
+    ExceptionTransition,
+    ExceptionComment,
+    FieldCorrectionRecord,
+    ExceptionCategoryEnum,
+    ExceptionSeverityEnum,
+    ExceptionStatusEnum,
+    ResolutionTypeEnum,
+)
+from app.models.notification import Notification
 
 __all__ = [
     "Base",
@@ -57,4 +68,13 @@ __all__ = [
     "ValidationLayerEnum",
     "VerificationStatusEnum",
     "AuditEvent",
+    "OnboardingException",
+    "ExceptionTransition",
+    "ExceptionComment",
+    "FieldCorrectionRecord",
+    "ExceptionCategoryEnum",
+    "ExceptionSeverityEnum",
+    "ExceptionStatusEnum",
+    "ResolutionTypeEnum",
+    "Notification",
 ]

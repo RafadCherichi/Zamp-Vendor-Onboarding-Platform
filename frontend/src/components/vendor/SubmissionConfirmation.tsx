@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Application } from '../../types/application';
 import { CheckCircle2, Clock, Lock, Copy, Check } from 'lucide-react';
+import { VendorExceptionsBanner } from './VendorExceptionsBanner';
 
 interface Props {
   application: Application;
@@ -17,6 +18,12 @@ export const SubmissionConfirmation: React.FC<Props> = ({ application }) => {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 py-6">
+      {/* Priority Vendor Exception Clarifications & Corrections */}
+      <VendorExceptionsBanner
+        applicationId={application.id}
+        onCorrectionSubmitted={() => {}}
+      />
+
       <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center space-y-4">
         <div className="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
           <CheckCircle2 className="w-10 h-10" />

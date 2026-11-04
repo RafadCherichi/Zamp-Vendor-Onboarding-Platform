@@ -380,11 +380,29 @@ async def upload_document(
 ) -> DocumentSlotResponse:
     app = get_scoped_application(application_id, member, db)
 
+    # 0. Check active exception if application is already submitted
+    active_exc = None
     if app.status == ApplicationStatusEnum.SUBMITTED.value:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot upload documents to an already submitted application.",
-        )
+        doc_slot = db.query(Document).filter(
+            Document.application_id == app.id,
+            Document.document_type == document_type,
+        ).first()
+        if doc_slot:
+            from app.models.exception import OnboardingException, ExceptionStatusEnum
+            active_exc = (
+                db.query(OnboardingException)
+                .filter(
+                    OnboardingException.application_id == app.id,
+                    OnboardingException.related_document_id == doc_slot.id,
+                    OnboardingException.status == ExceptionStatusEnum.ACTION_REQUIRED_FROM_VENDOR.value,
+                )
+                .first()
+            )
+        if not active_exc and member.role == RoleEnum.VENDOR.value:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot upload documents to an already submitted application unless requested by an active exception.",
+            )
 
     # 1. Validate filename and extension
     filename = file.filename or "uploaded_file"
@@ -497,6 +515,19 @@ async def upload_document(
     # Process synchronously so upload response has instant extraction insights; background task ensures async resilience
     background_tasks.add_task(background_process_document, version.id)
     extraction = run_pipeline_for_document_version(version.id, db)
+
+    # If linked to an active exception requiring vendor action, update exception
+    if active_exc:
+        try:
+            from app.services.exceptions.revalidation import ExceptionResolutionService
+            ExceptionResolutionService(db).link_document_replacement(
+                exception_id=active_exc.id,
+                document_version_id=version.id,
+                user=member.user,
+                explanation="Replacement statutory document uploaded",
+            )
+        except Exception as e:
+            logger.warning(f"Error linking replacement document to exception {active_exc.id}: {e}")
 
     proc_status = extraction.status if extraction else "PROCESSING"
     det_type = extraction.detected_document_type if extraction else None

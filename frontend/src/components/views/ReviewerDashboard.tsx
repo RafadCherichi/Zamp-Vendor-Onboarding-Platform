@@ -10,6 +10,7 @@ import {
   apiFetchAuditTrail,
 } from '../../api/validation';
 import { ValidationFindingsCard } from '../vendor/ValidationFindingsCard';
+import { ExceptionManagerCard } from '../reviewer/ExceptionManagerCard';
 import {
   UserCheck,
   AlertTriangle,
@@ -28,8 +29,8 @@ export const ReviewerDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Inspection Drawer tabs: VALIDATION, REGISTRIES, DUPLICATES, AUDIT
-  const [activeTab, setActiveTab] = useState<'VALIDATION' | 'REGISTRIES' | 'DUPLICATES' | 'AUDIT'>('VALIDATION');
+  // Inspection Drawer tabs: EXCEPTIONS, VALIDATION, REGISTRIES, DUPLICATES, AUDIT
+  const [activeTab, setActiveTab] = useState<'EXCEPTIONS' | 'VALIDATION' | 'REGISTRIES' | 'DUPLICATES' | 'AUDIT'>('EXCEPTIONS');
   const [verifications, setVerifications] = useState<ExternalVerificationRecord[]>([]);
   const [duplicateSignals, setDuplicateSignals] = useState<DuplicateSignal[]>([]);
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
@@ -215,10 +216,20 @@ export const ReviewerDashboard: React.FC = () => {
                 </div>
 
                 {/* Sub-Navigation Tabs */}
-                <div className="flex gap-2 pt-3 text-xs font-semibold border-b border-slate-100">
+                <div className="flex gap-2 pt-3 text-xs font-semibold border-b border-slate-100 overflow-x-auto">
+                  <button
+                    onClick={() => setActiveTab('EXCEPTIONS')}
+                    className={`pb-2 px-2 border-b-2 transition whitespace-nowrap ${
+                      activeTab === 'EXCEPTIONS'
+                        ? 'border-indigo-600 text-indigo-700'
+                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Exceptions &amp; Clarifications
+                  </button>
                   <button
                     onClick={() => setActiveTab('VALIDATION')}
-                    className={`pb-2 px-2 border-b-2 transition ${
+                    className={`pb-2 px-2 border-b-2 transition whitespace-nowrap ${
                       activeTab === 'VALIDATION'
                         ? 'border-indigo-600 text-indigo-700'
                         : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -258,6 +269,11 @@ export const ReviewerDashboard: React.FC = () => {
                   </button>
                 </div>
               </div>
+
+              {/* Tab 0: Exception Management & Clarifications */}
+              {activeTab === 'EXCEPTIONS' && (
+                <ExceptionManagerCard applicationId={selectedApp.id} isReviewer={true} />
+              )}
 
               {/* Tab 1: Validation Engine Findings Card */}
               {activeTab === 'VALIDATION' && token && (

@@ -465,6 +465,20 @@ class ValidationOrchestrator:
             )
             self.db.add(dup_audit)
 
+        self.db.flush()
+
+        # 7. Automatically synchronize non-duplicate exceptions for actionable findings
+        try:
+            from app.services.exceptions.generator import ExceptionGenerator
+            ExceptionGenerator(self.db).sync_exceptions_for_application(
+                application_id=app.id,
+                actor_user_id=user_id,
+                actor_role="SYSTEM" if not user_id else "USER",
+                validation_run=new_run,
+            )
+        except Exception as e:
+            logger.exception(f"Error syncing exceptions after validation run: {e}")
+
         self.db.commit()
         self.db.refresh(new_run)
         return new_run

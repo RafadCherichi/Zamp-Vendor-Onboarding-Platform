@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { apiListInvitations, apiCreateInvitation, apiRevokeInvitation } from '../../api/invitations';
+import { exceptionsApi } from '../../api/exceptions';
 import type { Invitation, InvitationStatus } from '../../types/invitation';
+import type { OnboardingException } from '../../types/exception';
 import {
   Send,
   Plus,
@@ -19,6 +21,7 @@ import {
 export const ProcurementDashboard: React.FC = () => {
   const { token, user } = useAuth();
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [orgExceptions, setOrgExceptions] = useState<OnboardingException[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,8 +41,12 @@ export const ProcurementDashboard: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiListInvitations(token);
-      setInvitations(data);
+      const [invData, excData] = await Promise.all([
+        apiListInvitations(token),
+        exceptionsApi.getExceptions().catch(() => []),
+      ]);
+      setInvitations(invData);
+      setOrgExceptions(excData);
     } catch (err: any) {
       setError(err?.message || 'Failed to load invitations.');
     } finally {
@@ -196,6 +203,52 @@ export const ProcurementDashboard: React.FC = () => {
           </span>
           <div className="text-2xl font-bold text-slate-700 mt-1">{expiredCount}</div>
           <div className="text-[11px] text-slate-400 mt-1">Require re-invitation</div>
+        </div>
+      </div>
+
+      {/* Operational Exception Counter Overview */}
+      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-3">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+          <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+            <AlertTriangle className="w-4 h-4 text-amber-500" />
+            Operational Exceptions &amp; Remediation Status
+          </h3>
+          <span className="text-xs text-slate-500">
+            {orgExceptions.length} total exception{orgExceptions.length === 1 ? '' : 's'} across organisation
+          </span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
+            <span className="text-[11px] font-semibold text-amber-800 uppercase">Awaiting Vendor Action</span>
+            <div className="text-xl font-bold text-amber-900 mt-0.5">
+              {orgExceptions.filter((e) => e.status === 'ACTION_REQUIRED_FROM_VENDOR').length}
+            </div>
+            <span className="text-[10px] text-amber-700">Clarification or re-upload requested</span>
+          </div>
+
+          <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+            <span className="text-[11px] font-semibold text-blue-800 uppercase">Vendor Responded</span>
+            <div className="text-xl font-bold text-blue-900 mt-0.5">
+              {orgExceptions.filter((e) => e.status === 'RESPONSE_SUBMITTED').length}
+            </div>
+            <span className="text-[10px] text-blue-700">Ready for reviewer evaluation</span>
+          </div>
+
+          <div className="p-3 rounded-lg bg-rose-50 border border-rose-200">
+            <span className="text-[11px] font-semibold text-rose-800 uppercase">Critical / High Severity</span>
+            <div className="text-xl font-bold text-rose-900 mt-0.5">
+              {orgExceptions.filter((e) => (e.severity === 'CRITICAL' || e.severity === 'HIGH') && e.status !== 'RESOLVED' && e.status !== 'CLOSED').length}
+            </div>
+            <span className="text-[10px] text-rose-700">Statutory / PAN / GST discrepancies</span>
+          </div>
+
+          <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200">
+            <span className="text-[11px] font-semibold text-emerald-800 uppercase">Resolved &amp; Verified</span>
+            <div className="text-xl font-bold text-emerald-900 mt-0.5">
+              {orgExceptions.filter((e) => e.status === 'RESOLVED' || e.status === 'CLOSED').length}
+            </div>
+            <span className="text-[10px] text-emerald-700">Remediated or overridden with note</span>
+          </div>
         </div>
       </div>
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { Building2, LogOut, ShieldCheck, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import type { Role } from '../types/auth';
+import { NotificationBell } from './notifications/NotificationBell';
 
 const ROLE_BADGES: Record<Role, { label: string; bg: string; text: string; border: string }> = {
   admin: {
@@ -70,6 +71,8 @@ export const Navbar: React.FC = () => {
 
         {/* Right: Role & Profile Controls */}
         <div className="flex items-center space-x-3">
+          <NotificationBell />
+
           <div
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${roleMeta.bg} ${roleMeta.text} ${roleMeta.border}`}
           >
