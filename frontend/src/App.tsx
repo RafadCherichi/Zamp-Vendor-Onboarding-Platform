@@ -1,124 +1,136 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { Header } from './components/Header';
+import React, { useState, useEffect } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { Navbar } from './components/Navbar';
+import { LoginView } from './components/views/LoginView';
+import { ProcurementDashboard } from './components/views/ProcurementDashboard';
+import { VendorDashboard } from './components/views/VendorDashboard';
+import { ReviewerDashboard } from './components/views/ReviewerDashboard';
+import { AdminDashboard } from './components/views/AdminDashboard';
+import { InviteLandingView } from './components/views/InviteLandingView';
 import { HealthCard } from './components/HealthCard';
-import { FoundationRoadmap } from './components/FoundationRoadmap';
 import { fetchHealth } from './api/client';
 import type { HealthResponse } from './types/api';
-import { ShieldCheck, Database, FileText, Cpu, Lock } from 'lucide-react';
+import { Activity, ChevronDown, ChevronUp } from 'lucide-react';
 
-export const App: React.FC = () => {
+const MainAppContent: React.FC = () => {
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [showDiagnostics, setShowDiagnostics] = useState<boolean>(false);
   const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [healthLoading, setHealthLoading] = useState<boolean>(false);
+  const [healthError, setHealthError] = useState<string | null>(null);
 
-  const loadHealth = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  useEffect(() => {
+    // Check if the current browser path is an invitation link: /invite/<token>
+    const path = window.location.pathname;
+    if (path.startsWith('/invite/')) {
+      const token = path.replace('/invite/', '').trim();
+      if (token) {
+        setInviteToken(token);
+      }
+    }
+  }, []);
+
+  const loadHealthData = async () => {
+    setHealthLoading(true);
+    setHealthError(null);
     try {
       const data = await fetchHealth();
       setHealth(data);
     } catch (err: any) {
-      setError(err?.message || 'Failed to connect to backend service.');
+      setHealthError(err?.message || 'Failed to ping health endpoint');
     } finally {
-      setLoading(false);
+      setHealthLoading(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
-    loadHealth();
-  }, [loadHealth]);
+    if (showDiagnostics && !health) {
+      loadHealthData();
+    }
+  }, [showDiagnostics, health]);
 
-  const isBackendHealthy = error ? false : health ? health.status === 'ok' : null;
+  if (inviteToken) {
+    return (
+      <InviteLandingView
+        token={inviteToken}
+        onGoToLogin={() => {
+          window.history.pushState({}, '', '/');
+          setInviteToken(null);
+        }}
+      />
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center text-xs text-slate-500 gap-3">
+        <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+        Initializing session and verifying organisation context...
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !user) {
+    return <LoginView />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <Header isBackendHealthy={isBackendHealthy} />
+      <Navbar />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Hero Section */}
-        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 sm:p-8 text-white shadow-lg">
-          <div className="max-w-3xl space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-xs font-medium">
-              <ShieldCheck className="w-4 h-4 text-indigo-400" />
-              Increment 0: Foundation Layer Ready
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {/* Role-Specific Scoped Landing */}
+        {user.role === 'procurement_officer' && <ProcurementDashboard />}
+        {user.role === 'vendor' && <VendorDashboard />}
+        {user.role === 'reviewer' && <ReviewerDashboard />}
+        {user.role === 'admin' && <AdminDashboard />}
+
+        {/* Collapsible System Health & Diagnostics */}
+        <div className="pt-4 border-t border-slate-200">
+          <button
+            onClick={() => setShowDiagnostics((prev) => !prev)}
+            className="flex items-center justify-between w-full p-3 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
+          >
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-indigo-600" />
+              <span>Foundation Environment Diagnostics (Database & Object Storage Health)</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              India-Focused Vendor Onboarding Platform
-            </h2>
-            <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
-              &ldquo;Collect the right information once, check it consistently, explain what is
-              wrong, make corrections easy, and give reviewers traceable evidence for
-              decisions.&rdquo;
-            </p>
-          </div>
+            {showDiagnostics ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+
+          {showDiagnostics && (
+            <div className="mt-3">
+              <HealthCard
+                health={health}
+                loading={healthLoading}
+                error={healthError}
+                onRefresh={loadHealthData}
+              />
+            </div>
+          )}
         </div>
-
-        {/* System Health Card */}
-        <HealthCard
-          health={health}
-          loading={loading}
-          error={error}
-          onRefresh={loadHealth}
-        />
-
-        {/* Foundation Architecture Highlights */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center mb-3">
-              <Cpu className="w-4 h-4" />
-            </div>
-            <h3 className="text-sm font-semibold text-slate-900">FastAPI Backend</h3>
-            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-              Asynchronous Python 3.12 service with typed Pydantic schemas, CORS configuration, and modular routers.
-            </p>
-          </div>
-
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3">
-              <Database className="w-4 h-4" />
-            </div>
-            <h3 className="text-sm font-semibold text-slate-900">PostgreSQL & Alembic</h3>
-            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-              Relational migrations infrastructure using SQLAlchemy 2.0 with PostgreSQL drivers and local fallback support.
-            </p>
-          </div>
-
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-            <div className="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center mb-3">
-              <Lock className="w-4 h-4" />
-            </div>
-            <h3 className="text-sm font-semibold text-slate-900">Private Object Storage</h3>
-            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-              Pluggable adapter interface supporting local isolated storage and Supabase S3 buckets with signed URLs.
-            </p>
-          </div>
-
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-            <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center mb-3">
-              <FileText className="w-4 h-4" />
-            </div>
-            <h3 className="text-sm font-semibold text-slate-900">Untrusted File Security</h3>
-            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-              Pre-upload validation guards: MIME sniffing, extension allowlist, and zero client-exposed secrets.
-            </p>
-          </div>
-        </div>
-
-        {/* Roadmap */}
-        <FoundationRoadmap />
       </main>
 
-      <footer className="bg-white border-t border-slate-200 py-6 mt-auto">
+      <footer className="bg-white border-t border-slate-200 py-4 mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
           <div>
-            Vendor Onboarding Platform &bull; Version 1.0 baseline specification
+            Vendor Onboarding Platform &bull; India Edition &bull; Increment 1 Identity & App Shell
           </div>
           <div>
-            Built with React 19, TypeScript, Tailwind CSS & FastAPI
+            Organisation Scoped: <span className="font-semibold text-slate-700">{user.organisation.name}</span>
           </div>
         </div>
       </footer>
     </div>
+  );
+};
+
+export const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <MainAppContent />
+    </AuthProvider>
   );
 };
 

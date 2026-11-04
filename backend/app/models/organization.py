@@ -1,5 +1,6 @@
 import uuid
 from sqlalchemy import Column, String, Text, Boolean
+from sqlalchemy.orm import relationship
 from app.database import Base
 from app.models.base import TimestampMixin
 
@@ -17,3 +18,6 @@ class Organization(Base, TimestampMixin):
     is_active = Column(Boolean, default=True, nullable=False)
     policy_version = Column(String(50), default="1.0.0", nullable=False)
     settings = Column(Text, nullable=True)  # JSON-encoded string for flexible settings
+
+    members = relationship("OrganisationMember", back_populates="organization", cascade="all, delete-orphan")
+    invitations = relationship("Invitation", back_populates="organization", cascade="all, delete-orphan")
