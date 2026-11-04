@@ -152,11 +152,14 @@ def test_scenario_a_clean_vendor_onboarding_and_approval(db_session: Session, cl
         )
     assert gst_upload.status_code == 200
 
-    with open(demo_docs["bank_png"], "rb") as f:
+    bank_doc = demo_docs.get("bank_pdf", demo_docs["bank_png"])
+    ext = "application/pdf" if bank_doc.endswith(".pdf") else "image/png"
+    fname = "cheque.pdf" if ext == "application/pdf" else "cheque.png"
+    with open(bank_doc, "rb") as f:
         bank_upload = client.post(
             f"/api/applications/{app_id}/documents/BANK_PROOF/upload",
             headers={"Authorization": f"Bearer {vendor_token}"},
-            files={"file": ("cheque.png", f, "image/png")},
+            files={"file": (fname, f, ext)},
         )
     assert bank_upload.status_code == 200
 

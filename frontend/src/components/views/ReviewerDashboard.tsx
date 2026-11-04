@@ -19,7 +19,7 @@ export const ReviewerDashboard: React.FC = () => {
   const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
 
   // Quick filters for queue
-  const [queueStatusFilter, setQueueStatusFilter] = useState<string>('SUBMITTED');
+  const [queueStatusFilter, setQueueStatusFilter] = useState<string>('ALL');
   const [queueSeverityFilter, setQueueSeverityFilter] = useState<string>('ALL');
   const [queueReadyFilter, setQueueReadyFilter] = useState<boolean>(false);
   const [assignedToMeOnly, setAssignedToMeOnly] = useState<boolean>(false);
@@ -109,7 +109,7 @@ export const ReviewerDashboard: React.FC = () => {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           {/* Card 1: Ready for Approval */}
           <div
-            onClick={() => handleFilterClick('SUBMITTED', 'ALL', true, false)}
+            onClick={() => handleFilterClick('ALL', 'ALL', true, false)}
             className="bg-white p-4 rounded-xl border border-emerald-200 bg-emerald-50/15 hover:border-emerald-400 cursor-pointer transition shadow-2xs group"
           >
             <div className="flex items-center justify-between">

@@ -348,10 +348,11 @@ def reset_and_seed_demo(db: Session = None) -> dict:
         sync_application_documents(db, app1)
 
         # Upload and extract compliance docs for Case 1
-        seed_document(db, app1, "PAN_PROOF", demo_docs["pan_pdf"], "application/pdf", "pan_tata_supplies.pdf", vendor1_user.id)
-        seed_document(db, app1, "GST_CERTIFICATE", demo_docs["gst_pdf"], "application/pdf", "gst_reg06_tata.pdf", vendor1_user.id)
-        seed_document(db, app1, "BANK_PROOF", demo_docs["bank_png"], "image/png", "cancelled_cheque_tata.png", vendor1_user.id)
-        seed_document(db, app1, "CONSTITUTION_PROOF", demo_docs["coi_pdf"], "application/pdf", "coi_certificate_tata.pdf", vendor1_user.id)
+        seed_document(db, app1, "PAN_PROOF", demo_docs["pan_tata_pdf"], "application/pdf", "pan_tata_supplies.pdf", vendor1_user.id)
+        seed_document(db, app1, "GST_CERTIFICATE", demo_docs["gst_tata_pdf"], "application/pdf", "gst_reg06_tata.pdf", vendor1_user.id)
+        seed_document(db, app1, "BANK_PROOF", demo_docs["bank_tata_pdf"], "application/pdf", "cancelled_cheque_tata.pdf", vendor1_user.id)
+        seed_document(db, app1, "CONSTITUTION_PROOF", demo_docs["coi_tata_pdf"], "application/pdf", "coi_certificate_tata.pdf", vendor1_user.id)
+        seed_document(db, app1, "SIGNATORY_PROOF", demo_docs["board_res_tata_pdf"], "application/pdf", "board_resolution_tata.pdf", vendor1_user.id)
 
         # Run validation for Case 1
         orchestrator = ValidationOrchestrator(db)
@@ -458,10 +459,10 @@ def reset_and_seed_demo(db: Session = None) -> dict:
         sync_application_documents(db, app2)
 
         # Upload docs for Case 2
-        seed_document(db, app2, "PAN_PROOF", demo_docs["pan_pdf"], "application/pdf", "pan_card_sharma.pdf", vendor2_user.id)
-        seed_document(db, app2, "GST_CERTIFICATE", demo_docs["gst_pdf"], "application/pdf", "gst_certificate_sharma.pdf", vendor2_user.id)
-        bank_v2 = seed_document(db, app2, "BANK_PROOF", demo_docs["bank_png"], "image/png", "cheque_sharma.png", vendor2_user.id)
-        seed_document(db, app2, "UDYAM_CERTIFICATE", demo_docs["udyam_pdf"], "application/pdf", "udyam_cert_sharma.pdf", vendor2_user.id)
+        seed_document(db, app2, "PAN_PROOF", demo_docs["pan_sharma_pdf"], "application/pdf", "pan_card_sharma.pdf", vendor2_user.id)
+        seed_document(db, app2, "GST_CERTIFICATE", demo_docs["gst_sharma_pdf"], "application/pdf", "gst_certificate_sharma.pdf", vendor2_user.id)
+        bank_v2 = seed_document(db, app2, "BANK_PROOF", demo_docs["bank_sharma_pdf"], "application/pdf", "cheque_sharma.pdf", vendor2_user.id)
+        seed_document(db, app2, "UDYAM_CERTIFICATE", demo_docs["udyam_sharma_pdf"], "application/pdf", "udyam_cert_sharma.pdf", vendor2_user.id)
 
         # Run validation
         run2 = orchestrator.run_full_validation(
@@ -691,7 +692,8 @@ def reset_and_seed_demo(db: Session = None) -> dict:
         # ---------------------------------------------------------------------
         # 7. Live Demo Invitation (Pending Token Acceptance)
         # ---------------------------------------------------------------------
-        raw_inv_token, inv_token_hash = generate_invitation_token()
+        raw_inv_token = "demo-invitation-token-apex-2026"
+        inv_token_hash = hashlib.sha256(raw_inv_token.encode("utf-8")).hexdigest()
         live_inv = Invitation(
             id="inv-live-demo-001",
             organisation_id=apex_org.id,
@@ -702,6 +704,7 @@ def reset_and_seed_demo(db: Session = None) -> dict:
             status=InvitationStatusEnum.PENDING.value,
             expires_at=now + timedelta(days=7),
             custom_message="Please complete your official vendor onboarding and statutory compliance registration with Apex Enterprises Ltd.",
+            metadata_json=json.dumps({"raw_token": raw_inv_token}),
         )
         db.add(live_inv)
         db.commit()

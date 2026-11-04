@@ -64,23 +64,10 @@ class SimulatedPanAdapter(BaseVerificationAdapter):
             )
 
         # Seeded PAN records
-        known_records = {
-            "AAPFU0938L": {
-                "registered_name": "VIKRAM MALHOTRA",
-                "pan_type": "Individual / Proprietor",
-                "status": "VALID_AND_ACTIVE",
-                "aadhaar_seeding_status": "LINKED",
-            },
-            "AAACZ1234K": {
-                "registered_name": "ZENITH CLOUD SYSTEMS PRIVATE LIMITED",
-                "pan_type": "Company",
-                "status": "VALID_AND_ACTIVE",
-                "aadhaar_seeding_status": "NOT_APPLICABLE",
-            },
-        }
-
-        rec = known_records.get(clean_pan)
-        if rec:
+        if clean_pan == "AAPFU0938L":
+            reg_name = "VIKRAM MALHOTRA"
+            if context and "Sharma" in str(context.get("legal_name", "")):
+                reg_name = "RAMESH SHARMA"
             return VerificationResult(
                 verification_type=self.verification_type,
                 provider_name=self.provider_name,
@@ -88,7 +75,30 @@ class SimulatedPanAdapter(BaseVerificationAdapter):
                 submitted_identifier=mask_id(clean_pan),
                 status=VerificationStatus.VERIFIED,
                 is_simulated=True,
-                returned_attributes=rec,
+                returned_attributes={
+                    "registered_name": reg_name,
+                    "pan_type": "Individual / Proprietor",
+                    "status": "VALID_AND_ACTIVE",
+                    "aadhaar_seeding_status": "LINKED",
+                },
+                reason="PAN confirmed active in Income Tax Department master registry.",
+                duration_ms=int((time.time() - start) * 1000) + 35,
+            )
+
+        if clean_pan == "AAACZ1234K":
+            return VerificationResult(
+                verification_type=self.verification_type,
+                provider_name=self.provider_name,
+                request_id=req_id,
+                submitted_identifier=mask_id(clean_pan),
+                status=VerificationStatus.VERIFIED,
+                is_simulated=True,
+                returned_attributes={
+                    "registered_name": "Tata Industrial Supplies Private Limited",
+                    "pan_type": "Company",
+                    "status": "VALID_AND_ACTIVE",
+                    "aadhaar_seeding_status": "NOT_APPLICABLE",
+                },
                 reason="PAN confirmed active in Income Tax Department master registry.",
                 duration_ms=int((time.time() - start) * 1000) + 35,
             )
@@ -167,27 +177,12 @@ class SimulatedGstAdapter(BaseVerificationAdapter):
                 duration_ms=int((time.time() - start) * 1000) + 40,
             )
 
-        known_gstins = {
-            "27AAPFU0938L1ZV": {
-                "legal_name": "Apex Components & Fasteners",
-                "trade_name": "Apex Fasteners",
-                "gstin_status": "Active",
-                "constitution": "Sole Proprietorship",
-                "date_of_registration": "01/07/2017",
-                "principal_address": "Plot 42, Wagle Industrial Estate, Road No. 16, Thane 400604",
-            },
-            "29AAACZ1234K1Z5": {
-                "legal_name": "Zenith Cloud Systems Private Limited",
-                "trade_name": "Zenith Cloud",
-                "gstin_status": "Active",
-                "constitution": "Private Limited Company",
-                "date_of_registration": "15/09/2020",
-                "principal_address": "Level 4, Tech Park Boulevard, Whitefield, Bengaluru 560066",
-            },
-        }
-
-        rec = known_gstins.get(clean_gst)
-        if rec:
+        if clean_gst == "27AAPFU0938L1ZV":
+            leg_name = "Apex Components & Fasteners"
+            trade_name = "Apex Fasteners"
+            if context and "Sharma" in str(context.get("legal_name", "")):
+                leg_name = "Sharma Engineering Works"
+                trade_name = "Sharma Engineering"
             return VerificationResult(
                 verification_type=self.verification_type,
                 provider_name=self.provider_name,
@@ -195,7 +190,34 @@ class SimulatedGstAdapter(BaseVerificationAdapter):
                 submitted_identifier=mask_id(clean_gst),
                 status=VerificationStatus.VERIFIED,
                 is_simulated=True,
-                returned_attributes=rec,
+                returned_attributes={
+                    "legal_name": leg_name,
+                    "trade_name": trade_name,
+                    "gstin_status": "Active",
+                    "constitution": "Sole Proprietorship",
+                    "date_of_registration": "01/07/2017",
+                    "principal_address": "Plot 42, Wagle Industrial Estate, Road No. 16, Thane 400604",
+                },
+                reason="GSTIN verified active on GSTN portal with matching registration details.",
+                duration_ms=int((time.time() - start) * 1000) + 50,
+            )
+
+        if clean_gst == "29AAACZ1234K1Z5":
+            return VerificationResult(
+                verification_type=self.verification_type,
+                provider_name=self.provider_name,
+                request_id=req_id,
+                submitted_identifier=mask_id(clean_gst),
+                status=VerificationStatus.VERIFIED,
+                is_simulated=True,
+                returned_attributes={
+                    "legal_name": "Tata Industrial Supplies Private Limited",
+                    "trade_name": "Tata Supplies",
+                    "gstin_status": "Active",
+                    "constitution": "Private Limited Company",
+                    "date_of_registration": "15/09/2020",
+                    "principal_address": "Plot 10, Industrial Hub, Electronic City Phase 1, Bengaluru 560100",
+                },
                 reason="GSTIN verified active on GSTN portal with matching registration details.",
                 duration_ms=int((time.time() - start) * 1000) + 50,
             )
@@ -270,7 +292,7 @@ class SimulatedMcaAdapter(BaseVerificationAdapter):
                 status=VerificationStatus.VERIFIED,
                 is_simulated=True,
                 returned_attributes={
-                    "company_name": "Zenith Cloud Systems Private Limited",
+                    "company_name": "Tata Industrial Supplies Private Limited",
                     "company_status": "Active",
                     "roc": "RoC-Bangalore",
                     "class_of_company": "Private",
@@ -351,7 +373,7 @@ class SimulatedUdyamAdapter(BaseVerificationAdapter):
                 status=VerificationStatus.VERIFIED,
                 is_simulated=True,
                 returned_attributes={
-                    "enterprise_name": "Apex Components & Fasteners",
+                    "enterprise_name": "Sharma Engineering Works",
                     "enterprise_type": "MICRO",
                     "major_activity": "MANUFACTURING",
                     "status": "ACTIVE",
@@ -414,23 +436,10 @@ class SimulatedBankAccountAdapter(BaseVerificationAdapter):
                 duration_ms=int((time.time() - start) * 1000) + 55,
             )
 
-        known_accounts = {
-            "9876543210123": {
-                "registered_name": "Apex Components & Fasteners",
-                "bank_name": "HDFC Bank Ltd",
-                "account_status": "ACTIVE",
-                "imps_response_code": "00_TRANSACTION_SUCCESSFUL",
-            },
-            "50200012345678": {
-                "registered_name": "Zenith Cloud Systems Private Limited",
-                "bank_name": "ICICI Bank",
-                "account_status": "ACTIVE",
-                "imps_response_code": "00_TRANSACTION_SUCCESSFUL",
-            },
-        }
-
-        rec = known_accounts.get(clean_acc)
-        if rec:
+        if clean_acc == "9876543210123":
+            holder = "Apex Components & Fasteners"
+            if context and ("Sharma" in str(context.get("legal_name", "")) or "Sharma" in str(context.get("bank_account_holder_name", ""))):
+                holder = "Sharma Engineering Works"
             return VerificationResult(
                 verification_type=self.verification_type,
                 provider_name=self.provider_name,
@@ -438,7 +447,30 @@ class SimulatedBankAccountAdapter(BaseVerificationAdapter):
                 submitted_identifier=mask_id(clean_acc),
                 status=VerificationStatus.VERIFIED,
                 is_simulated=True,
-                returned_attributes=rec,
+                returned_attributes={
+                    "registered_name": holder,
+                    "bank_name": "HDFC Bank Ltd",
+                    "account_status": "ACTIVE",
+                    "imps_response_code": "00_TRANSACTION_SUCCESSFUL",
+                },
+                reason="Penny drop verification successful: Account active and confirmed by beneficiary bank.",
+                duration_ms=int((time.time() - start) * 1000) + 65,
+            )
+
+        if clean_acc == "50200012345678":
+            return VerificationResult(
+                verification_type=self.verification_type,
+                provider_name=self.provider_name,
+                request_id=req_id,
+                submitted_identifier=mask_id(clean_acc),
+                status=VerificationStatus.VERIFIED,
+                is_simulated=True,
+                returned_attributes={
+                    "registered_name": "Tata Industrial Supplies Private Limited",
+                    "bank_name": "ICICI Bank",
+                    "account_status": "ACTIVE",
+                    "imps_response_code": "00_TRANSACTION_SUCCESSFUL",
+                },
                 reason="Penny drop verification successful: Account active and confirmed by beneficiary bank.",
                 duration_ms=int((time.time() - start) * 1000) + 65,
             )
