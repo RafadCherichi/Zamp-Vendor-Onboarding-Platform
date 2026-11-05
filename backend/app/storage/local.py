@@ -6,6 +6,12 @@ from app.storage.base import StorageAdapter
 from app.config import settings
 
 
+def _safe_resolve(p: Path) -> Path:
+    try:
+        return p.resolve()
+    except OSError:
+        return Path(os.path.abspath(str(p)))
+
 class LocalStorageAdapter(StorageAdapter):
     """
     Local filesystem implementation of private object storage for development and testing.
@@ -13,13 +19,14 @@ class LocalStorageAdapter(StorageAdapter):
     """
 
     def __init__(self, base_dir: Optional[str] = None):
-        self.base_dir = Path(base_dir or settings.STORAGE_LOCAL_DIR).resolve()
+        raw_path = Path(base_dir or settings.STORAGE_LOCAL_DIR)
+        self.base_dir = _safe_resolve(raw_path)
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
     def _resolve_path(self, storage_key: str) -> Path:
         # Prevent directory traversal attacks
         safe_key = os.path.normpath(storage_key).lstrip("\\/")
-        resolved = (self.base_dir / safe_key).resolve()
+        resolved = _safe_resolve(self.base_dir / safe_key)
         if not str(resolved).startswith(str(self.base_dir)):
             raise ValueError(f"Illegal path traversal attempt: {storage_key}")
         return resolved
