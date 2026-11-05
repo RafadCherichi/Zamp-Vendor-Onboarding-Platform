@@ -1,0 +1,1585 @@
+FINAL CONSOLIDATEDPRODUCT SPECIFICATION
+
+Vendor Onboarding Platform
+
+India-focused • Invitation-first • AI-assisted • Human-controlled
+
+Version 1.0 | 4 November 2026Implementation source of truth for AntigravityProduct name intentionally undecided
+
+Document control
+
+Attribute
+
+Value
+
+Purpose
+
+Final cross-phase research review and implementation specification covering Phases 1–4 and architecture.
+
+Status
+
+Recommended v1 baseline. Record material changes and update acceptance tests.
+
+Target
+
+Indian mid-sized businesses with recurring vendor onboarding.
+
+Demo
+
+Real workflow using synthetic documents and clearly labelled simulated verification.
+
+Out of scope
+
+Full procurement suite, purchase orders, invoices, payments and live government integrations without authorisation.
+
+How to interpret this documentEstablished decision = agreed in the conversation. Research note = externally supported fact. Recommendation = proposed design choice. Assumption/open item = verify before production.
+
+Contents
+
+1 Executive summary
+
+2 Cross-phase research and completeness review
+
+3 Scope, users and journeys
+
+4 Vendor data and conditional documents
+
+5 Lifecycle and state machine
+
+6 Validation and exception management
+
+7 UX requirements
+
+8 Architecture and operations
+
+9 Database model
+
+10 API and events
+
+11 AI/document pipeline
+
+12 Verification strategy
+
+13 Security, privacy and audit
+
+14 Demo strategy
+
+15 Acceptance criteria
+
+16 Antigravity build sequence
+
+17 Risks and open decisions
+
+18 Research references
+
+1. Executive summary
+
+The platform manages vendor onboarding from buyer invitation through business information collection, document submission, AI-assisted extraction, deterministic validation, external verification coordination, exception resolution and human approval. It is focused on vendor identity and onboarding, not the wider procurement lifecycle.
+
+Product promiseCollect the right information once, check it consistently, explain what is wrong, make corrections easy, and give reviewers traceable evidence for decisions.
+
+1.1 Problem
+
+Vendor information is fragmented across forms, email and attachments.
+
+Employees manually enter and compare PAN, GST, constitution and bank details.
+
+Requirements vary by legal constitution, activity and buyer policy.
+
+Vendors receive vague correction requests and repeat work.
+
+External verification may be delayed, unavailable or restricted to authorised access.
+
+Decisions and evidence are difficult to reconstruct without an audit trail.
+
+1.2 Differentiation
+
+Core differentiator: explainable exception resolution with change-aware resubmission. Identify the issue and evidence, tell the vendor what to correct, preserve prior versions, rerun dependent checks and give reviewers a clear comparison.
+
+1.3 Product measures
+
+Metric
+
+Definition
+
+First-pass completeness
+
+Share of submissions with all buyer-required fields/documents.
+
+Correction cycle time
+
+Time from correction request to corrected resubmission.
+
+Manual review rate
+
+Share routed to review, segmented by exception type.
+
+Rework rate
+
+Checks repeated unnecessarily after a correction.
+
+Provider availability
+
+Verified, negative, unavailable and error rates reported separately.
+
+Audit completeness
+
+Decisions with actor, timestamp, reason and evidence.
+
+Do not optimise only for automatic approval rate. Incorrectly passing uncertain submissions is worse than a justified review.
+
+2. Cross-phase research and completeness review
+
+Phase
+
+Decisions consolidated
+
+1 — Users/lifecycle
+
+Invitation-first; vendor, procurement officer and reviewer primary; administrator supporting; save/resume; explicit application states.
+
+2 — Data model
+
+Six information sections; four legal constitutions; activity-based conditional documents; Vendor and Application separate; preserve originals and versions.
+
+3 — Validation
+
+Four validation layers; AI extraction plus deterministic rules; provider-independent verification; human review for ambiguous/high-risk cases; selective revalidation.
+
+4 — UX
+
+Separate vendor portal and internal workspace; 12 core screens; mobile-first vendor and desktop-first reviewer.
+
+2.1 Gaps found and resolved
+
+Add asynchronous processing, persisted jobs, idempotency, bounded retries, correlation IDs and dead-letter handling.
+
+Treat uploaded documents as untrusted input. Defend against prompt injection; never execute or obey instructions inside documents.
+
+Add file security: MIME sniffing, extension allowlist, size/page limits, malware scanning where available, private storage and safe preview.
+
+Separate application state, document state, validation status, exception status and provider status.
+
+Provider timeout/unavailability must never be treated as verified or negative.
+
+Same PAN alone must not automatically merge/reject: one legal identity may have multiple GST registrations/locations.
+
+Udyam registration is permanent and does not require renewal according to the official portal; avoid generic expiry rules.
+
+Proprietorship generally uses proprietor PAN; do not invent a separate proprietorship PAN.
+
+A cancelled cheque proves printed details, not current account activity. Active verification requires an authorised provider.
+
+OCR cannot establish authenticity by itself. Suspicious content is a review signal, not definitive fraud evidence.
+
+Add retention/deletion, backup/restore, monitoring, incident response, provider contract review and production legal review.
+
+Completeness conclusionEarlier phases covered the product workflow but under-specified operational architecture and security. This specification adds processing reliability, untrusted-file handling, provider resilience, data governance, audit integrity and entity-aware duplicate resolution.
+
+3. Scope, users and journeys
+
+Dimension
+
+v1 decision
+
+Geography
+
+India only.
+
+Buyer
+
+Mid-sized organisation with recurring vendor onboarding.
+
+Initial industries
+
+Manufacturing, distribution and operations-heavy businesses.
+
+Constitutions
+
+Proprietorship, partnership firm, LLP, company.
+
+Activities
+
+Goods/manufacturing, services, logistics and selected conditional categories.
+
+Onboarding
+
+Buyer invitation-first.
+
+Demo tenancy
+
+One organisation; organisation-scoped schema.
+
+Approval
+
+Human approval by default for demo; policy automation may be considered later.
+
+Role
+
+Job and permissions
+
+Vendor
+
+Own application only; save/resume; submit information; upload/replace evidence; see vendor-safe status and correction instructions.
+
+Procurement officer
+
+Invite vendors; monitor queues; assign reviewers; request corrections; access approved vendor data.
+
+Reviewer
+
+Inspect submitted/extracted/verified evidence; resolve exceptions; approve, clarify, reject or escalate.
+
+Administrator
+
+Manage users, roles, document policies, organisation settings and verification configuration.
+
+3.1 Primary journey
+
+Procurement creates expiring invitation with known vendor/contact context.
+
+Vendor opens invitation, saves/resumes form, uploads required evidence and submits.
+
+Backend stores original files and starts asynchronous processing.
+
+Workers classify documents, extract fields, run deterministic rules and configured verification.
+
+Exception manager routes vendor-correctable issues to vendor and ambiguous/high-risk issues to reviewers.
+
+Vendor corrects fields or replaces affected evidence; revisions are retained and dependent checks rerun.
+
+Reviewer examines evidence and records a reasoned decision.
+
+Approved vendor identity and application snapshot are retained; later changes use controlled update workflow.
+
+4. Vendor data and conditional documents
+
+Form section
+
+Fields
+
+Business identity
+
+Legal name; trade name; constitution; establishment/incorporation date; registered and operating addresses.
+
+Tax/registration
+
+PAN; GST registration status and GSTIN if registered; Udyam claim/number if applicable; relevant identifiers.
+
+Contact
+
+Contact name, designation, business email and mobile.
+
+Authorisation
+
+Authorised signatory and authority evidence where buyer policy requires.
+
+Banking
+
+Account holder name, account number and confirmation, IFSC, account type.
+
+Classification/declarations
+
+Business activity/category; relevant licences; accuracy/authority declaration; privacy and verification notice acknowledgement.
+
+Document
+
+When required / caveat
+
+PAN evidence
+
+If buyer policy requires evidence. Proprietor PAN for proprietorship; entity PAN for partnership/LLP/company as applicable.
+
+GST certificate
+
+If registered or buyer policy requires. Non-registration is not automatically failure.
+
+Constitution proof
+
+Entity-specific evidence per buyer policy: partnership deed/registration; LLP incorporation/LLP agreement; company incorporation; accepted proprietorship business proof.
+
+Bank proof
+
+Buyer-required evidence such as cancelled cheque, bank certificate or accepted alternative.
+
+Authorised signatory evidence
+
+Where buyer policy or risk requires.
+
+Udyam evidence
+
+When MSME status is claimed and buyer needs evidence. Official portal says registration does not require renewal.
+
+Industry licence
+
+Only where activity and policy require it: e.g. FSSAI, factory/pollution, transport or contractor/labour approvals.
+
+Checklist engine inputs: constitution, business activity/subcategory, buyer policy version, vendor declarations and configured jurisdiction/product conditions. Each requirement needs required/optional/conditional status, condition expression, accepted document types, expiry relevance, validation profile and vendor-facing explanation.
+
+Important caveatThere is no single universal Indian vendor-onboarding checklist. This is a configurable policy engine, not a claim that every listed document is mandatory.
+
+5. Lifecycle and state machine
+
+State
+
+Meaning
+
+Transitions
+
+INVITED
+
+Invitation created.
+
+IN_PROGRESS, EXPIRED, CANCELLED
+
+IN_PROGRESS
+
+Vendor editing; partial save allowed.
+
+SUBMITTED, EXPIRED, CANCELLED
+
+SUBMITTED
+
+Vendor submitted application.
+
+PROCESSING
+
+PROCESSING
+
+Async extraction, rules and verification.
+
+ACTION_REQUIRED, UNDER_REVIEW, READY_FOR_APPROVAL, PROCESSING_FAILED
+
+ACTION_REQUIRED
+
+Vendor correction needed.
+
+SUBMITTED / PROCESSING after correction
+
+UNDER_REVIEW
+
+Human review required/in progress.
+
+ACTION_REQUIRED, READY_FOR_APPROVAL, REJECTED
+
+READY_FOR_APPROVAL
+
+Configured required checks complete.
+
+APPROVED, UNDER_REVIEW, REJECTED
+
+APPROVED
+
+Approved snapshot recorded.
+
+Controlled vendor-update workflow only
+
+REJECTED
+
+Rejected with reason.
+
+Closed; new application per buyer policy
+
+EXPIRED/CANCELLED
+
+Invitation/application inactive.
+
+New invitation or authorised reopen
+
+5.1 Separate status dimensions
+
+Application lifecycle: overall workflow state.
+
+Document status: uploaded, processing, readable, unreadable, wrong type, superseded.
+
+Validation status: passed, failed, warning, unverified, unavailable, not applicable, pending.
+
+Exception status: open, awaiting vendor, awaiting reviewer, retrying, resolved, waived with reason.
+
+Verification status: not requested, pending, verified, negative, unavailable, provider error.
+
+Only backend-authorised transitions change application state.
+
+Approval blocked while buyer-policy-required blocking checks/exceptions remain.
+
+Rejection requires reason; override/waiver requires actor, reason and evidence.
+
+Corrections create revisions; previous values/files remain auditable.
+
+Approval stores versioned snapshot of values, evidence references and validation outcomes.
+
+Post-approval bank changes use controlled re-verification and approval.
+
+6. Validation and exception management
+
+Layer
+
+Responsibilities
+
+Examples
+
+1 Input/document
+
+Completeness, syntax, file integrity, classification, readability, extraction.
+
+PAN/GSTIN format, missing doc, blurry scan.
+
+2 Cross-document
+
+Compare form, extracted evidence and entity identity.
+
+PAN embedded in GSTIN, legal name, address, bank beneficiary.
+
+3 External verification
+
+Authoritative/authorised provider checks.
+
+PAN, GST, MCA, Udyam, bank.
+
+4 Decision/exception
+
+Aggregate under buyer policy and route action.
+
+Correction, review, retry, ready, reject.
+
+Check
+
+Method
+
+Failure behaviour
+
+PAN format
+
+Deterministic syntax.
+
+Malformed format; does not prove PAN exists/invalid.
+
+GSTIN structure/checksum
+
+Deterministic rules.
+
+Format failure; still needs external verification.
+
+PAN embedded in GSTIN
+
+Exact comparison.
+
+High-severity identity exception.
+
+CIN/LLPIN
+
+Format plus MCA check.
+
+Format pass does not prove entity active.
+
+IFSC
+
+Format plus directory/provider if configured.
+
+Does not prove account ownership.
+
+Bank account
+
+Presence/confirmation and authorised provider.
+
+Cheque image alone does not prove active account.
+
+Document classification
+
+AI/vision.
+
+Wrong or uncertain type flagged.
+
+Readability
+
+OCR/image quality.
+
+Request replacement if essential fields unreadable.
+
+Required docs/fields
+
+Versioned buyer policy.
+
+Vendor correction.
+
+Legal-name matching
+
+Normalisation + entity-aware rules.
+
+Probable variation to human review.
+
+Address matching
+
+Normalisation and field comparison.
+
+Warning/review based on policy.
+
+Bank beneficiary
+
+Provider result plus cautious name comparison.
+
+Ambiguous match to reviewer.
+
+Duplicate candidate
+
+Identifiers plus contextual similarity.
+
+Reviewer; never auto-merge.
+
+PAN/GST/MCA/Udyam
+
+Authorised source/provider.
+
+Store source, time, result and evidence.
+
+6.1 Name matching
+
+Class
+
+Meaning
+
+Action
+
+Exact/normalised
+
+Same after case, punctuation, spacing and approved suffix normalisation.
+
+Pass; preserve original and normalised values.
+
+Probable
+
+Abbreviation, spelling variation or moderate similarity.
+
+Human review; score is triage only.
+
+Material mismatch
+
+Substantially different identity/conflicting authoritative evidence.
+
+Block approval; investigate.
+
+Do not apply one global exact-match rule. A proprietor's personal PAN name may differ from trade name; companies may use suffix variations; bank names may be abbreviated. Retain original strings, normalisation algorithm/version and evidence.
+
+6.2 Duplicate resolution
+
+Strong signals: same CIN/LLPIN for same entity; same GSTIN; same PAN combined with corroborating identity fields.
+
+Same PAN alone must not automatically merge/reject because a legal person may have multiple GST registrations/branches.
+
+Same bank account is a risk signal, not conclusive duplicate proof.
+
+Name/address/contact similarity is supporting evidence only.
+
+Reviewer can link, keep separate or escalate; record decision.
+
+6.3 Exception taxonomy
+
+Exception
+
+Default action
+
+Severity baseline
+
+Missing required field/document
+
+Vendor correction.
+
+Medium
+
+Unreadable/wrong document
+
+Replace; retain old file.
+
+Medium
+
+Malformed critical identifier
+
+Block and correct.
+
+High/Critical
+
+PAN/GSTIN relationship mismatch
+
+Block approval; investigate.
+
+Critical
+
+Ambiguous legal/bank name
+
+Reviewer investigation.
+
+High
+
+Negative authoritative status
+
+Apply buyer policy; reviewer review.
+
+High/Critical
+
+Provider unavailable/timeout
+
+Retry; mark unavailable.
+
+Operational/pending
+
+Possible duplicate
+
+Reviewer resolution.
+
+High
+
+Expired required licence
+
+Renewal or reviewer action.
+
+Medium/High
+
+Post-approval bank change
+
+Reverify and authorised approval.
+
+Critical
+
+6.4 Correction and selective revalidation
+
+Create exception with rule ID, severity, source fields, evidence, explanation, owner and action.
+
+Route vendor-correctable issue to vendor; ambiguous/high-risk issue to reviewer; provider outage to retry queue.
+
+Vendor correction creates new field/document revision and event.
+
+Dependency manager identifies stale checks and reruns affected checks plus dependants.
+
+Resolved exceptions close with evidence; waived exceptions require reviewer reason and retain history.
+
+Reopen if a later run reproduces the issue.
+
+Changed item
+
+Checks to rerun
+
+PAN evidence
+
+PAN extraction, format, identity and dependent GST comparison.
+
+GST certificate
+
+GST extraction, format, PAN relationship and GST verification.
+
+Bank proof
+
+Bank extraction/readability, account/IFSC comparison and bank verification.
+
+Registered address
+
+Address comparison and configured checks.
+
+Signatory evidence
+
+Signatory and authority checks.
+
+7. UX and screen requirements
+
+Screen
+
+Requirements
+
+Priority
+
+S01 Invitation
+
+Buyer identity, vendor context, secure start/resume, expiry/help.
+
+Must
+
+S02 Business form
+
+Six sections; constitution/activity fields; save/resume; inline validation.
+
+Must
+
+S03 Document checklist
+
+Policy-generated requirements, upload, guidance, processing feedback/status.
+
+Must
+
+S04 Confirmation
+
+Reference, timestamp, next steps; explicitly not yet approved.
+
+Must
+
+S05 Application status
+
+Timeline, status, outstanding actions and correction history.
+
+Must
+
+S06 Correction
+
+Issue explanation, affected field/doc, replace/upload, version history.
+
+Must
+
+S07 Procurement dashboard
+
+KPIs, status distribution, pending actions, recent activity.
+
+Must
+
+S08 Application queue
+
+Search, filters, sorting, pagination, assignment.
+
+Must
+
+S09 Application details
+
+Overview, business, docs, validations, exceptions, verification, activity.
+
+Must
+
+S10 Reviewer workspace
+
+Evidence preview, extracted fields, submitted values, provider results, explanation and decision.
+
+Must
+
+S11 Verification activity
+
+Provider, request/response time, reference, status, reason and retry history.
+
+Should
+
+S12 Audit history
+
+Chronological actor/action/time/object/before-after/reason.
+
+Must
+
+S13 Settings
+
+Basic organisation, user/role, checklist and verification config.
+
+Later/basic
+
+Vendor portal mobile-first; internal workspace desktop-first but responsive.
+
+Persistent labels, text errors, keyboard access, visible focus and status not colour-only.
+
+Vendor messages actionable; avoid internal risk jargon.
+
+Reviewer evidence shows provenance: source document/page/field and extraction confidence where available.
+
+Never show one opaque AI score as vendor legitimacy.
+
+Mask PAN and bank details in list views.
+
+8. Architecture and operations
+
+Layer
+
+Recommendation
+
+Responsibilities
+
+Frontend
+
+React + TypeScript; Tailwind CSS.
+
+Vendor portal, internal workspace, shared accessible components.
+
+Backend
+
+Python + FastAPI.
+
+Auth, permissions, business rules and workflow APIs.
+
+Database
+
+PostgreSQL.
+
+Relational records, constraints, indexes and transactions.
+
+Object storage
+
+Supabase Storage or equivalent private storage.
+
+Private buckets, short-lived signed URLs, versions.
+
+AI
+
+Vision-capable LLM with schema-constrained extraction.
+
+Classification, extraction, explanations; adapter.
+
+OCR
+
+Replaceable OCR/document parser.
+
+Text/layout extraction; provider chosen after access/cost check.
+
+Queue/worker
+
+Background queue and worker.
+
+OCR/LLM/provider calls, retries and async status.
+
+Verification
+
+Adapter interface + mock provider.
+
+Simulated demo; live only after authorisation/contracts.
+
+Deployment
+
+Managed cloud hosting.
+
+Separate dev/demo/prod configuration and secrets.
+
+8.1 Logical components
+
+Web clients: vendor portal and internal workspace.
+
+API layer: auth, role checks, request validation, rate limits and orchestration.
+
+Application service: invitations, state transitions, policy selection and vendor identity.
+
+Document service: upload validation, private storage, versions, preview and access control.
+
+Processing workers: classification, OCR, LLM extraction and normalisation.
+
+Validation engine: deterministic rules, cross-document matching and duplicate candidates.
+
+Verification orchestrator: adapters, timeouts, retries and callback handling.
+
+Exception manager: creation, assignment, correction and resolution.
+
+Audit service: append-only event creation and retrieval.
+
+Notification service: in-app first; email later.
+
+8.2 Operational requirements
+
+Persist background jobs, IDs, status and correlation IDs; workers recover after restart.
+
+Idempotency for submit, replace, processing trigger and provider callbacks.
+
+Bounded exponential backoff for transient errors; do not retry permanent validation failures.
+
+Explicit provider timeouts and circuit-breaker/pause mechanism for outages.
+
+Structured logs and metrics: queue age, extraction failures, latency, provider errors, stuck applications.
+
+Dead-letter handling with safe replay.
+
+Database foreign keys, unique constraints, migrations and transactions.
+
+Private object storage; MIME sniffing; file/page limits; malware scan where available; safe previews.
+
+Automated backups and tested restore for production.
+
+9. Database model
+
+Table
+
+Purpose / important fields
+
+organisations
+
+Buyer workspace, policy version and settings.
+
+users
+
+Authenticated user identity and status.
+
+organisation_members
+
+Organisation membership and role.
+
+vendors
+
+Stable legal identity scoped to buyer; constitution and canonical identifiers.
+
+vendor_registrations
+
+Multiple GST registrations, identifiers, jurisdiction and locations.
+
+applications
+
+Onboarding request, status, policy version and timestamps.
+
+application_revisions
+
+Versioned submitted form payloads.
+
+documents
+
+Logical document slot, type and current version.
+
+document_versions
+
+Immutable file version, storage key, checksum, MIME, uploader and timestamp.
+
+extracted_fields
+
+Extracted value, confidence, page/evidence location and document version.
+
+document_policies
+
+Conditional requirements and buyer policy version.
+
+validation_rules
+
+Versioned rule definitions and configuration.
+
+validation_runs
+
+Processing attempt, trigger, status and correlation ID.
+
+validation_results
+
+Individual rule outcome, severity, evidence and result.
+
+verification_attempts
+
+Provider, check type, status, reference and timestamps.
+
+exceptions / exception_events
+
+Open/resolved issue and full event history.
+
+review_decisions
+
+Reviewer, decision, reason and evidence references.
+
+audit_events
+
+Append-only actor/object/action/before-after/time record.
+
+notifications
+
+In-app notification state.
+
+processing_jobs
+
+Job type, idempotency key, status, attempts and retry time.
+
+Relationships: organisation → users/vendors/applications; vendor → multiple applications and registrations; application → revisions, documents, validation runs, verification attempts, exceptions, decisions and events; document → immutable versions; extracted fields reference exact document version; validation results reference a specific run and rule version.
+
+Protect sensitive identifiers at rest and mask them in views/logs. Keyed hashes may support exact duplicate lookup but require careful key management and do not replace encryption.
+
+10. API contracts and domain events
+
+Method / route
+
+Purpose
+
+Access
+
+POST /api/invitations
+
+Create invitation.
+
+Procurement/admin
+
+GET /api/invitations/{token}
+
+Validate invitation; safe context.
+
+Valid token
+
+POST /api/applications
+
+Create/resume application.
+
+Vendor/invitation
+
+GET /api/applications/{id}
+
+Retrieve permitted application.
+
+Scoped role
+
+PATCH /api/applications/{id}
+
+Update draft/create revision.
+
+Vendor/authorised staff
+
+POST /api/applications/{id}/submit
+
+Submit and enqueue processing.
+
+Vendor
+
+POST /api/applications/{id}/documents
+
+Upload to document slot.
+
+Vendor/authorised staff
+
+POST /api/documents/{id}/replace
+
+Create immutable version.
+
+Vendor/authorised staff
+
+GET /api/applications/{id}/validations
+
+Retrieve results.
+
+Scoped role
+
+GET /api/applications/{id}/exceptions
+
+Retrieve safe/internal exceptions.
+
+Scoped role
+
+POST /api/exceptions/{id}/resolve
+
+Record resolution.
+
+Scoped actor
+
+POST /api/applications/{id}/process
+
+Trigger/retry processing.
+
+Internal/admin
+
+POST /api/applications/{id}/review
+
+Record decision.
+
+Reviewer
+
+GET /api/applications/{id}/timeline
+
+Retrieve event history.
+
+Scoped role
+
+GET /api/dashboard/summary
+
+Dashboard aggregates.
+
+Procurement/admin
+
+API requirements: typed schemas; server-side validation; idempotency keys; stable error codes; pagination; organisation/object-level permission checks; no provider secrets or unrestricted storage keys exposed. Webhooks require signature verification, timestamp/replay protection and idempotent handling.
+
+Domain events: invitation.created/opened; application.created/submitted; document.uploaded/version_created/classified; extraction.completed; validation.started/completed; verification.requested/completed; exception.created/assigned/resolved; correction.requested/submitted; review.decision_recorded; application.approved/rejected. Consider transactional outbox when external workers/notifications are introduced.
+
+11. AI and document-processing pipeline
+
+Validate size, extension, detected MIME type and file safety.
+
+Store original in private storage; calculate checksum; create document version.
+
+Create idempotent job and correlation ID.
+
+Classify document and confirm expected checklist slot.
+
+Run OCR/layout extraction or vision extraction.
+
+Request schema-constrained fields; unknown/null where evidence absent.
+
+Validate model output against schema; reject malformed output.
+
+Store values, confidence, page and evidence location.
+
+Run deterministic checks and cross-document matching.
+
+Request configured external verification asynchronously.
+
+Aggregate findings, create exceptions and update safe status.
+
+11.1 AI guardrails
+
+Treat document content as untrusted; ignore embedded instructions; never execute document content.
+
+Require structured output and unknown rather than guessed values.
+
+Capture field provenance where available.
+
+LLM does not decide legal validity, bank ownership, fraud or final approval.
+
+Confidence is extraction reliability, not vendor legitimacy.
+
+Minimise personal data sent to AI; review provider retention, training, region and contract terms.
+
+Record model/provider/version, prompt version and timestamp.
+
+12. External verification strategy
+
+Check
+
+Potential route
+
+Limitation
+
+PAN
+
+Income Tax Verify PAN / approved external agency service.
+
+External agency service exists; bulk/webservice access requires approval.
+
+GST
+
+GST taxpayer search or authorised GSP/provider.
+
+Public search does not imply unrestricted production API.
+
+MCA
+
+MCA company/LLP services and available master data.
+
+Name search alone does not establish active status.
+
+Udyam
+
+Official portal/certificate QR/provider.
+
+Registration permanent; no generic renewal expiry.
+
+Bank
+
+Authorised verification provider/supported banking framework.
+
+Access, consent, coverage and commercial terms must be confirmed.
+
+Status
+
+Meaning
+
+NOT_REQUESTED
+
+Buyer policy did not request check.
+
+PENDING
+
+Request accepted; result pending.
+
+VERIFIED
+
+Positive evidence returned for requested fields.
+
+NEGATIVE
+
+Provider returned negative/inactive/mismatch result; interpret under policy.
+
+UNAVAILABLE
+
+Provider/system could not complete.
+
+ERROR
+
+Auth, malformed request or non-transient error.
+
+NOT_APPLICABLE
+
+Check does not apply.
+
+Adapter response should include provider, check type, status, reference, request/response timestamps, verified fields, match result, evidence summary, error code, retryable flag and restricted raw-response reference. Demo responses must be visibly labelled simulated.
+
+13. Security, privacy and audit
+
+Separate vendor access from employee authentication; use high-entropy expiring/revocable invitation tokens; store token hashes where practical.
+
+Apply role-based, organisation-scoped permissions on every endpoint; rate-limit invitation, login, upload and verification-trigger endpoints.
+
+Private storage and short-lived signed URLs; allowlist PDF/JPEG/PNG initially; verify MIME; enforce size/page limits; scan/quarantine where available.
+
+Safe preview rendering; immutable versions; retention/deletion policy for originals and derived extracts.
+
+Encrypt in transit and at rest; secrets in managed secret store; never expose API keys in frontend, prompts or committed files.
+
+Mask PAN/bank values in lists/logs; restrict access to documents/provider responses; audit sensitive access.
+
+Clear privacy notice describing data, purposes, sharing and retention; minimise collection; review processor/provider terms.
+
+Append-only audit events with actor, UTC timestamp, object, action, reason, evidence and correlation ID; restrict update/delete.
+
+Monitor jobs/providers; support backup/restore, incident response and access revocation.
+
+DPDP commencement noteThe DPDP Act and Rules were notified with phased commencement. The Gazette schedule specifies provisions commencing immediately, after one year and after eighteen months. Map each obligation to its commencement date and obtain legal review before production; do not claim every obligation is already operative.
+
+This is a product/engineering specification, not a legal compliance certification.
+
+14. Demo strategy and synthetic scenarios
+
+Vendor
+
+Scenario
+
+Expected behaviour
+
+VND-001 Apex Components
+
+Required docs present/readable; consistent details; mock PAN/GST/bank positive.
+
+Ready for approval; reviewer approves; audit shows full path.
+
+VND-002 Apex Industrial Supplies
+
+Bank proof unreadable; beneficiary name abbreviated.
+
+Correction/review; replace v1; preserve history; rerun bank checks; reviewer decides.
+
+VND-003 Southern Trade Services
+
+Missing mandatory evidence and PAN/GST relationship mismatch.
+
+Request missing evidence; block approval for critical mismatch; explain actions.
+
+Introduce manual onboarding problem and product promise.
+
+Show invitation, vendor form and dynamic checklist.
+
+Submit and show extraction plus deterministic checks.
+
+Open bank exception with evidence and explanation.
+
+Replace document; show version history and selective revalidation.
+
+Review evidence side-by-side and record decision.
+
+Show audit timeline; state external results are simulated.
+
+All demo names, identifiers, account numbers, IFSCs and documents must be synthetic and visibly marked DEMO DATA.
+
+15. Acceptance criteria
+
+ID
+
+Test
+
+Pass condition
+
+AC01
+
+Invitation
+
+Unique, expiring, revocable; event recorded.
+
+AC02
+
+Invitation access
+
+Expired/revoked token denied; valid token shows safe context.
+
+AC03
+
+Dynamic form
+
+Constitution-specific fields behave correctly.
+
+AC04
+
+Checklist
+
+Constitution/activity/buyer policy produce correct requirements.
+
+AC05
+
+Upload
+
+Private file, checksum, metadata and version persisted.
+
+AC06
+
+Wrong document
+
+Classifier flags mismatch and gives correction instruction.
+
+AC07
+
+Unreadable document
+
+Requests replacement; no fabricated values.
+
+AC08
+
+Extraction
+
+Schema-valid fields with provenance/confidence where supported.
+
+AC09
+
+Identifier syntax
+
+Malformed input fails without claiming external invalidity.
+
+AC10
+
+PAN/GST mismatch
+
+Critical exception; approval blocked.
+
+AC11
+
+Provider unavailable
+
+Unavailable status, retry possible, never pass/negative.
+
+AC12
+
+Name variation
+
+Probable match routed to review.
+
+AC13
+
+Duplicate
+
+Candidate shown; no automatic merge.
+
+AC14
+
+Correction
+
+New version created; old version retained.
+
+AC15
+
+Revalidation
+
+Affected/dependent checks rerun; unrelated results retain provenance.
+
+AC16
+
+Reviewer decision
+
+Actor, timestamp, reason and evidence stored.
+
+AC17
+
+Approval snapshot
+
+Approved values and supporting result versions retained.
+
+AC18
+
+Permissions
+
+Vendor cannot access another vendor/internal notes.
+
+AC19
+
+Audit
+
+Complete chronological event sequence.
+
+AC20
+
+Idempotency
+
+Repeated submit/process/callback creates no duplicate side effects.
+
+AC21
+
+Unsafe file
+
+Rejected/quarantined; no unsafe preview.
+
+AC22
+
+Restart
+
+Persisted application and jobs recover.
+
+Non-functional expectations: responsive vendor flow; server-side pagination; asynchronous processing; safe retries; no public document URLs; no frontend secrets; structured logs/correlation IDs; accessible labels, keyboard interaction and text status messages.
+
+16. Antigravity build sequence
+
+Increment
+
+Build contents
+
+Exit gate
+
+0 Foundation
+
+Inspect repo; architecture notes; environment config; lint/test; README.
+
+App runs; secrets environment-only.
+
+1 App shell/identity
+
+React shell, FastAPI, PostgreSQL migrations, organisation/role model, invitation tokens.
+
+Vendor and employee routes protected.
+
+2 Vendor onboarding
+
+Form, conditional checklist, save/resume, upload and submit.
+
+Persisted vendor application end-to-end.
+
+3 Document processing
+
+Private storage, versions, worker, classification/OCR/LLM adapter, extraction schema.
+
+Synthetic files processed with provenance.
+
+4 Validation/verification
+
+Rule engine, matcher, duplicate candidates, mock provider adapters, decision aggregation.
+
+Fixtures produce expected results.
+
+5 Exception lifecycle
+
+Correction requests, replacement versions, dependency revalidation, reviewer assignment.
+
+VND-002 journey works end-to-end.
+
+6 Internal workspace
+
+Dashboard, queue, details, reviewer evidence comparison and decision.
+
+Reviewer can decide without DB edits.
+
+7 Audit/hardening
+
+Timeline, permissions, retries, file safety, tests, demo data and deployment.
+
+Acceptance tests pass; demo reproducible.
+
+Ask Antigravity to inspect existing files before modifying structure.
+
+Build one increment at a time with acceptance tests.
+
+Require changed-file summary, migrations, environment variables and run commands.
+
+Run app/tests and inspect diffs after each increment.
+
+Never paste secrets into prompts/source/browser or commit .env.
+
+Commit a known-good checkpoint after each increment.
+
+Use mock providers and synthetic data until core workflow is stable.
+
+17. Risks and open decisions
+
+Risk/open item
+
+Mitigation/current default
+
+Resolve
+
+No production verification credentials
+
+Mock adapters; provider-neutral interface.
+
+Before live pilot.
+
+OCR/LLM cost/latency
+
+Replaceable adapters; sample-doc test; provider review.
+
+During processing build.
+
+Buyer/legal requirements vary
+
+Configurable policy; buyer legal/finance review.
+
+Before production.
+
+Name matching false positives
+
+Exact/probable/material tiers; human review.
+
+Validation testing.
+
+Same PAN across GST registrations
+
+Separate legal identity from registrations/locations.
+
+Before schema migrations.
+
+Sensitive data exposure
+
+Masking, private storage, encryption, roles and audit.
+
+Before real data.
+
+Provider outages/callbacks
+
+Async jobs, signature validation, retry, unavailable status.
+
+Integration build.
+
+Document authenticity limits
+
+OCR is not proof; reviewer escalation.
+
+Validation/UX.
+
+Multi-tenant complexity
+
+Organisation-scoped schema; one-org demo.
+
+Foundation.
+
+Email delivery
+
+In-app first; development/simulated email initially.
+
+After core flow.
+
+Retention/deletion periods
+
+Configurable pending legal/customer review.
+
+Before production.
+
+Approval authority
+
+Human approval by default in demo.
+
+Before pilot.
+
+Assumptions: one buyer organisation in demo; buyer supplies document policy; synthetic data permitted; one application per onboarding attempt; vendor identity persists across attempts; production integrations require eligibility, credentials, contracts and security review.
+
+18. Research references
+
+Income Tax Department — Verify your PAN — https://www.incometax.gov.in/iec/foportal/help/all-topics/e-filing-services/verify-your-panPAN status/name verification; external agency access; bulk verification approval.
+
+Income Tax Department — External agency verification — https://www.incometax.gov.in/iec/foportal/central-state-government-approved-undertaking-agencyPAN verification webservice and external agency access process.
+
+Official Gazette — DPDP commencement notification, 13 Nov 2025 — https://egazette.gov.in/WriteReadData/2025/267647.pdfPrimary source for phased commencement schedule.
+
+PIB — DPDP Rules 2025 notified — https://www.pib.gov.in/PressReleasePage.aspx?PRID=2190655&lang=2&reg=48Government explanation of notification and phased implementation.
+
+MeitY — DPDP Rules 2025 repository — https://www.meity.gov.in/documents/act-and-policies/digital-personal-data-protection-rules-2025-gDOxUjMtQWa?pageTitle=Digital-Personal-Data-Protection-Rules-2025Official rules and implementation timeline.
+
+Udyam Registration Portal — Important — https://www.udyamregistration.gov.in/Important.aspxPermanent registration number, QR certificate and no renewal requirement.
+
+Udyam Registration Portal — Circulars — https://udyamregistration.gov.in/Circular.aspxOfficial circulars including Udyam certificate through DigiLocker.
+
+GST Council — GST taxpayer search note — https://gstcouncil.gov.in/node/3913Taxpayer search fields and historical API discussion; not proof of unrestricted API.
+
+FinAGG GSP developer portal — https://developer.gsp.finagg.in/Example of GSP API access with provider onboarding/API key.
+
+W3C — WCAG 2.2 — https://www.w3.org/TR/WCAG22/Accessibility reference for forms, errors, status and interaction.
+
+18.1 Evidence limitations
+
+This review does not establish API credentials, pricing, SLAs or legal eligibility for the user's organisation.
+
+Public portals are not equivalent to unrestricted machine-to-machine APIs.
+
+Buyer document requirements need customer legal/finance/compliance validation.
+
+Bank verification coverage depends on provider contracts, consent and supported methods.
+
+Recheck legal commencement and obligations with counsel before production.
+
+Implementation baseline — final decision
+
+Proceed to buildBuild an invitation-first, India-focused vendor onboarding workflow with a responsive vendor portal, role-based internal workspace, configurable document checklist, asynchronous AI-assisted extraction, deterministic validation, provider-independent simulated verification, explainable exceptions, versioned corrections, human approval and traceable audit history.
+
+Product name remains undecided. This document is the working source of truth for the first Antigravity implementation. Material changes to scope, lifecycle, data model or validation policy should be reflected in the specification and tests.

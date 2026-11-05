@@ -53,16 +53,16 @@ export const Navbar: React.FC = () => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-bold text-slate-900 tracking-tight text-base">
-                Vendor Onboarding Platform
+              <span className="font-bold text-slate-900 tracking-tight text-sm sm:text-base truncate max-w-[170px] sm:max-w-none">
+                Vendor Onboarding
               </span>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+              <span className="hidden sm:inline-block text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
                 v1.0
               </span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+            <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500">
               <Building2 className="w-3.5 h-3.5 text-slate-400" />
-              <span className="font-medium text-slate-700">{user.organisation.name}</span>
+              <span className="font-medium text-slate-700 truncate max-w-[160px]">{user.organisation.name}</span>
               <span className="text-slate-300">&bull;</span>
               <span className="text-slate-400">Org ID: {user.organisation.slug}</span>
             </div>
@@ -70,14 +70,15 @@ export const Navbar: React.FC = () => {
         </div>
 
         {/* Right: Role & Profile Controls */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3">
           <NotificationBell />
 
           <div
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${roleMeta.bg} ${roleMeta.text} ${roleMeta.border}`}
+            className={`inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-semibold border ${roleMeta.bg} ${roleMeta.text} ${roleMeta.border}`}
           >
-            <ShieldCheck className="w-3.5 h-3.5" />
-            {roleMeta.label}
+            <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden sm:inline">{roleMeta.label}</span>
+            <span className="sm:hidden">{roleMeta.label.split(' ')[0]}</span>
           </div>
 
           <div className="hidden md:flex items-center gap-2 pl-2 border-l border-slate-200 text-xs text-slate-600">

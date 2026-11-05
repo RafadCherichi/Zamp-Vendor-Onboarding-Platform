@@ -320,8 +320,21 @@ export const ApplicationQueue: React.FC<Props> = ({
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-center py-8 text-slate-400">
-                  No applications matched the selected filters.
+                <td colSpan={7} className="text-center py-8 text-slate-400 space-y-2">
+                  <p>No applications matched the selected filters.</p>
+                  <button
+                    onClick={() => {
+                      setSearch('');
+                      setStatus('ALL');
+                      setSeverity('ALL');
+                      setReadyForApprovalOnly(false);
+                      setAssignedReviewerId('ALL');
+                      setPage(1);
+                    }}
+                    className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition"
+                  >
+                    <span>Clear All Filters</span>
+                  </button>
                 </td>
               </tr>
             ) : (

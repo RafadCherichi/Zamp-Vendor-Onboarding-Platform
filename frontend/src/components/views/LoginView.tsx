@@ -33,10 +33,17 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     tagColor: 'bg-amber-50 text-amber-700 border-amber-200',
   },
   {
+    email: 'vendor.mismatch@sharmaworks.in',
+    name: 'Ramesh Sharma',
+    role: 'Vendor (Action Required)',
+    org: 'Sharma Engineering Works',
+    tagColor: 'bg-amber-100 text-amber-800 border-amber-300 font-bold',
+  },
+  {
     email: 'vendor@apexcomponents.com',
     name: 'Vikram Malhotra',
-    role: 'Vendor Contact',
-    org: 'Apex Enterprises Ltd.',
+    role: 'Vendor (Clean Case)',
+    org: 'Apex Components Ltd.',
     tagColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   },
   {

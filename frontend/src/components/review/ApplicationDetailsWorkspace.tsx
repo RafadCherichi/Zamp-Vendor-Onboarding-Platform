@@ -347,9 +347,14 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
                   setActionError(null);
                   setActiveModal('APPROVE');
                 }}
+                title={
+                  overview.is_approval_eligible
+                    ? 'Grant formal vendor approval'
+                    : 'Approval blocked: Unresolved high/blocking exceptions or incomplete statutory requirements'
+                }
                 className={`px-4 py-1.5 rounded-lg text-xs font-semibold text-white transition flex items-center gap-1.5 shadow-xs ${
                   overview.is_approval_eligible
-                    ? 'bg-emerald-600 hover:bg-emerald-700'
+                    ? 'bg-emerald-600 hover:bg-emerald-700 cursor-pointer'
                     : 'bg-slate-400 hover:bg-slate-500 cursor-not-allowed opacity-90'
                 }`}
               >
@@ -361,7 +366,7 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
         </div>
 
         {/* 7 Section Navigation Tabs */}
-        <div className="flex gap-2 pt-2 border-t border-slate-100 text-xs font-semibold overflow-x-auto">
+        <div className="flex gap-1.5 pt-2 border-t border-slate-100 text-xs font-semibold overflow-x-auto no-scrollbar py-1">
           {[
             { id: 'OVERVIEW', label: 'A. Overview & Gates' },
             { id: 'BUSINESS', label: 'B. Business Details' },
@@ -374,9 +379,9 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`pb-2 px-3 border-b-2 transition whitespace-nowrap ${
+              className={`pb-2 px-3 border-b-2 transition whitespace-nowrap shrink-0 text-xs font-semibold ${
                 activeTab === tab.id
-                  ? 'border-indigo-600 text-indigo-700'
+                  ? 'border-indigo-600 text-indigo-700 font-bold'
                   : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
             >

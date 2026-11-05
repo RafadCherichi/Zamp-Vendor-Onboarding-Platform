@@ -214,9 +214,16 @@ export const VendorExceptionsBanner: React.FC<VendorExceptionsBannerProps> = ({
                     {/* If this exception relates to an application field */}
                     {exc.related_field_name && (
                       <div>
-                        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                          Correct Value for: <span className="text-indigo-600">{exc.related_field_name}</span>
-                        </label>
+                        <div className="flex flex-wrap items-center justify-between gap-1 mb-1.5">
+                          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                            Correct Value for: <span className="text-indigo-600">{exc.related_field_name}</span>
+                          </label>
+                          {exc.field_corrections && exc.field_corrections.length > 0 && exc.field_corrections[0].previous_value && (
+                            <span className="text-[11px] text-slate-500 font-mono">
+                              Originally submitted: <span className="font-semibold text-rose-700 line-through">{exc.field_corrections[0].previous_value}</span>
+                            </span>
+                          )}
+                        </div>
                         <input
                           type="text"
                           value={fieldValues[exc.id] || ''}

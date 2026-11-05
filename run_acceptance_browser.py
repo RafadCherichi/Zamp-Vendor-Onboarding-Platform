@@ -21,9 +21,12 @@ DEMO_INVITE_TOKEN = "demo-invitation-token-apex-2026"
 def save_screenshot(page, filename, desc=""):
     local_path = SCREENSHOTS_DIR / filename
     art_path = ARTIFACT_SCREENSHOTS_DIR / filename
-    page.screenshot(path=str(local_path))
-    shutil.copy2(local_path, art_path)
-    print(f"  [SCREENSHOT] Saved: {filename} - {desc}")
+    try:
+        page.screenshot(path=str(local_path), timeout=8000)
+        shutil.copy2(local_path, art_path)
+        print(f"  [SCREENSHOT] Saved: {filename} - {desc}")
+    except Exception as e:
+        print(f"  [SCREENSHOT WARN] Could not capture {filename}: {e}")
 
 def run_acceptance():
     print("=" * 80)
