@@ -9,6 +9,7 @@ from app.database import get_db
 from app.core.deps import get_current_member, require_roles
 from app.models.member import OrganisationMember
 from app.models.role import RoleEnum
+from app.models.vendor import Vendor
 from app.models.application import Application
 from app.models.exception import (
     OnboardingException,
@@ -70,9 +71,10 @@ def list_exceptions(
     if member.role == RoleEnum.VENDOR.value:
         vendor_apps = (
             db.query(Application.id)
+            .join(Vendor, Application.vendor_id == Vendor.id, isouter=True)
             .filter(
                 Application.organisation_id == member.organisation_id,
-                Application.created_by_user_id == member.user_id,
+                (Application.created_by_user_id == member.user_id) | (Vendor.created_by_user_id == member.user_id),
             )
             .all()
         )

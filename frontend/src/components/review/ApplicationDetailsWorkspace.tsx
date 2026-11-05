@@ -43,6 +43,7 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
   onActionComplete,
   isReviewer = true,
 }) => {
+  const token = localStorage.getItem('vop_auth_token') || localStorage.getItem('token') || '';
   const [details, setDetails] = useState<ApplicationComprehensiveDetails | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -672,7 +673,10 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
 
                         <button
                           onClick={() => {
-                            setPreviewUrl(ver.preview_url);
+                            const url = ver.preview_url.includes('?')
+                              ? `${ver.preview_url}&token=${encodeURIComponent(token || '')}`
+                              : `${ver.preview_url}?token=${encodeURIComponent(token || '')}`;
+                            setPreviewUrl(url);
                             setPreviewTitle(`${doc.title} (v${ver.version_number})`);
                           }}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium text-xs transition self-start md:self-auto"

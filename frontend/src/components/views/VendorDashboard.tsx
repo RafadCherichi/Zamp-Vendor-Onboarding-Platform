@@ -12,9 +12,9 @@ export const VendorDashboard: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadApplication = useCallback(async () => {
+  const loadApplication = useCallback(async (silent = false) => {
     if (!token) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const data = await apiFetchCurrentApplication(token);
@@ -22,12 +22,12 @@ export const VendorDashboard: React.FC = () => {
     } catch (err: any) {
       setError(err?.message || 'Failed to initialize vendor application.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [token]);
 
   useEffect(() => {
-    loadApplication();
+    loadApplication(false);
   }, [loadApplication]);
 
   if (loading) {
@@ -47,7 +47,7 @@ export const VendorDashboard: React.FC = () => {
           <span>{error || 'Unable to retrieve application profile.'}</span>
         </div>
         <button
-          onClick={loadApplication}
+          onClick={() => loadApplication(false)}
           className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700"
         >
           Retry Connection
@@ -57,16 +57,22 @@ export const VendorDashboard: React.FC = () => {
   }
 
   if (['SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'ESCALATED'].includes(application.status)) {
-    return <SubmissionConfirmation application={application} />;
+    return (
+      <SubmissionConfirmation
+        token={token!}
+        application={application}
+        onRefresh={() => loadApplication(true)}
+      />
+    );
   }
 
   return (
     <OnboardingWizard
       token={token!}
       initialApplication={application}
-      onRefresh={loadApplication}
+      onRefresh={(silent = true) => loadApplication(silent)}
       onSubmitSuccess={() => {
-        loadApplication();
+        loadApplication(false);
       }}
     />
   );

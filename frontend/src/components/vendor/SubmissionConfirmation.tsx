@@ -5,9 +5,11 @@ import { VendorExceptionsBanner } from './VendorExceptionsBanner';
 
 interface Props {
   application: Application;
+  token?: string;
+  onRefresh?: () => void;
 }
 
-export const SubmissionConfirmation: React.FC<Props> = ({ application }) => {
+export const SubmissionConfirmation: React.FC<Props> = ({ application, token, onRefresh }) => {
   const [copied, setCopied] = React.useState(false);
 
   const handleCopy = () => {
@@ -24,8 +26,9 @@ export const SubmissionConfirmation: React.FC<Props> = ({ application }) => {
     <div className="max-w-3xl mx-auto space-y-6 py-6">
       {/* Priority Vendor Exception Clarifications & Corrections */}
       <VendorExceptionsBanner
+        token={token}
         applicationId={application.id}
-        onCorrectionSubmitted={() => {}}
+        onCorrectionSubmitted={onRefresh || (() => {})}
       />
 
       <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center space-y-4">

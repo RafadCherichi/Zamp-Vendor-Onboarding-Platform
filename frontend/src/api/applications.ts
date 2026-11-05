@@ -89,8 +89,13 @@ export async function apiUploadDocument(
   return res.json();
 }
 
-export function getDocumentPreviewUrl(applicationId: string, documentId: string): string {
-  return `${API_BASE}/applications/${applicationId}/documents/${documentId}/preview`;
+export function getDocumentPreviewUrl(
+  applicationId: string,
+  documentId: string,
+  token?: string
+): string {
+  const base = `${API_BASE}/applications/${applicationId}/documents/${documentId}/preview`;
+  return token ? `${base}?token=${encodeURIComponent(token)}` : base;
 }
 
 export async function apiFetchDocumentExtraction(
@@ -151,9 +156,11 @@ export async function apiSubmitApplication(
     if (errorData.detail && typeof errorData.detail === 'object') {
       const msg = errorData.detail.message || 'Submission failed';
       const errors = Array.isArray(errorData.detail.errors)
-        ? errorData.detail.errors.join('; ')
-        : '';
-      throw new Error(`${msg}: ${errors}`);
+        ? errorData.detail.errors
+        : [];
+      const err = new Error(msg) as any;
+      err.errors = errors;
+      throw err;
     }
     throw new Error(errorData.detail || 'Failed to submit application');
   }

@@ -18,7 +18,6 @@ import {
   FileCheck,
   Sparkles,
   Info,
-  AlertCircle,
   Search,
 } from 'lucide-react';
 
@@ -32,6 +31,7 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
   const [uploadingType, setUploadingType] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [previewDoc, setPreviewDoc] = useState<DocumentSlot | null>(null);
+  const [previewError, setPreviewError] = useState<boolean>(false);
   const [inspectingDoc, setInspectingDoc] = useState<DocumentSlot | null>(null);
   const [extractionDetail, setExtractionDetail] = useState<DocumentExtractionDetail | null>(null);
   const [loadingExtraction, setLoadingExtraction] = useState(false);
@@ -88,6 +88,12 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
   const uploadedMandatory = mandatoryDocs.filter((d) => d.status === 'UPLOADED');
   const allMandatoryUploaded = mandatoryDocs.length > 0 && uploadedMandatory.length === mandatoryDocs.length;
 
+  const needsAttentionDocs = documents.filter(
+    (d) =>
+      d.status === 'UPLOADED' &&
+      (d.is_type_match === false || d.processing_status === 'NEEDS_REVIEW' || d.processing_status === 'FAILED')
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -97,7 +103,7 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
         </h3>
         <p className="text-xs text-slate-500 mt-1">
           Upload statutory evidence required based on your legal constitution (
-          <span className="font-semibold text-slate-700">{application.constitution.replace('_', ' ')}</span>
+          <span className="font-semibold text-slate-700">{application.constitution.replace(/_/g, ' ')}</span>
           ), tax registration, and business operations. Each document is parsed via our automated OCR pipeline to extract compliance fields.
         </p>
       </div>
@@ -111,27 +117,43 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
         </div>
       )}
 
-      {/* Progress pill */}
-      <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <span className="text-xs font-bold text-slate-900">
-            Mandatory Documents Uploaded: {uploadedMandatory.length} of {mandatoryDocs.length}
-          </span>
-          <p className="text-[11px] text-slate-500">
-            {allMandatoryUploaded
-              ? 'All required documents have been uploaded.'
-              : 'Please upload all mandatory documents to proceed to final submission.'}
-          </p>
-        </div>
-        <div className="w-full sm:w-48 bg-slate-100 rounded-full h-2.5 overflow-hidden">
-          <div
-            className={`h-2.5 rounded-full transition-all ${
-              allMandatoryUploaded ? 'bg-emerald-500' : 'bg-indigo-600'
-            }`}
-            style={{
-              width: `${mandatoryDocs.length ? (uploadedMandatory.length / mandatoryDocs.length) * 100 : 0}%`,
-            }}
-          />
+      {/* Progress and Semantic Health Card */}
+      <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-900">
+                Mandatory Uploads: {uploadedMandatory.length} of {mandatoryDocs.length}
+              </span>
+              {needsAttentionDocs.length > 0 && (
+                <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-300 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3 text-amber-600" />
+                  {needsAttentionDocs.length} Needs Attention
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              {allMandatoryUploaded && needsAttentionDocs.length === 0
+                ? 'All mandatory statutory documents uploaded and successfully processed.'
+                : needsAttentionDocs.length > 0
+                ? `${needsAttentionDocs.length} uploaded document(s) have potential issues detected by automated verification. You may replace them before final submission.`
+                : 'Please upload all required statutory documents to unlock submission.'}
+            </p>
+          </div>
+          <div className="w-full sm:w-48 bg-slate-100 rounded-full h-2.5 overflow-hidden">
+            <div
+              className={`h-2.5 rounded-full transition-all ${
+                allMandatoryUploaded
+                  ? needsAttentionDocs.length > 0
+                    ? 'bg-amber-500'
+                    : 'bg-emerald-500'
+                  : 'bg-indigo-600'
+              }`}
+              style={{
+                width: `${mandatoryDocs.length ? (uploadedMandatory.length / mandatoryDocs.length) * 100 : 0}%`,
+              }}
+            />
+          </div>
         </div>
       </div>
 
@@ -144,13 +166,18 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
           const hasFlags = slot.review_flags && slot.review_flags.length > 0;
           const hasTypeMismatch = slot.is_type_match === false;
 
+          // Determine distinct semantic status
+          const isNeedsAttention = isUploaded && (hasTypeMismatch || procStatus === 'NEEDS_REVIEW' || procStatus === 'FAILED');
+          const isProcessing = isUploaded && (procStatus === 'PROCESSING' || procStatus === 'QUEUED');
+          const isVerifiedExtracted = isUploaded && !isNeedsAttention && !isProcessing;
+
           return (
             <div
               key={slot.id}
               className={`p-5 rounded-xl border transition-all ${
-                hasTypeMismatch
-                  ? 'bg-amber-50/30 border-amber-300'
-                  : isUploaded
+                isNeedsAttention
+                  ? 'bg-amber-50/40 border-amber-300'
+                  : isVerifiedExtracted
                   ? 'bg-emerald-50/20 border-emerald-200'
                   : slot.is_required
                   ? 'bg-white border-slate-200 hover:border-indigo-300'
@@ -161,6 +188,8 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
                 <div className="space-y-1.5 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-bold text-slate-900 text-sm">{slot.title}</span>
+
+                    {/* Requirement Tier */}
                     {slot.is_required ? (
                       <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
                         Mandatory
@@ -171,33 +200,25 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
                       </span>
                     )}
 
-                    {isUploaded && slot.current_version && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                        Uploaded (v{slot.current_version.version_number})
+                    {/* Semantic Status Badge */}
+                    {!isUploaded ? (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200">
+                        Pending Upload
                       </span>
-                    )}
-
-                    {/* Processing Status Badge */}
-                    {isUploaded && procStatus && (
-                      <span
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
-                          procStatus === 'EXTRACTED'
-                            ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                            : procStatus === 'NEEDS_REVIEW'
-                            ? 'bg-amber-50 text-amber-700 border-amber-300'
-                            : procStatus === 'PROCESSING' || procStatus === 'QUEUED'
-                            ? 'bg-blue-50 text-blue-700 border-blue-200'
-                            : 'bg-rose-50 text-rose-700 border-rose-200'
-                        }`}
-                      >
-                        {procStatus === 'EXTRACTED' && <Sparkles className="w-3 h-3 text-indigo-600" />}
-                        {procStatus === 'NEEDS_REVIEW' && <AlertTriangle className="w-3 h-3 text-amber-600" />}
-                        {(procStatus === 'PROCESSING' || procStatus === 'QUEUED') && (
-                          <RefreshCw className="w-3 h-3 text-blue-600 animate-spin" />
-                        )}
-                        {procStatus === 'FAILED' && <AlertCircle className="w-3 h-3 text-rose-600" />}
-                        <span>{procStatus.replace('_', ' ')}</span>
+                    ) : isNeedsAttention ? (
+                      <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3 text-amber-600" />
+                        Needs Attention (v{slot.current_version?.version_number || 1})
+                      </span>
+                    ) : isProcessing ? (
+                      <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1">
+                        <RefreshCw className="w-3 h-3 text-blue-600 animate-spin" />
+                        Processing OCR... (v{slot.current_version?.version_number || 1})
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        Uploaded &amp; Parsed (v{slot.current_version?.version_number || 1})
                       </span>
                     )}
                   </div>
@@ -229,7 +250,7 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
                         <div className="text-[11px] px-2 py-1 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
                           Detected:{' '}
                           <span className="font-bold text-slate-900">
-                            {slot.detected_document_type.replace('_', ' ')}
+                            {slot.detected_document_type.replace(/_/g, ' ')}
                           </span>
                         </div>
                       )}
@@ -242,7 +263,7 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
                       <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                       <div>
                         <span className="font-bold">Document Type Mismatch Warning:</span> This document resembles a{' '}
-                        <span className="font-bold underline">{slot.detected_document_type?.replace('_', ' ')}</span>{' '}
+                        <span className="font-bold underline">{slot.detected_document_type?.replace(/_/g, ' ')}</span>{' '}
                         rather than the requested <span className="font-bold">{slot.title}</span>. Please verify and
                         replace if incorrect.
                       </div>
@@ -262,7 +283,7 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
                           onClick={() => handleOpenInspection(slot)}
                           className="text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold underline flex items-center gap-1"
                         >
-                          <Search className="w-3 h-3" /> View Evidence & Confidence
+                          <Search className="w-3 h-3" /> View Evidence &amp; Confidence
                         </button>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-1">
@@ -305,7 +326,10 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
                     <>
                       <button
                         type="button"
-                        onClick={() => setPreviewDoc(slot)}
+                        onClick={() => {
+                          setPreviewError(false);
+                          setPreviewDoc(slot);
+                        }}
                         className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 shadow-2xs transition-colors"
                       >
                         <Eye className="w-3.5 h-3.5 text-indigo-600" />
@@ -370,6 +394,7 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
                 </p>
               </div>
               <button
+                type="button"
                 onClick={() => setPreviewDoc(null)}
                 className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
               >
@@ -378,24 +403,63 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
             </div>
 
             <div className="flex-1 bg-slate-100 p-2 overflow-auto flex items-center justify-center">
-              {previewDoc.current_version?.content_type === 'application/pdf' ? (
-                <iframe
-                  src={getDocumentPreviewUrl(application.id, previewDoc.id)}
-                  title="Document Preview"
-                  className="w-full h-full rounded-lg border border-slate-300 bg-white"
-                />
-              ) : (
-                <img
-                  src={getDocumentPreviewUrl(application.id, previewDoc.id)}
-                  alt="Document Preview"
-                  className="max-h-full max-w-full object-contain rounded-lg shadow-sm"
-                />
-              )}
+              {(() => {
+                const previewUrl = getDocumentPreviewUrl(application.id, previewDoc.id, token);
+                const filename = previewDoc.current_version?.original_filename || '';
+                const contentType = previewDoc.current_version?.content_type || '';
+                const isPdf = contentType === 'application/pdf' || filename.toLowerCase().endsWith('.pdf');
+                const isImage = contentType.startsWith('image/') || /\.(png|jpe?g)$/i.test(filename);
+
+                if (previewError) {
+                  return (
+                    <div className="p-8 text-center space-y-2 bg-white rounded-xl border border-slate-200 max-w-md shadow-2xs">
+                      <FileText className="w-10 h-10 text-slate-400 mx-auto" />
+                      <p className="text-xs font-bold text-slate-800">Preview rendering not available</p>
+                      <p className="text-[11px] text-slate-500">
+                        The document file is securely preserved in storage. The buyer compliance officer can inspect it directly.
+                      </p>
+                    </div>
+                  );
+                }
+
+                if (isPdf) {
+                  return (
+                    <iframe
+                      src={previewUrl}
+                      title="Document Preview"
+                      className="w-full h-full rounded-lg border border-slate-300 bg-white"
+                      onError={() => setPreviewError(true)}
+                    />
+                  );
+                }
+
+                if (isImage) {
+                  return (
+                    <img
+                      src={previewUrl}
+                      alt="Document Preview"
+                      className="max-h-full max-w-full object-contain rounded-lg shadow-sm"
+                      onError={() => setPreviewError(true)}
+                    />
+                  );
+                }
+
+                return (
+                  <div className="p-8 text-center space-y-2 bg-white rounded-xl border border-slate-200 max-w-md shadow-2xs">
+                    <FileText className="w-10 h-10 text-slate-400 mx-auto" />
+                    <p className="text-xs font-bold text-slate-800">Unsupported format for direct browser preview</p>
+                    <p className="text-[11px] text-slate-500">
+                      Standard inline rendering is supported for PDF, PNG, and JPEG files.
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="px-6 py-3 border-t border-slate-200 bg-white flex justify-between items-center text-xs text-slate-500">
-              <span>Private Object Storage &bull; In-line Streaming</span>
+              <span>Private Object Storage &bull; Authorized Inline Streaming</span>
               <button
+                type="button"
                 onClick={() => setPreviewDoc(null)}
                 className="px-4 py-1.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800"
               >
@@ -415,7 +479,7 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
                 <Sparkles className="w-5 h-5 text-indigo-600" />
                 <div>
                   <h4 className="text-sm font-bold text-slate-900">
-                    OCR & Compliance Extraction Evidence — {inspectingDoc.title}
+                    OCR &amp; Compliance Extraction Evidence — {inspectingDoc.title}
                   </h4>
                   <p className="text-xs text-slate-500 font-mono">
                     {inspectingDoc.current_version?.original_filename} (Version{' '}
@@ -424,6 +488,7 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setInspectingDoc(null)}
                 className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
               >
@@ -436,67 +501,73 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
               <div className="h-full bg-slate-100 p-3 overflow-auto flex flex-col">
                 <span className="text-[11px] font-bold text-slate-600 mb-2">Original Document Preview</span>
                 <div className="flex-1 bg-white rounded-xl border border-slate-300 overflow-hidden flex items-center justify-center">
-                  {inspectingDoc.current_version?.content_type === 'application/pdf' ? (
-                    <iframe
-                      src={getDocumentPreviewUrl(application.id, inspectingDoc.id)}
-                      title="Document Preview"
-                      className="w-full h-full"
-                    />
-                  ) : (
-                    <img
-                      src={getDocumentPreviewUrl(application.id, inspectingDoc.id)}
-                      alt="Document Preview"
-                      className="max-h-full max-w-full object-contain p-2"
-                    />
-                  )}
+                  {(() => {
+                    const previewUrl = getDocumentPreviewUrl(application.id, inspectingDoc.id, token);
+                    const filename = inspectingDoc.current_version?.original_filename || '';
+                    const contentType = inspectingDoc.current_version?.content_type || '';
+                    const isPdf = contentType === 'application/pdf' || filename.toLowerCase().endsWith('.pdf');
+
+                    if (isPdf) {
+                      return (
+                        <iframe
+                          src={previewUrl}
+                          title="Document Preview"
+                          className="w-full h-full"
+                        />
+                      );
+                    }
+                    return (
+                      <img
+                        src={previewUrl}
+                        alt="Document Preview"
+                        className="max-h-full max-w-full object-contain p-2"
+                      />
+                    );
+                  })()}
                 </div>
               </div>
 
               {/* Right Column: Structured Extraction & Provenance */}
-              <div className="h-full overflow-y-auto p-5 space-y-5">
+              <div className="h-full bg-white overflow-auto p-4 space-y-4">
                 {loadingExtraction ? (
-                  <div className="h-full flex flex-col items-center justify-center py-16 text-slate-500 space-y-2">
-                    <RefreshCw className="w-6 h-6 animate-spin text-indigo-600" />
-                    <span className="text-xs">Loading document extraction data...</span>
+                  <div className="py-16 text-center text-xs text-slate-400 flex flex-col items-center gap-2">
+                    <RefreshCw className="w-5 h-5 animate-spin text-indigo-600" />
+                    Loading OCR extraction fields &amp; layout coordinates...
                   </div>
                 ) : extractionDetail ? (
                   <>
-                    {/* Classification Decision */}
-                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-800">Classification Result</span>
-                        <span
-                          className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${
-                            extractionDetail.is_type_match
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                              : 'bg-amber-50 text-amber-800 border-amber-300'
-                          }`}
-                        >
-                          {extractionDetail.detected_document_type?.replace('_', ' ')} (
-                          {Math.round((extractionDetail.classification_confidence || 0) * 100)}% match)
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1 text-xs">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-slate-700">Classification:</span>
+                        <span className="font-mono font-bold text-indigo-900">
+                          {extractionDetail.detected_document_type || 'UNKNOWN'}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-600">{extractionDetail.classification_reason}</p>
-                      <div className="text-[11px] text-slate-400 font-mono">
-                        Pipeline Provider: {extractionDetail.provider_used} &bull; Pages: {extractionDetail.page_count}
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-slate-700">Classification Confidence:</span>
+                        <span className="font-mono font-bold text-slate-900">
+                          {Math.round((extractionDetail.classification_confidence || 0) * 100)}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-slate-700">Provider &amp; Pages:</span>
+                        <span>
+                          {extractionDetail.provider_used} &bull; {extractionDetail.page_count} page(s)
+                        </span>
                       </div>
                     </div>
 
-                    {/* Extracted Fields Table */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold text-slate-900">
-                          Extracted Structured Fields ({extractionDetail.fields.length})
-                        </span>
-                        <span className="text-[11px] text-slate-400">Field-level Confidence & Evidence</span>
-                      </div>
+                    <div className="space-y-2">
+                      <span className="text-xs font-bold text-slate-900 block">
+                        Extracted Statutory Fields ({extractionDetail.fields.length})
+                      </span>
 
                       {extractionDetail.fields.length === 0 ? (
-                        <div className="p-4 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
-                          No structured compliance identifiers recognized in document text.
+                        <div className="p-4 text-xs text-slate-400 text-center border border-dashed rounded-xl">
+                          No specific fields extracted from this document.
                         </div>
                       ) : (
-                        <div className="space-y-2.5">
+                        <div className="space-y-2">
                           {extractionDetail.fields.map((f) => (
                             <div key={f.id} className="p-3 rounded-xl border border-slate-200 bg-white space-y-1.5">
                               <div className="flex items-center justify-between">
@@ -570,6 +641,7 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
               </button>
 
               <button
+                type="button"
                 onClick={() => setInspectingDoc(null)}
                 className="px-4 py-1.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800"
               >

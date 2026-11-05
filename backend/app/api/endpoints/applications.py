@@ -9,11 +9,13 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, BackgroundTasks, Query
 from fastapi.responses import FileResponse
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.config import settings
-from app.core.deps import get_current_user, get_current_member, require_roles
+from app.core.security import decode_access_token
+from app.core.deps import get_current_user, get_current_member, require_roles, security_scheme
 from app.models.user import User
 from app.models.member import OrganisationMember
 from app.models.role import RoleEnum
@@ -194,7 +196,13 @@ def get_scoped_application(application_id: str, member: OrganisationMember, db: 
 
     # If the user is a vendor, restrict strictly to their own application
     if member.role == RoleEnum.VENDOR.value:
-        query = query.filter(Application.created_by_user_id == member.user_id)
+        from sqlalchemy import or_
+        query = query.filter(
+            or_(
+                Application.created_by_user_id == member.user_id,
+                Application.vendor.has(Vendor.created_by_user_id == member.user_id),
+            )
+        )
 
     app = query.first()
     if not app:
@@ -603,7 +611,28 @@ def update_application_draft(
         cats = update_dict.pop("categories")
         app.categories_json = json.dumps(cats if isinstance(cats, list) else [])
 
+    # Explicit GST registration status handling
+    if "is_gst_registered" in update_dict:
+        if not update_dict["is_gst_registered"]:
+            app.is_gst_registered = False
+            app.gstin = None
+        else:
+            app.is_gst_registered = True
+
+    # Explicit Udyam MSME status handling
+    if "is_udyam_registered" in update_dict:
+        if not update_dict["is_udyam_registered"]:
+            app.is_udyam_registered = False
+            app.udyam_number = None
+        else:
+            app.is_udyam_registered = True
+
     for field, val in update_dict.items():
+        if field in ["is_gst_registered", "is_udyam_registered"]:
+            continue
+        # Do not overwrite real stored bank account number if client sends masked bullets
+        if field == "bank_account_number" and val and ("•" in str(val) or "*" in str(val)):
+            continue
         if hasattr(app, field) and val is not None:
             setattr(app, field, val)
 
@@ -997,9 +1026,46 @@ def reprocess_document(
 def preview_document(
     application_id: str,
     document_id: str,
+    token: Optional[str] = Query(None, description="Bearer token for authenticated inline preview in iframe/img"),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
     db: Session = Depends(get_db),
-    member: OrganisationMember = Depends(get_current_member),
 ):
+    raw_token = credentials.credentials if credentials and credentials.credentials else token
+    if not raw_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication credentials were not provided.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    try:
+        payload = decode_access_token(raw_token)
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token subject.")
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session has expired or credentials could not be validated.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or deactivated.")
+
+    token_org_id = payload.get("org_id")
+    query = db.query(OrganisationMember).filter(
+        OrganisationMember.user_id == user.id,
+        OrganisationMember.is_active == True,
+    )
+    if token_org_id:
+        member = query.filter(OrganisationMember.organisation_id == token_org_id).first()
+    else:
+        member = query.first()
+
+    if not member:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No active organisation membership.")
+
     app = get_scoped_application(application_id, member, db)
     doc = (
         db.query(Document)
@@ -1017,9 +1083,21 @@ def preview_document(
     if not file_path.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Underlying storage file not found.")
 
+    media_type = latest_version.content_type
+    ext = file_path.suffix.lower()
+    if not media_type or media_type == "application/octet-stream":
+        if ext == ".pdf":
+            media_type = "application/pdf"
+        elif ext in [".jpg", ".jpeg"]:
+            media_type = "image/jpeg"
+        elif ext == ".png":
+            media_type = "image/png"
+        else:
+            media_type = "application/octet-stream"
+
     return FileResponse(
         path=str(file_path),
-        media_type=latest_version.content_type,
+        media_type=media_type,
         filename=latest_version.original_filename,
         content_disposition_type="inline",
     )
@@ -1049,60 +1127,60 @@ def submit_application(
 
     missing_fields = []
 
-    # Section 1: Business Identity
+    # Step 1: Business Identity
     if not app.legal_name or not app.legal_name.strip():
-        missing_fields.append("Section 1: Legal Business Name is required")
+        missing_fields.append("Step 1 (Identity): Legal Business Name is required")
     if not app.constitution:
-        missing_fields.append("Section 1: Legal Constitution is required")
+        missing_fields.append("Step 1 (Identity): Legal Constitution is required")
     if not app.registered_address or not app.registered_address.strip():
-        missing_fields.append("Section 1: Registered Address is required")
+        missing_fields.append("Step 1 (Identity): Registered Address is required")
     if not app.city or not app.city.strip():
-        missing_fields.append("Section 1: City is required")
+        missing_fields.append("Step 1 (Identity): City is required")
     if not app.state or not app.state.strip():
-        missing_fields.append("Section 1: State is required")
+        missing_fields.append("Step 1 (Identity): State is required")
     if not app.pincode or not app.pincode.strip():
-        missing_fields.append("Section 1: PIN Code is required")
+        missing_fields.append("Step 1 (Identity): PIN Code is required")
 
-    # Section 2: Tax & Registration
+    # Step 2: Tax & Registration
     if not app.pan or not app.pan.strip():
-        missing_fields.append("Section 2: PAN is required")
+        missing_fields.append("Step 2 (Tax & Reg): PAN is required")
     if app.is_gst_registered and (not app.gstin or not app.gstin.strip()):
-        missing_fields.append("Section 2: GSTIN is required when registered for GST")
+        missing_fields.append("Step 2 (Tax & Reg): GSTIN is required when registered for GST")
     if app.is_udyam_registered and (not app.udyam_number or not app.udyam_number.strip()):
-        missing_fields.append("Section 2: Udyam Registration Number is required when registered under MSME")
+        missing_fields.append("Step 2 (Tax & Reg): Udyam Registration Number is required when registered under MSME")
     if app.constitution in [ConstitutionEnum.PVT_LTD.value, ConstitutionEnum.PUB_LTD.value, ConstitutionEnum.LLP.value]:
         if not app.cin_llpin or not app.cin_llpin.strip():
-            missing_fields.append(f"Section 2: CIN/LLPIN is required for {app.constitution.replace('_', ' ')}")
+            missing_fields.append(f"Step 2 (Tax & Reg): CIN/LLPIN is required for {app.constitution.replace('_', ' ')}")
 
-    # Section 3: Authorised Contact
+    # Step 3: Authorised Contact
     if not app.contact_name or not app.contact_name.strip():
-        missing_fields.append("Section 3: Contact Person Name is required")
+        missing_fields.append("Step 3 (Contact): Contact Person Name is required")
     if not app.contact_email or not app.contact_email.strip():
-        missing_fields.append("Section 3: Contact Email is required")
+        missing_fields.append("Step 3 (Contact): Contact Email is required")
     if not app.contact_mobile or not app.contact_mobile.strip():
-        missing_fields.append("Section 3: Contact Mobile is required")
+        missing_fields.append("Step 3 (Contact): Contact Mobile is required")
 
-    # Section 4: Banking Details
+    # Step 4: Banking Details
     if not app.bank_account_holder_name or not app.bank_account_holder_name.strip():
-        missing_fields.append("Section 4: Bank Account Holder Name is required")
+        missing_fields.append("Step 4 (Banking): Bank Account Holder Name is required")
     if not app.bank_account_number or not app.bank_account_number.strip():
-        missing_fields.append("Section 4: Bank Account Number is required")
+        missing_fields.append("Step 4 (Banking): Bank Account Number is required")
     if not app.bank_ifsc or not app.bank_ifsc.strip():
-        missing_fields.append("Section 4: Bank IFSC Code is required")
+        missing_fields.append("Step 4 (Banking): Bank IFSC Code is required")
 
-    # Section 6: Declarations
+    # Step 7: Declarations
     if not app.declaration_accurate_info:
-        missing_fields.append("Section 6: Accuracy declaration must be confirmed")
+        missing_fields.append("Step 7 (Review): Accuracy declaration must be confirmed")
     if not app.declaration_authorised_rep:
-        missing_fields.append("Section 6: Authorised representation declaration must be confirmed")
+        missing_fields.append("Step 7 (Review): Authorised representation declaration must be confirmed")
     if not app.declaration_verification_consent:
-        missing_fields.append("Section 6: Verification and processing consent must be confirmed")
+        missing_fields.append("Step 7 (Review): Verification and processing consent must be confirmed")
 
-    # Mandatory Documents
+    # Mandatory Documents (Step 6)
     missing_docs = []
     for doc in app.documents:
         if doc.is_required and doc.status != "UPLOADED":
-            missing_docs.append(f"Document missing: {doc.title}")
+            missing_docs.append(f"Step 6 (Checklist): Document missing - {doc.title}")
 
     all_errors = missing_fields + missing_docs
     if all_errors:

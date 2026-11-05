@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Application, ApplicationDraftUpdate } from '../../types/application';
 import { apiUpdateApplicationDraft } from '../../api/applications';
 import { StepBusinessIdentity } from './StepBusinessIdentity';
@@ -21,16 +21,17 @@ import {
   ArrowLeft,
   Save,
   CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface WizardProps {
   token: string;
   initialApplication: Application;
-  onRefresh: () => void;
+  onRefresh: (silent?: boolean) => void;
   onSubmitSuccess: (refNumber: string) => void;
 }
 
-const STEPS = [
+export const STEPS = [
   { id: 0, label: 'Identity', icon: Building, title: 'Business Identity' },
   { id: 1, label: 'Tax & Reg', icon: FileCheck2, title: 'Tax & Registration' },
   { id: 2, label: 'Contact', icon: UserCheck, title: 'Authorised Contact' },
@@ -40,19 +41,150 @@ const STEPS = [
   { id: 6, label: 'Review', icon: ShieldCheck, title: 'Review & Submit' },
 ];
 
+export function isStepValid(stepIdx: number, app: Application): { isValid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  switch (stepIdx) {
+    case 0: // Identity
+      if (!app.legal_name || !app.legal_name.trim() || app.legal_name.trim().length < 2) {
+        errors.push('Legal Business Name is required (minimum 2 characters).');
+      }
+      if (!app.constitution) {
+        errors.push('Legal Constitution must be selected.');
+      }
+      if (!app.registered_address || !app.registered_address.trim()) {
+        errors.push('Registered Office Address is required.');
+      }
+      if (!app.city || !app.city.trim()) {
+        errors.push('City is required.');
+      }
+      if (!app.state || !app.state.trim()) {
+        errors.push('State / Union Territory is required.');
+      }
+      if (!app.pincode || !/^\d{6}$/.test(app.pincode.trim())) {
+        errors.push('PIN Code must be exactly 6 digits.');
+      }
+      break;
+
+    case 1: // Tax & Registration
+      if (!app.pan || !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(app.pan.trim().toUpperCase())) {
+        errors.push('Valid 10-character Permanent Account Number (PAN) is required (e.g. ABCDE1234F).');
+      }
+      if (app.is_gst_registered) {
+        const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+        if (!app.gstin || !gstRegex.test(app.gstin.trim().toUpperCase())) {
+          errors.push('Valid 15-character statutory GSTIN is required when declared GST registered.');
+        }
+      }
+      if (app.is_udyam_registered && (!app.udyam_number || !app.udyam_number.trim())) {
+        errors.push('Udyam Registration Number is required when declared registered under MSME.');
+      }
+      if (['PVT_LTD', 'PUB_LTD', 'LLP'].includes(app.constitution)) {
+        if (!app.cin_llpin || !app.cin_llpin.trim()) {
+          errors.push(`Statutory ${app.constitution === 'LLP' ? 'LLPIN' : 'CIN'} is required for ${app.constitution.replace(/_/g, ' ')}.`);
+        }
+      }
+      break;
+
+    case 2: // Contact
+      if (!app.contact_name || !app.contact_name.trim()) {
+        errors.push('Primary Contact Person Name is required.');
+      }
+      if (!app.contact_designation || !app.contact_designation.trim()) {
+        errors.push('Contact Person Designation / Title is required.');
+      }
+      if (!app.contact_email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(app.contact_email.trim())) {
+        errors.push('Valid Contact Email Address is required.');
+      }
+      if (!app.contact_mobile || !/^(?:\+91|0)?[6-9]\d{9}$/.test(app.contact_mobile.trim().replace(/[\s-]/g, ''))) {
+        errors.push('Valid 10-digit Indian Mobile Number is required.');
+      }
+      break;
+
+    case 3: // Banking
+      if (!app.bank_account_holder_name || !app.bank_account_holder_name.trim()) {
+        errors.push('Bank Account Beneficiary / Holder Name is required.');
+      }
+      if (!app.bank_account_number || !app.bank_account_number.trim()) {
+        errors.push('Bank Account Number is required.');
+      }
+      if (!app.bank_ifsc || !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(app.bank_ifsc.trim().toUpperCase())) {
+        errors.push('Valid 11-character RBI IFSC Code is required (e.g. HDFC0000123).');
+      }
+      break;
+
+    case 4: // Activity / Classification
+      if (!app.categories || app.categories.length === 0) {
+        errors.push('Select at least one business activity classification category.');
+      }
+      break;
+
+    case 5: // Document Checklist
+      const mandatoryDocs = (app.documents || []).filter((d) => d.is_required);
+      const missingDocs = mandatoryDocs.filter((d) => d.status !== 'UPLOADED');
+      if (missingDocs.length > 0) {
+        missingDocs.forEach((d) => errors.push(`Mandatory document upload required: ${d.title}.`));
+      }
+      break;
+
+    case 6: // Review & Submit
+      // Check prior steps
+      for (let i = 0; i < 6; i++) {
+        const prior = isStepValid(i, app);
+        if (!prior.isValid) {
+          errors.push(`Complete all mandatory fields in Step ${i + 1} (${STEPS[i].label}).`);
+        }
+      }
+      if (!app.declaration_accurate_info) {
+        errors.push('Please confirm the accuracy declaration.');
+      }
+      if (!app.declaration_authorised_rep) {
+        errors.push('Please confirm the authorized representation declaration.');
+      }
+      if (!app.declaration_verification_consent) {
+        errors.push('Please confirm the verification and processing consent declaration.');
+      }
+      break;
+  }
+
+  return { isValid: errors.length === 0, errors };
+}
+
 export const OnboardingWizard: React.FC<WizardProps> = ({
   token,
   initialApplication,
   onRefresh,
   onSubmitSuccess,
 }) => {
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState<number>(() => {
+    try {
+      const saved = sessionStorage.getItem(`vop_step_${initialApplication.id}`);
+      if (saved !== null) {
+        const val = parseInt(saved, 10);
+        if (!isNaN(val) && val >= 0 && val < STEPS.length) return val;
+      }
+    } catch {}
+    return 0;
+  });
+
   const [application, setApplication] = useState<Application>(initialApplication);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+  const [stepErrors, setStepErrors] = useState<{ stepId: number; errors: string[] } | null>(null);
+
+  useEffect(() => {
+    setApplication(initialApplication);
+  }, [initialApplication]);
+
+  const updateStep = (newStep: number) => {
+    setCurrentStep(newStep);
+    try {
+      sessionStorage.setItem(`vop_step_${application.id}`, String(newStep));
+    } catch {}
+  };
 
   const handleFieldChange = async (updates: ApplicationDraftUpdate) => {
-    // Optimistic local state update
+    setStepErrors(null);
     setApplication((prev) => ({
       ...prev,
       ...updates,
@@ -60,7 +192,6 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
       categories: updates.categories !== undefined ? updates.categories : prev.categories,
     }));
 
-    // Auto-save debounced or explicit
     try {
       const updated = await apiUpdateApplicationDraft(token, application.id, updates);
       setApplication(updated);
@@ -85,9 +216,9 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
         pincode: application.pincode || undefined,
         pan: application.pan || undefined,
         is_gst_registered: application.is_gst_registered,
-        gstin: application.gstin || undefined,
+        gstin: application.is_gst_registered ? (application.gstin || undefined) : undefined,
         is_udyam_registered: application.is_udyam_registered,
-        udyam_number: application.udyam_number || undefined,
+        udyam_number: application.is_udyam_registered ? (application.udyam_number || undefined) : undefined,
         cin_llpin: application.cin_llpin || undefined,
         contact_name: application.contact_name || undefined,
         contact_designation: application.contact_designation || undefined,
@@ -107,7 +238,7 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
       setApplication(updated);
       setSaveSuccessMsg(`Progress saved at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
       setTimeout(() => setSaveSuccessMsg(null), 3000);
-      onRefresh();
+      onRefresh(true);
     } catch (err: any) {
       alert(err?.message || 'Failed to save draft progress.');
     } finally {
@@ -115,17 +246,58 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
     }
   };
 
+  const handleStepClick = (targetStep: number) => {
+    if (targetStep <= currentStep) {
+      // Backward navigation to review or edit previous steps is always permitted
+      setStepErrors(null);
+      updateStep(targetStep);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // Forward navigation: verify all prior steps are completed
+    for (let i = 0; i < targetStep; i++) {
+      const check = isStepValid(i, application);
+      if (!check.isValid) {
+        setStepErrors({
+          stepId: i,
+          errors: check.errors,
+        });
+        updateStep(i);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+    }
+
+    setStepErrors(null);
+    updateStep(targetStep);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleNext = async () => {
+    // Validate current step before advancing
+    const check = isStepValid(currentStep, application);
+    if (!check.isValid) {
+      setStepErrors({
+        stepId: currentStep,
+        errors: check.errors,
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    setStepErrors(null);
     await handleExplicitSave();
     if (currentStep < STEPS.length - 1) {
-      setCurrentStep((prev) => prev + 1);
+      updateStep(currentStep + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   const handlePrev = () => {
+    setStepErrors(null);
     if (currentStep > 0) {
-      setCurrentStep((prev) => prev - 1);
+      updateStep(currentStep - 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -134,8 +306,9 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
     <div className="space-y-6">
       {/* Priority Vendor Exception Clarifications & Corrections */}
       <VendorExceptionsBanner
+        token={token}
         applicationId={application.id}
-        onCorrectionSubmitted={onRefresh}
+        onCorrectionSubmitted={() => onRefresh(true)}
       />
 
       {/* Top Wizard Navigation Card */}
@@ -173,22 +346,26 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
           {STEPS.map((step) => {
             const Icon = step.icon;
             const isCurrent = currentStep === step.id;
-            const isCompleted = currentStep > step.id;
+            const isCompleted = isStepValid(step.id, application).isValid;
 
             return (
               <button
                 key={step.id}
                 type="button"
-                onClick={() => setCurrentStep(step.id)}
+                onClick={() => handleStepClick(step.id)}
                 className={`flex flex-col sm:flex-row items-center sm:items-start gap-1.5 p-2 rounded-xl text-center sm:text-left transition-all ${
                   isCurrent
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : isCompleted
-                    ? 'text-slate-700 hover:bg-slate-100'
+                    ? 'text-slate-800 hover:bg-emerald-50/50 bg-emerald-50/20'
                     : 'text-slate-400 hover:bg-slate-50'
                 }`}
               >
-                <Icon className={`w-4 h-4 shrink-0 ${isCurrent ? 'text-white' : isCompleted ? 'text-emerald-600' : 'text-slate-400'}`} />
+                {isCompleted && !isCurrent ? (
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                ) : (
+                  <Icon className={`w-4 h-4 shrink-0 ${isCurrent ? 'text-white' : 'text-slate-400'}`} />
+                )}
                 <div className="truncate">
                   <div className="text-[10px] uppercase font-bold tracking-wider leading-none">
                     Step {step.id + 1}
@@ -202,6 +379,23 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
           })}
         </div>
       </div>
+
+      {/* Section Validation Error Banner */}
+      {stepErrors && stepErrors.stepId === currentStep && (
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-start gap-3 shadow-2xs">
+          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <span className="font-bold block">
+              Please complete all mandatory information in Step {currentStep + 1} ({STEPS[currentStep].title}) to continue:
+            </span>
+            <ul className="list-disc list-inside space-y-0.5 text-rose-700">
+              {stepErrors.errors.map((err, idx) => (
+                <li key={idx}>{err}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       {/* Active Step Container */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-2xs">
@@ -234,7 +428,7 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
           <StepReviewSubmit
             token={token}
             application={application}
-            onGoToStep={(stepIdx) => setCurrentStep(stepIdx)}
+            onGoToStep={(stepIdx) => handleStepClick(stepIdx)}
             onChange={handleFieldChange}
             onSubmitSuccess={onSubmitSuccess}
           />

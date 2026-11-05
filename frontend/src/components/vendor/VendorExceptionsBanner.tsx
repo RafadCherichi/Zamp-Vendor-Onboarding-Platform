@@ -13,11 +13,13 @@ import type { OnboardingException } from '../../types/exception';
 
 interface VendorExceptionsBannerProps {
   applicationId: string;
+  token?: string;
   onCorrectionSubmitted?: () => void;
 }
 
 export const VendorExceptionsBanner: React.FC<VendorExceptionsBannerProps> = ({
   applicationId,
+  token,
   onCorrectionSubmitted,
 }) => {
   const [exceptions, setExceptions] = useState<OnboardingException[]>([]);
@@ -34,7 +36,7 @@ export const VendorExceptionsBanner: React.FC<VendorExceptionsBannerProps> = ({
   const fetchExceptions = async () => {
     try {
       setLoading(true);
-      const data = await exceptionsApi.getExceptions({ application_id: applicationId });
+      const data = await exceptionsApi.getExceptions({ application_id: applicationId }, token);
       setExceptions(data);
     } catch (err) {
       console.error('Failed to fetch exceptions for vendor:', err);
@@ -47,7 +49,7 @@ export const VendorExceptionsBanner: React.FC<VendorExceptionsBannerProps> = ({
     if (applicationId) {
       fetchExceptions();
     }
-  }, [applicationId]);
+  }, [applicationId, token]);
 
   const actionableExceptions = exceptions.filter(
     (e) => e.status === 'ACTION_REQUIRED_FROM_VENDOR'
@@ -63,6 +65,53 @@ export const VendorExceptionsBanner: React.FC<VendorExceptionsBannerProps> = ({
 
   if (actionableExceptions.length === 0 && submittedExceptions.length === 0) {
     return null;
+  }
+
+  if (actionableExceptions.length === 0 && submittedExceptions.length > 0) {
+    return (
+      <div className="mb-6 rounded-xl border border-sky-200 bg-sky-50/50 shadow-sm overflow-hidden">
+        <div className="p-4 sm:p-5 bg-gradient-to-r from-sky-600 to-indigo-600 text-white flex items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-white/20 backdrop-blur-xs">
+              <Clock className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base leading-tight">
+                Responses Submitted — Awaiting Review ({submittedExceptions.length})
+              </h3>
+              <p className="text-xs text-sky-100 mt-0.5">
+                Your clarifications and corrections have been submitted to the compliance team. No further action is required from you at this time.
+              </p>
+            </div>
+          </div>
+          <span className="hidden sm:inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-white text-indigo-800 shadow-xs">
+            Responses Under Review
+          </span>
+        </div>
+        <div className="p-4 sm:p-5 space-y-3">
+          {submittedExceptions.map((subExc) => (
+            <div
+              key={subExc.id}
+              className="bg-white rounded-lg border border-slate-200 p-3.5 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs"
+            >
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-900">{subExc.title}</span>
+                  <span className="text-slate-400 font-mono text-[11px]">({subExc.reference_number})</span>
+                </div>
+                {subExc.description && (
+                  <p className="text-slate-500 text-[11px] mt-0.5 line-clamp-1">{subExc.description}</p>
+                )}
+              </div>
+              <span className="px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 font-semibold text-[11px] border border-sky-200 self-start sm:self-auto shrink-0 flex items-center gap-1">
+                <Clock className="w-3 h-3 text-sky-600" />
+                Under Compliance Review
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   const handleFieldChange = (excId: string, val: string) => {
@@ -98,21 +147,25 @@ export const VendorExceptionsBanner: React.FC<VendorExceptionsBannerProps> = ({
       setErrorMessages((prev) => ({ ...prev, [excId]: '' }));
 
       // If document replacement was provided
+      const authToken = token || localStorage.getItem('token') || localStorage.getItem('vop_auth_token') || '';
       if (file) {
-        const token = localStorage.getItem('token') || '';
         let docType = 'PAN_PROOF';
         if (exc.category.includes('GST')) docType = 'GST_CERTIFICATE';
         else if (exc.category.includes('BANK')) docType = 'BANK_PROOF';
         else if (exc.category.includes('CIN') || exc.category.includes('LLPIN')) docType = 'COI';
-        await apiUploadDocument(token, applicationId, docType, file);
+        await apiUploadDocument(authToken, applicationId, docType, file);
       }
 
       // Submit field correction and clarification
-      await exceptionsApi.submitVendorCorrection(excId, {
-        field_name: exc.related_field_name,
-        new_field_value: newVal ? newVal.trim().toUpperCase() : undefined,
-        explanation: exp ? exp.trim() : (file ? 'Uploaded replacement document' : undefined),
-      });
+      await exceptionsApi.submitVendorCorrection(
+        excId,
+        {
+          field_name: exc.related_field_name,
+          new_field_value: newVal ? newVal.trim().toUpperCase() : undefined,
+          explanation: exp ? exp.trim() : (file ? 'Uploaded replacement document' : undefined),
+        },
+        authToken
+      );
 
       setSuccessMessages((prev) => ({
         ...prev,

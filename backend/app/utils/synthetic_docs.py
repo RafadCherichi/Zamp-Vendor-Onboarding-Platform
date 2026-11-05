@@ -357,7 +357,8 @@ def generate_synthetic_unreadable_image(dest_path: str) -> str:
 
     # Blur heavily so zero text is recognizable
     img = img.filter(ImageFilter.GaussianBlur(radius=8))
-    img.save(dest_path, "PNG")
+    with open(dest_path, "wb") as f:
+        img.save(f, format="PNG")
     return dest_path
 
 
