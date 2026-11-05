@@ -71,6 +71,7 @@ class ApplicationDraftUpdate(BaseModel):
 
     # Section 5: Business Classification
     categories: Optional[List[str]] = None
+    other_business_activity_description: Optional[str] = None
 
     # Section 6: Declarations & Consent
     declaration_accurate_info: Optional[bool] = None
@@ -123,6 +124,7 @@ class ApplicationResponse(BaseModel):
 
     # Section 5
     categories: List[str] = []
+    other_business_activity_description: Optional[str] = None
 
     # Section 6
     declaration_accurate_info: bool

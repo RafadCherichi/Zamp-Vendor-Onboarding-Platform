@@ -86,39 +86,41 @@ const MainAppContent: React.FC = () => {
         {user.role === 'reviewer' && <ReviewerDashboard />}
         {user.role === 'admin' && <AdminDashboard />}
 
-        {/* Collapsible System Health & Diagnostics */}
-        <div className="pt-4 border-t border-slate-200">
-          <button
-            onClick={() => setShowDiagnostics((prev) => !prev)}
-            className="flex items-center justify-between w-full p-3 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
-          >
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-indigo-600" />
-              <span>Foundation Environment Diagnostics (Database & Object Storage Health)</span>
-            </div>
-            {showDiagnostics ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
+        {/* Collapsible System Health & Diagnostics (Admin & Internal Staff Only; Hidden from Vendors) */}
+        {user.role !== 'vendor' && (
+          <div className="pt-4 border-t border-slate-200">
+            <button
+              onClick={() => setShowDiagnostics((prev) => !prev)}
+              className="flex items-center justify-between w-full p-3 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
+            >
+              <div className="flex items-center gap-2">
+                <Activity className="w-4 h-4 text-indigo-600" />
+                <span>Foundation Environment Diagnostics (Database & Object Storage Health)</span>
+              </div>
+              {showDiagnostics ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
 
-          {showDiagnostics && (
-            <div className="mt-3">
-              <HealthCard
-                health={health}
-                loading={healthLoading}
-                error={healthError}
-                onRefresh={loadHealthData}
-              />
-            </div>
-          )}
-        </div>
+            {showDiagnostics && (
+              <div className="mt-3">
+                <HealthCard
+                  health={health}
+                  loading={healthLoading}
+                  error={healthError}
+                  onRefresh={loadHealthData}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
       <footer className="bg-white border-t border-slate-200 py-4 mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
           <div>
-            Vendor Onboarding Platform &bull; India Edition &bull; Increment 1 Identity & App Shell
+            Vendor Onboarding &amp; Statutory Compliance Platform &bull; India Edition
           </div>
           <div>
-            Organisation Scoped: <span className="font-semibold text-slate-700">{user.organisation.name}</span>
+            Organisation: <span className="font-semibold text-slate-700">{user.organisation.name}</span>
           </div>
         </div>
       </footer>

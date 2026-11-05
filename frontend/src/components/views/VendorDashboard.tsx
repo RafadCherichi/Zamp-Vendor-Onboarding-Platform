@@ -56,7 +56,7 @@ export const VendorDashboard: React.FC = () => {
     );
   }
 
-  if (['SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'ESCALATED'].includes(application.status)) {
+  if (['SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'ESCALATED', 'ACTION_REQUIRED'].includes(application.status)) {
     return (
       <SubmissionConfirmation
         token={token!}

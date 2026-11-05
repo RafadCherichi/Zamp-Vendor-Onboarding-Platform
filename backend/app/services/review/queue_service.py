@@ -437,6 +437,7 @@ class QueueAndDashboardService:
             },
             "classification": {
                 "categories": json.loads(app.categories_json) if app.categories_json else [],
+                "other_business_activity_description": app.other_business_activity_description,
             },
             "declarations": {
                 "declaration_accurate_info": app.declaration_accurate_info,
@@ -661,6 +662,7 @@ class QueueAndDashboardService:
         return {
             "overview": overview,
             "business_details": business_details,
+            "classification": business_details["classification"],
             "documents": docs_list,
             "validation": validation_data,
             "exceptions": exceptions_list,

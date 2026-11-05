@@ -41,11 +41,10 @@ export const StepBusinessIdentity: React.FC<StepProps> = ({ application, onChang
       <div>
         <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
           <Building className="w-5 h-5 text-indigo-600" />
-          Section 1: Business Identity & Legal Entity
+          Step 1: About Your Business
         </h3>
         <p className="text-xs text-slate-500 mt-1">
-          Provide legal and operational identification for your business. Requirements and verification
-          checklists dynamically adapt to your selected constitution.
+          Tell us about your business name, legal structure, and registered office address as shown on your official registration certificates.
         </p>
       </div>
 

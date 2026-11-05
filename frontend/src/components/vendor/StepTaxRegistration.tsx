@@ -15,11 +15,10 @@ export const StepTaxRegistration: React.FC<StepProps> = ({ application, onChange
       <div>
         <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
           <FileCheck2 className="w-5 h-5 text-indigo-600" />
-          Section 2: Tax & Statutory Registration
+          Step 2: Tax Details
         </h3>
         <p className="text-xs text-slate-500 mt-1">
-          Provide your Indian tax identifiers. GST and MSME registrations are conditional based on
-          your business eligibility.
+          Enter your business PAN. If your business is registered under GST or Udyam, provide those details too. If you are not registered, you can select that option and continue.
         </p>
       </div>
 

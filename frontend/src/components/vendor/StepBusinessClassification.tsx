@@ -54,15 +54,29 @@ const CATEGORIES: { id: string; label: string; desc: string; licenceHint?: strin
 
 export const StepBusinessClassification: React.FC<StepProps> = ({ application, onChange }) => {
   const selectedCategories = application.categories || [];
+  const otherDescription = application.other_business_activity_description || '';
+  const isOtherSelected = selectedCategories.includes('other');
 
   const handleToggle = (categoryId: string) => {
     let updated: string[];
     if (selectedCategories.includes(categoryId)) {
       updated = selectedCategories.filter((c) => c !== categoryId);
+      // When 'other' is deselected, clear the description
+      if (categoryId === 'other') {
+        onChange({
+          categories: updated,
+          other_business_activity_description: '',
+        });
+        return;
+      }
     } else {
       updated = [...selectedCategories, categoryId];
     }
     onChange({ categories: updated });
+  };
+
+  const handleDescriptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange({ other_business_activity_description: e.target.value });
   };
 
   return (
@@ -70,13 +84,19 @@ export const StepBusinessClassification: React.FC<StepProps> = ({ application, o
       <div>
         <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
           <Tag className="w-5 h-5 text-indigo-600" />
-          Section 5: Business Activity & Classification
+          Step 5: What Does Your Business Do?
         </h3>
         <p className="text-xs text-slate-500 mt-1">
-          Select all applicable business operations your organization provides to the buyer. This
-          determines applicable industry licences and compliance requirements.
+          Select all activities that describe the products or services your business provides. This helps us ask for only the relevant documents and registrations.
         </p>
       </div>
+
+      {selectedCategories.length === 0 && (
+        <div className="p-3 bg-amber-50 text-amber-800 rounded-xl border border-amber-200 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+          <span>Please select at least one activity that describes the products or services your business provides.</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {CATEGORIES.map((cat) => {
@@ -111,11 +131,34 @@ export const StepBusinessClassification: React.FC<StepProps> = ({ application, o
         })}
       </div>
 
+      {/* Dynamic Conditional Other Description */}
+      {isOtherSelected && (
+        <div className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-200 space-y-2 animate-fadeIn">
+          <label htmlFor="other_business_desc" className="block text-xs font-bold text-slate-900">
+            Please describe your business activity <span className="text-rose-500">*</span>
+          </label>
+          <p className="text-[11px] text-slate-500">
+            Tell us what products or services your business provides.
+          </p>
+          <input
+            id="other_business_desc"
+            type="text"
+            value={otherDescription}
+            onChange={handleDescriptionChange}
+            placeholder="e.g. Automobile spare parts repair and maintenance"
+            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-2xs"
+          />
+          {!otherDescription.trim() && (
+            <span className="text-[11px] text-rose-600 font-medium block">
+              A description is required when 'Other Business Activities' is selected.
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600">
-        <span className="font-semibold text-slate-900">Dynamic Checklist Impact:</span> The Document
-        Checklist in Step 6 automatically recalculates when categories change. For example, selecting{' '}
-        <span className="font-semibold">Food, Beverages & Catering</span> activates mandatory FSSAI
-        verification.
+        <span className="font-semibold text-slate-900">Required Documents:</span> The document checklist in the next step automatically updates based on your selections above. For example, selecting{' '}
+        <span className="font-semibold">Food, Beverages & Catering</span> adds an FSSAI Food Safety Licence requirement.
       </div>
     </div>
   );

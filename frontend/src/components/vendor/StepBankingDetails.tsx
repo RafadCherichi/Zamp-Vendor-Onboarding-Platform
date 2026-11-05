@@ -41,27 +41,28 @@ export const StepBankingDetails: React.FC<StepProps> = ({ application, onChange 
       <div>
         <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
           <Landmark className="w-5 h-5 text-indigo-600" />
-          Section 4: Banking &amp; Disbursement Details
+          Step 4: Bank Account Details
         </h3>
         <p className="text-xs text-slate-500 mt-1">
-          Provide your commercial bank account details for invoice disbursement. Details must match
-          the cancelled cheque or bank proof uploaded in the document checklist.
+          Enter the bank account where you want to receive payments. Make sure the account holder name
+          matches your registered business or proprietor name.
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-            Beneficiary / Account Holder Name <span className="text-rose-500">*</span>
+            Beneficiary / Account Holder Name (as per Bank Records) <span className="text-rose-500">*</span>
           </label>
           <input
             type="text"
             required
             value={application.bank_account_holder_name || ''}
             onChange={(e) => onChange({ bank_account_holder_name: e.target.value })}
-            placeholder="Name exactly as printed on bank records"
+            placeholder="Name exactly as printed on cheque or bank statement"
             className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white"
           />
+          <p className="text-[11px] text-slate-400 mt-1">Must match your business entity or proprietor name</p>
         </div>
 
         <div>
@@ -72,9 +73,10 @@ export const StepBankingDetails: React.FC<StepProps> = ({ application, onChange 
             type="text"
             value={application.bank_name || ''}
             onChange={(e) => onChange({ bank_name: e.target.value })}
-            placeholder="e.g. HDFC Bank, State Bank of India, ICICI Bank"
+            placeholder="e.g. State Bank of India, HDFC Bank, ICICI Bank"
             className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white"
           />
+          <p className="text-[11px] text-slate-400 mt-1">Commercial or public-sector scheduled bank</p>
         </div>
 
         {/* Bank Account Number handling (with saved-mask preservation) */}
@@ -166,7 +168,7 @@ export const StepBankingDetails: React.FC<StepProps> = ({ application, onChange 
 
         <div>
           <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-            IFSC Code (11 alphanumeric characters) <span className="text-rose-500">*</span>
+            IFSC Code (11 characters) <span className="text-rose-500">*</span>
           </label>
           <input
             type="text"
@@ -177,6 +179,7 @@ export const StepBankingDetails: React.FC<StepProps> = ({ application, onChange 
             placeholder="e.g. HDFC0000123"
             className="w-full px-3 py-2 text-xs font-mono uppercase tracking-wider border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white"
           />
+          <p className="text-[11px] text-slate-400 mt-1">Found on your cheque or passbook (the 5th character is always 0)</p>
         </div>
 
         <div>
@@ -188,17 +191,18 @@ export const StepBankingDetails: React.FC<StepProps> = ({ application, onChange 
             onChange={(e) => onChange({ bank_account_type: e.target.value })}
             className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white"
           >
-            <option value="CURRENT">Current Account (Commercial)</option>
-            <option value="SAVINGS">Savings Account (Individual / Proprietor)</option>
-            <option value="OD_CC">Overdraft / Cash Credit Account</option>
+            <option value="CURRENT">Current Account (Commercial / Recommended)</option>
+            <option value="SAVINGS">Savings Account (Individual / Sole Proprietorship)</option>
+            <option value="OD_CC">Cash Credit / Overdraft Account (OD/CC)</option>
           </select>
+          <p className="text-[11px] text-slate-400 mt-1">Select account type registered with your bank</p>
         </div>
       </div>
 
       <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500">
-        <span className="font-semibold text-slate-700">Security Safeguard:</span> Full bank account
-        numbers are never exposed in public logs or non-privileged screens. A cancelled cheque will
-        be required in the document checklist to verify account printed details.
+        <span className="font-semibold text-slate-700">Security Safeguard:</span> Your banking information
+        is encrypted and securely stored. We only use this information to verify your account and process payments
+        for approved invoices. Full account numbers are never exposed in public logs.
       </div>
     </div>
   );

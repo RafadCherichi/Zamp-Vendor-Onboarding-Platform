@@ -115,6 +115,7 @@ export interface Application {
 
   // Section 5: Business Classification
   categories: string[];
+  other_business_activity_description?: string | null;
 
   // Section 6: Declarations & Consent
   declaration_accurate_info: boolean;
@@ -152,6 +153,7 @@ export interface ApplicationDraftUpdate {
   bank_account_type?: string;
   bank_name?: string;
   categories?: string[];
+  other_business_activity_description?: string;
   declaration_accurate_info?: boolean;
   declaration_authorised_rep?: boolean;
   declaration_verification_consent?: boolean;

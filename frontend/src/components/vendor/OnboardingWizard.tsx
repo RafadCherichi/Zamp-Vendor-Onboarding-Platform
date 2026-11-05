@@ -32,102 +32,106 @@ interface WizardProps {
 }
 
 export const STEPS = [
-  { id: 0, label: 'Identity', icon: Building, title: 'Business Identity' },
-  { id: 1, label: 'Tax & Reg', icon: FileCheck2, title: 'Tax & Registration' },
-  { id: 2, label: 'Contact', icon: UserCheck, title: 'Authorised Contact' },
-  { id: 3, label: 'Banking', icon: Landmark, title: 'Banking Details' },
-  { id: 4, label: 'Activity', icon: Tag, title: 'Business Classification' },
-  { id: 5, label: 'Checklist', icon: FileText, title: 'Document Checklist' },
-  { id: 6, label: 'Review', icon: ShieldCheck, title: 'Review & Submit' },
+  { id: 0, label: 'Business', icon: Building, title: 'About Your Business' },
+  { id: 1, label: 'Tax', icon: FileCheck2, title: 'Tax Details' },
+  { id: 2, label: 'Contact', icon: UserCheck, title: 'Contact Details' },
+  { id: 3, label: 'Banking', icon: Landmark, title: 'Bank Account Details' },
+  { id: 4, label: 'Activity', icon: Tag, title: 'What Does Your Business Do?' },
+  { id: 5, label: 'Documents', icon: FileText, title: 'Documents You Need to Provide' },
+  { id: 6, label: 'Review', icon: ShieldCheck, title: 'Review and Submit' },
 ];
 
 export function isStepValid(stepIdx: number, app: Application): { isValid: boolean; errors: string[] } {
   const errors: string[] = [];
 
   switch (stepIdx) {
-    case 0: // Identity
+    case 0: // About Your Business
       if (!app.legal_name || !app.legal_name.trim() || app.legal_name.trim().length < 2) {
         errors.push('Legal Business Name is required (minimum 2 characters).');
       }
       if (!app.constitution) {
-        errors.push('Legal Constitution must be selected.');
+        errors.push('Please select your business constitution.');
       }
       if (!app.registered_address || !app.registered_address.trim()) {
-        errors.push('Registered Office Address is required.');
+        errors.push('Registered office address is required.');
       }
       if (!app.city || !app.city.trim()) {
         errors.push('City is required.');
       }
       if (!app.state || !app.state.trim()) {
-        errors.push('State / Union Territory is required.');
+        errors.push('State or Union Territory is required.');
       }
       if (!app.pincode || !/^\d{6}$/.test(app.pincode.trim())) {
-        errors.push('PIN Code must be exactly 6 digits.');
+        errors.push('PIN code must be a 6-digit number.');
       }
       break;
 
-    case 1: // Tax & Registration
+    case 1: // Tax Details
       if (!app.pan || !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(app.pan.trim().toUpperCase())) {
-        errors.push('Valid 10-character Permanent Account Number (PAN) is required (e.g. ABCDE1234F).');
+        errors.push('Please enter a valid 10-character PAN (e.g. ABCDE1234F).');
       }
       if (app.is_gst_registered) {
         const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
         if (!app.gstin || !gstRegex.test(app.gstin.trim().toUpperCase())) {
-          errors.push('Valid 15-character statutory GSTIN is required when declared GST registered.');
+          errors.push('Please enter a valid 15-character GSTIN matching your state code and PAN.');
         }
       }
       if (app.is_udyam_registered && (!app.udyam_number || !app.udyam_number.trim())) {
-        errors.push('Udyam Registration Number is required when declared registered under MSME.');
+        errors.push('Please enter your Udyam Registration Number (e.g. UDYAM-MH-02-0012345).');
       }
       if (['PVT_LTD', 'PUB_LTD', 'LLP'].includes(app.constitution)) {
         if (!app.cin_llpin || !app.cin_llpin.trim()) {
-          errors.push(`Statutory ${app.constitution === 'LLP' ? 'LLPIN' : 'CIN'} is required for ${app.constitution.replace(/_/g, ' ')}.`);
+          errors.push(`Please enter your ${app.constitution === 'LLP' ? 'LLPIN' : 'CIN'} from your Certificate of Incorporation.`);
         }
       }
       break;
 
-    case 2: // Contact
+    case 2: // Contact Details
       if (!app.contact_name || !app.contact_name.trim()) {
-        errors.push('Primary Contact Person Name is required.');
+        errors.push('Contact person name is required.');
       }
       if (!app.contact_designation || !app.contact_designation.trim()) {
-        errors.push('Contact Person Designation / Title is required.');
+        errors.push('Designation or title is required.');
       }
       if (!app.contact_email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(app.contact_email.trim())) {
-        errors.push('Valid Contact Email Address is required.');
+        errors.push('Please enter a valid email address.');
       }
       if (!app.contact_mobile || !/^(?:\+91|0)?[6-9]\d{9}$/.test(app.contact_mobile.trim().replace(/[\s-]/g, ''))) {
-        errors.push('Valid 10-digit Indian Mobile Number is required.');
+        errors.push('Please enter a valid 10-digit Indian mobile number.');
       }
       break;
 
-    case 3: // Banking
+    case 3: // Bank Account Details
       if (!app.bank_account_holder_name || !app.bank_account_holder_name.trim()) {
-        errors.push('Bank Account Beneficiary / Holder Name is required.');
+        errors.push('Bank account holder name (as printed on cheque/passbook) is required.');
       }
       if (!app.bank_account_number || !app.bank_account_number.trim()) {
-        errors.push('Bank Account Number is required.');
+        errors.push('Bank account number is required.');
       }
       if (!app.bank_ifsc || !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(app.bank_ifsc.trim().toUpperCase())) {
-        errors.push('Valid 11-character RBI IFSC Code is required (e.g. HDFC0000123).');
+        errors.push('Please enter an 11-character RBI IFSC code (e.g. HDFC0000123).');
       }
       break;
 
-    case 4: // Activity / Classification
+    case 4: // What Does Your Business Do?
       if (!app.categories || app.categories.length === 0) {
-        errors.push('Select at least one business activity classification category.');
+        errors.push('Please select at least one activity that describes the products or services your business provides.');
+      } else if (app.categories.includes('other')) {
+        if (!app.other_business_activity_description || !app.other_business_activity_description.trim()) {
+          errors.push('Please describe your business activity when "Other Business Activities" is selected.');
+        }
       }
       break;
 
-    case 5: // Document Checklist
+    case 5: // Documents You Need to Provide
       const mandatoryDocs = (app.documents || []).filter((d) => d.is_required);
       const missingDocs = mandatoryDocs.filter((d) => d.status !== 'UPLOADED');
       if (missingDocs.length > 0) {
-        missingDocs.forEach((d) => errors.push(`Mandatory document upload required: ${d.title}.`));
+        missingDocs.forEach((d) => errors.push(`Please upload: ${d.title}.`));
       }
       break;
 
-    case 6: // Review & Submit
+    case 6: // Review and Submit
       // Check prior steps
       for (let i = 0; i < 6; i++) {
         const prior = isStepValid(i, app);

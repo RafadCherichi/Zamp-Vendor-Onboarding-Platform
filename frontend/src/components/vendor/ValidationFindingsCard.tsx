@@ -87,40 +87,87 @@ export const ValidationFindingsCard: React.FC<ValidationFindingsCardProps> = ({
   }
 
   const findings = validationRun.findings || [];
-  const filteredFindings = activeLayer === 'ALL'
-    ? findings
-    : findings.filter((f) => f.layer === activeLayer);
+
+  const isIdentityTax = (f: any) => {
+    const id = (f.check_id || '').toUpperCase();
+    const name = (f.check_name || '').toLowerCase();
+    return (
+      id.includes('PAN') ||
+      id.includes('GST') ||
+      id.includes('UDYAM') ||
+      id.includes('CIN') ||
+      id.includes('LLPIN') ||
+      name.includes('pan') ||
+      name.includes('gst') ||
+      name.includes('tax') ||
+      name.includes('msme') ||
+      name.includes('identity') ||
+      name.includes('constitution') ||
+      name.includes('company')
+    );
+  };
+
+  const isBanking = (f: any) => {
+    const id = (f.check_id || '').toUpperCase();
+    const name = (f.check_name || '').toLowerCase();
+    return (
+      id.includes('IFSC') ||
+      id.includes('BANK') ||
+      id.includes('ACCOUNT') ||
+      name.includes('bank') ||
+      name.includes('ifsc') ||
+      name.includes('beneficiary')
+    );
+  };
+
+  const isDocOrCross = (f: any) => {
+    return !isIdentityTax(f) && !isBanking(f);
+  };
+
+  const identityTaxCount = findings.filter(isIdentityTax).length;
+  const bankingCount = findings.filter(isBanking).length;
+  const docMatchingCount = findings.filter(isDocOrCross).length;
+  const attentionCount = findings.filter((f) => f.status === 'FAILED' || f.status === 'WARNING').length;
+
+  const filteredFindings = findings.filter((f) => {
+    if (activeLayer === 'ALL') return true;
+    if (activeLayer === 'IDENTITY_TAX') return isIdentityTax(f);
+    if (activeLayer === 'BANKING') return isBanking(f);
+    if (activeLayer === 'DOCUMENTS') return isDocOrCross(f);
+    if (activeLayer === 'ATTENTION') return f.status === 'FAILED' || f.status === 'WARNING';
+    return true;
+  });
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'PASSED':
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
-            PASSED
+            Passed
           </span>
         );
       case 'FAILED':
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-rose-100 text-rose-800 border border-rose-200">
-            FAILED
+            Needs Attention
           </span>
         );
       case 'WARNING':
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
-            WARNING
+            Notice
           </span>
         );
       case 'UNAVAILABLE':
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-sky-100 text-sky-800 border border-sky-200">
-            UNAVAILABLE
+            Manual Review Needed
           </span>
         );
       case 'UNVERIFIED':
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-200">
-            UNVERIFIED
+            Pending Check
           </span>
         );
       default:
@@ -132,16 +179,36 @@ export const ValidationFindingsCard: React.FC<ValidationFindingsCardProps> = ({
     }
   };
 
-  const getSeverityBadge = (sev: string) => {
+  const getSeverityBadge = (status: string, sev: string) => {
+    // Only display severity badges for non-passed actionable items
+    if (status === 'PASSED' || status === 'UNAVAILABLE' || status === 'UNVERIFIED') {
+      return null;
+    }
     switch (sev) {
       case 'CRITICAL':
-        return <span className="text-[11px] font-bold text-rose-600 uppercase tracking-wider">CRITICAL</span>;
+        return (
+          <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+            Action Required
+          </span>
+        );
       case 'HIGH':
-        return <span className="text-[11px] font-bold text-orange-600 uppercase tracking-wider">HIGH</span>;
+        return (
+          <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wider bg-orange-50 px-2 py-0.5 rounded border border-orange-200">
+            Important
+          </span>
+        );
       case 'MEDIUM':
-        return <span className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">MEDIUM</span>;
+        return (
+          <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+            Review
+          </span>
+        );
       case 'LOW':
-        return <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">LOW</span>;
+        return (
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+            Optional
+          </span>
+        );
       default:
         return null;
     }
@@ -153,14 +220,9 @@ export const ValidationFindingsCard: React.FC<ValidationFindingsCardProps> = ({
       <div className="p-5 border-b border-slate-200 bg-slate-50/70">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <div className="flex items-center space-x-2">
-              <h3 className="text-base font-bold text-slate-900">Deterministic Validation & Verification Engine</h3>
-              <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-800 font-semibold rounded-full">
-                4 Layers
-              </span>
-            </div>
+            <h3 className="text-base font-bold text-slate-900">Application Verification Summary</h3>
             <p className="text-xs text-slate-600 mt-1">
-              Multi-layer statutory checks, cross-field document matching, and simulated authoritative registries.
+              We automatically verify your business information and documents against statutory formats and registries to speed up approval.
             </p>
           </div>
 
@@ -173,14 +235,14 @@ export const ValidationFindingsCard: React.FC<ValidationFindingsCardProps> = ({
               {validating ? (
                 <>
                   <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin mr-1.5" />
-                  Validating...
+                  Checking...
                 </>
               ) : (
                 <>
                   <svg className="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  Revalidate Now
+                  Revalidate Checks
                 </>
               )}
             </button>
@@ -194,25 +256,25 @@ export const ValidationFindingsCard: React.FC<ValidationFindingsCardProps> = ({
             <span className="text-sm font-bold text-emerald-700">{validationRun.passed_count}</span>
           </div>
           <div className="bg-white p-2.5 rounded-lg border border-rose-200 flex items-center justify-between">
-            <span className="text-xs font-semibold text-rose-800">Failed</span>
+            <span className="text-xs font-semibold text-rose-800">Needs Attention</span>
             <span className="text-sm font-bold text-rose-700">{validationRun.failed_count}</span>
           </div>
           <div className="bg-white p-2.5 rounded-lg border border-amber-200 flex items-center justify-between">
-            <span className="text-xs font-semibold text-amber-800">Warnings</span>
+            <span className="text-xs font-semibold text-amber-800">Notices</span>
             <span className="text-sm font-bold text-amber-700">{validationRun.warning_count}</span>
           </div>
           <div className="bg-white p-2.5 rounded-lg border border-sky-200 flex items-center justify-between">
-            <span className="text-xs font-semibold text-sky-800">Unavailable</span>
+            <span className="text-xs font-semibold text-sky-800">Manual Review</span>
             <span className="text-sm font-bold text-sky-700">{validationRun.unavailable_count}</span>
           </div>
           <div className="bg-white p-2.5 rounded-lg border border-purple-200 flex items-center justify-between">
-            <span className="text-xs font-semibold text-purple-800">Unverified</span>
+            <span className="text-xs font-semibold text-purple-800">Pending</span>
             <span className="text-sm font-bold text-purple-700">{validationRun.unverified_count}</span>
           </div>
         </div>
       </div>
 
-      {/* Layer Filter Tabs */}
+      {/* Business-Friendly Filter Tabs */}
       <div className="flex border-b border-slate-200 bg-slate-50/50 px-4 gap-2 text-xs font-medium overflow-x-auto">
         <button
           onClick={() => setActiveLayer('ALL')}
@@ -222,55 +284,57 @@ export const ValidationFindingsCard: React.FC<ValidationFindingsCardProps> = ({
               : 'border-transparent text-slate-600 hover:text-slate-900'
           }`}
         >
-          All Layers ({findings.length})
+          All Checks ({findings.length})
         </button>
         <button
-          onClick={() => setActiveLayer('LAYER_A_INPUT')}
+          onClick={() => setActiveLayer('IDENTITY_TAX')}
           className={`py-2.5 px-3 border-b-2 font-semibold transition whitespace-nowrap ${
-            activeLayer === 'LAYER_A_INPUT'
+            activeLayer === 'IDENTITY_TAX'
               ? 'border-indigo-600 text-indigo-700'
               : 'border-transparent text-slate-600 hover:text-slate-900'
           }`}
         >
-          Layer A: Input & Checksums
+          Identity &amp; Tax ({identityTaxCount})
         </button>
         <button
-          onClick={() => setActiveLayer('LAYER_B_CONSISTENCY')}
+          onClick={() => setActiveLayer('BANKING')}
           className={`py-2.5 px-3 border-b-2 font-semibold transition whitespace-nowrap ${
-            activeLayer === 'LAYER_B_CONSISTENCY'
+            activeLayer === 'BANKING'
               ? 'border-indigo-600 text-indigo-700'
               : 'border-transparent text-slate-600 hover:text-slate-900'
           }`}
         >
-          Layer B: Cross-Field Consistency
+          Bank &amp; Account ({bankingCount})
         </button>
         <button
-          onClick={() => setActiveLayer('LAYER_C_EXTERNAL')}
+          onClick={() => setActiveLayer('DOCUMENTS')}
           className={`py-2.5 px-3 border-b-2 font-semibold transition whitespace-nowrap ${
-            activeLayer === 'LAYER_C_EXTERNAL'
+            activeLayer === 'DOCUMENTS'
               ? 'border-indigo-600 text-indigo-700'
               : 'border-transparent text-slate-600 hover:text-slate-900'
           }`}
         >
-          Layer C: Authoritative Verification [Simulated]
+          Documents &amp; Matching ({docMatchingCount})
         </button>
-        <button
-          onClick={() => setActiveLayer('LAYER_D_DUPLICATE')}
-          className={`py-2.5 px-3 border-b-2 font-semibold transition whitespace-nowrap ${
-            activeLayer === 'LAYER_D_DUPLICATE'
-              ? 'border-indigo-600 text-indigo-700'
-              : 'border-transparent text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          Layer D: Duplicate Signals
-        </button>
+        {attentionCount > 0 && (
+          <button
+            onClick={() => setActiveLayer('ATTENTION')}
+            className={`py-2.5 px-3 border-b-2 font-semibold transition whitespace-nowrap ${
+              activeLayer === 'ATTENTION'
+                ? 'border-rose-600 text-rose-700'
+                : 'border-transparent text-rose-600 hover:text-rose-800'
+            }`}
+          >
+            Needs Attention ({attentionCount})
+          </button>
+        )}
       </div>
 
       {/* Findings List */}
       <div className="divide-y divide-slate-100 p-2 sm:p-4">
         {filteredFindings.length === 0 ? (
           <div className="text-center py-8 text-xs text-slate-500">
-            No validation findings recorded for this layer.
+            No verification findings recorded in this category.
           </div>
         ) : (
           filteredFindings.map((finding) => (
@@ -297,14 +361,23 @@ export const ValidationFindingsCard: React.FC<ValidationFindingsCardProps> = ({
                   )}
                 </div>
                 <div className="flex items-center space-x-2 text-xs">
-                  {getSeverityBadge(finding.severity)}
-                  <span className="text-slate-400 font-mono text-[10px]">[{finding.check_id}]</span>
+                  {getSeverityBadge(finding.status, finding.severity)}
+                  <span
+                    className="text-slate-400 font-mono text-[10px] cursor-help hidden sm:inline"
+                    title={`Internal Verification Check ID: ${finding.check_id}`}
+                  >
+                    [{finding.check_id}]
+                  </span>
                 </div>
               </div>
 
               {/* Plain Language Explanation */}
               <p className="text-xs text-slate-700 mt-2 font-medium leading-relaxed">
-                {finding.explanation}
+                {finding.status === 'UNAVAILABLE'
+                  ? finding.explanation.toLowerCase().includes('temporarily') || finding.explanation.toLowerCase().includes('manual')
+                    ? finding.explanation
+                    : 'The external registry service was temporarily unavailable. A compliance officer will verify this check manually. No action is required from you.'
+                  : finding.explanation}
               </p>
 
               {/* Value Comparison Grid */}
@@ -312,19 +385,19 @@ export const ValidationFindingsCard: React.FC<ValidationFindingsCardProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2.5 p-2.5 bg-slate-50 rounded-md border border-slate-200/60 text-xs">
                   {finding.submitted_value && (
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Submitted Form Input</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Your Form Entry</span>
                       <span className="font-mono font-medium text-slate-800 break-all">{finding.submitted_value}</span>
                     </div>
                   )}
                   {finding.extracted_value && (
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Extracted OCR Document</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Found in Uploaded Document</span>
                       <span className="font-mono font-medium text-slate-800 break-all">{finding.extracted_value}</span>
                     </div>
                   )}
                   {finding.external_value && (
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">External Registry Value</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Official Registry Record</span>
                       <span className="font-mono font-medium text-slate-800 break-all">{finding.external_value}</span>
                     </div>
                   )}
@@ -338,7 +411,7 @@ export const ValidationFindingsCard: React.FC<ValidationFindingsCardProps> = ({
                     Evidence: {finding.evidence}
                   </div>
                 )}
-                {finding.recommended_action && finding.status !== 'PASSED' && (
+                {finding.recommended_action && finding.status !== 'PASSED' && finding.status !== 'UNAVAILABLE' && (
                   <div className="text-indigo-700 font-medium bg-indigo-50 px-2.5 py-1 rounded border border-indigo-100 flex items-center">
                     <span className="font-bold mr-1">Action:</span> {finding.recommended_action}
                   </div>

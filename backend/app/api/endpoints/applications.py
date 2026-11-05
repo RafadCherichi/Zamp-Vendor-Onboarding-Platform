@@ -180,6 +180,7 @@ def build_application_response(app: Application, db: Optional[Session] = None) -
         bank_account_type=app.bank_account_type,
         bank_name=app.bank_name,
         categories=categories,
+        other_business_activity_description=app.other_business_activity_description,
         declaration_accurate_info=app.declaration_accurate_info,
         declaration_authorised_rep=app.declaration_authorised_rep,
         declaration_verification_consent=app.declaration_verification_consent,
@@ -610,6 +611,16 @@ def update_application_draft(
     if "categories" in update_dict:
         cats = update_dict.pop("categories")
         app.categories_json = json.dumps(cats if isinstance(cats, list) else [])
+        if "other" not in (cats if isinstance(cats, list) else []):
+            app.other_business_activity_description = None
+
+    if "other_business_activity_description" in update_dict:
+        other_desc = update_dict.pop("other_business_activity_description")
+        current_cats = parse_categories(app.categories_json)
+        if "other" in current_cats and other_desc:
+            app.other_business_activity_description = other_desc.strip()
+        elif "other" not in current_cats:
+            app.other_business_activity_description = None
 
     # Explicit GST registration status handling
     if "is_gst_registered" in update_dict:
@@ -932,8 +943,8 @@ def get_document_extraction(
         ExtractedFieldResponse(
             id=f.id,
             field_name=f.field_name,
-            extracted_value=mask_sensitive_value(f.field_name, f.extracted_value),
-            normalized_value=mask_sensitive_value(f.field_name, f.normalized_value) if f.normalized_value else None,
+            extracted_value=f.extracted_value,
+            normalized_value=mask_sensitive_value(f.field_name, f.normalized_value or f.extracted_value) if f.normalized_value else mask_sensitive_value(f.field_name, f.extracted_value),
             confidence_score=f.confidence_score,
             page_number=f.page_number,
             evidence_text=f.evidence_text,
@@ -991,8 +1002,8 @@ def reprocess_document(
         ExtractedFieldResponse(
             id=f.id,
             field_name=f.field_name,
-            extracted_value=mask_sensitive_value(f.field_name, f.extracted_value),
-            normalized_value=mask_sensitive_value(f.field_name, f.normalized_value) if f.normalized_value else None,
+            extracted_value=f.extracted_value,
+            normalized_value=mask_sensitive_value(f.field_name, f.normalized_value or f.extracted_value) if f.normalized_value else mask_sensitive_value(f.field_name, f.extracted_value),
             confidence_score=f.confidence_score,
             page_number=f.page_number,
             evidence_text=f.evidence_text,
@@ -1167,6 +1178,13 @@ def submit_application(
         missing_fields.append("Step 4 (Banking): Bank Account Number is required")
     if not app.bank_ifsc or not app.bank_ifsc.strip():
         missing_fields.append("Step 4 (Banking): Bank IFSC Code is required")
+
+    # Step 5: Business Activity
+    cats = parse_categories(app.categories_json)
+    if not cats:
+        missing_fields.append("Step 5 (Activity): Please select at least one activity that describes the products or services your business provides")
+    elif "other" in cats and (not app.other_business_activity_description or not app.other_business_activity_description.strip()):
+        missing_fields.append("Step 5 (Activity): Please describe your business activity when 'Other Business Activities' is selected")
 
     # Step 7: Declarations
     if not app.declaration_accurate_info:

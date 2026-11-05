@@ -195,15 +195,15 @@ export const VendorExceptionsBanner: React.FC<VendorExceptionsBannerProps> = ({
           </div>
           <div>
             <h3 className="font-bold text-base sm:text-lg leading-tight">
-              Action Required from Vendor ({actionableExceptions.length})
+              Action Needed on Your Application ({actionableExceptions.length})
             </h3>
             <p className="text-xs sm:text-sm text-amber-100 mt-0.5">
-              The compliance review team has identified items requiring your clarification or correction.
+              The compliance review team has identified items requiring your clarification or correction. Please review the details below and provide the requested information to avoid delays.
             </p>
           </div>
         </div>
         <span className="hidden sm:inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-white text-amber-800 shadow-xs">
-          Priority Response Needed
+          Response Needed
         </span>
       </div>
 

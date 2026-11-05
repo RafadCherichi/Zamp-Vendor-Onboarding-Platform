@@ -1,3 +1,4 @@
+import json
 import uuid
 from enum import Enum
 from sqlalchemy import Column, String, Text, Boolean, DateTime, ForeignKey
@@ -87,6 +88,25 @@ class Application(Base, TimestampMixin):
 
     # Section 5: Business Classification
     categories_json = Column(Text, default="[]", nullable=False)  # JSON array of category identifiers
+    other_business_activity_description = Column(Text, nullable=True)  # Description when 'other' is selected
+
+    @property
+    def categories(self):
+        if not self.categories_json:
+            return []
+        try:
+            return json.loads(self.categories_json)
+        except Exception:
+            return []
+
+    @categories.setter
+    def categories(self, val):
+        if val is None:
+            self.categories_json = "[]"
+        elif isinstance(val, (list, tuple)):
+            self.categories_json = json.dumps(list(val))
+        elif isinstance(val, str):
+            self.categories_json = val
 
     # Section 6: Declarations and Consent
     declaration_accurate_info = Column(Boolean, default=False, nullable=False)

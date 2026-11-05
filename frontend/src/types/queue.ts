@@ -121,6 +121,7 @@ export interface ApplicationComprehensiveDetails {
     };
     classification: {
       categories: string[];
+      other_business_activity_description?: string;
     };
     declarations: {
       declaration_accurate_info: boolean;

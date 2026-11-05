@@ -130,6 +130,7 @@ def test_scenario_a_clean_vendor_onboarding_and_approval(db_session: Session, cl
             "declaration_accurate_info": True,
             "declaration_authorised_rep": True,
             "declaration_verification_consent": True,
+            "categories": ["manufacturing"],
         },
     )
     assert patch_res.status_code == 200

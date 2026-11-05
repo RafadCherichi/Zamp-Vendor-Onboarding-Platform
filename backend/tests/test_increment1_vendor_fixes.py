@@ -287,6 +287,7 @@ def test_non_gst_registered_vendor_onboarding(db_session: Session, client: TestC
             "declaration_accurate_info": True,
             "declaration_authorised_rep": True,
             "declaration_verification_consent": True,
+            "categories": ["goods_supplier"],
         },
     )
     assert r_patch.status_code == 200
@@ -363,6 +364,7 @@ def test_gst_registered_vendor_enforces_gstin_and_document(db_session: Session, 
             "declaration_accurate_info": True,
             "declaration_authorised_rep": True,
             "declaration_verification_consent": True,
+            "categories": ["goods_supplier"],
         },
     )
 
@@ -599,6 +601,7 @@ def test_cin_llpin_mandatory_for_corporate_entities(db_session: Session, client:
             "declaration_accurate_info": True,
             "declaration_authorised_rep": True,
             "declaration_verification_consent": True,
+            "categories": ["goods_supplier"],
         },
     )
 

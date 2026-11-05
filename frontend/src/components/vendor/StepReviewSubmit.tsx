@@ -14,6 +14,7 @@ import {
   Edit3,
   ArrowRight,
   RefreshCw,
+  Briefcase,
 } from 'lucide-react';
 
 interface StepProps {
@@ -47,79 +48,82 @@ export const StepReviewSubmit: React.FC<StepProps> = ({
   // Compute missing requirements aligned 100% with backend submission rules
   const missingItems: MissingItem[] = [];
 
-  // Step 1: Business Identity
+  // Step 1: About Your Business
   if (!application.legal_name || !application.legal_name.trim()) {
-    missingItems.push({ message: 'Legal Business Name is required', stepIdx: 0, stepLabel: 'Step 1: Business Identity' });
+    missingItems.push({ message: 'Legal Business Name is required', stepIdx: 0, stepLabel: 'Step 1: About Your Business' });
   }
   if (!application.constitution) {
-    missingItems.push({ message: 'Legal Constitution must be selected', stepIdx: 0, stepLabel: 'Step 1: Business Identity' });
+    missingItems.push({ message: 'Legal Constitution must be selected', stepIdx: 0, stepLabel: 'Step 1: About Your Business' });
   }
   if (!application.registered_address || !application.registered_address.trim()) {
-    missingItems.push({ message: 'Registered Address is required', stepIdx: 0, stepLabel: 'Step 1: Business Identity' });
+    missingItems.push({ message: 'Registered Address is required', stepIdx: 0, stepLabel: 'Step 1: About Your Business' });
   }
   if (!application.city || !application.city.trim()) {
-    missingItems.push({ message: 'City is required', stepIdx: 0, stepLabel: 'Step 1: Business Identity' });
+    missingItems.push({ message: 'City is required', stepIdx: 0, stepLabel: 'Step 1: About Your Business' });
   }
   if (!application.state || !application.state.trim()) {
-    missingItems.push({ message: 'State / Union Territory is required', stepIdx: 0, stepLabel: 'Step 1: Business Identity' });
+    missingItems.push({ message: 'State / Union Territory is required', stepIdx: 0, stepLabel: 'Step 1: About Your Business' });
   }
   if (!application.pincode || !/^\d{6}$/.test(application.pincode.trim())) {
-    missingItems.push({ message: 'PIN Code must be a 6-digit number', stepIdx: 0, stepLabel: 'Step 1: Business Identity' });
+    missingItems.push({ message: 'PIN Code must be a 6-digit number', stepIdx: 0, stepLabel: 'Step 1: About Your Business' });
   }
 
-  // Step 2: Tax & Registration
+  // Step 2: Tax Details
   if (!application.pan || !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(application.pan.trim().toUpperCase())) {
-    missingItems.push({ message: 'Valid 10-character statutory PAN is required', stepIdx: 1, stepLabel: 'Step 2: Tax & Registration' });
+    missingItems.push({ message: 'Valid 10-character statutory PAN is required', stepIdx: 1, stepLabel: 'Step 2: Tax Details' });
   }
   if (application.is_gst_registered) {
     const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
     if (!application.gstin || !gstRegex.test(application.gstin.trim().toUpperCase())) {
-      missingItems.push({ message: 'Valid 15-character statutory GSTIN is required when declared GST registered', stepIdx: 1, stepLabel: 'Step 2: Tax & Registration' });
+      missingItems.push({ message: 'Valid 15-character statutory GSTIN is required when declared GST registered', stepIdx: 1, stepLabel: 'Step 2: Tax Details' });
     }
   }
   if (application.is_udyam_registered && (!application.udyam_number || !application.udyam_number.trim())) {
-    missingItems.push({ message: 'Udyam Registration Number is required when MSME registered', stepIdx: 1, stepLabel: 'Step 2: Tax & Registration' });
+    missingItems.push({ message: 'Udyam Registration Number is required when MSME registered', stepIdx: 1, stepLabel: 'Step 2: Tax Details' });
   }
   if (['PVT_LTD', 'PUB_LTD', 'LLP'].includes(application.constitution)) {
     if (!application.cin_llpin || !application.cin_llpin.trim()) {
       missingItems.push({
         message: `${application.constitution === 'LLP' ? 'LLPIN' : 'CIN'} is required for ${application.constitution.replace(/_/g, ' ')}`,
         stepIdx: 1,
-        stepLabel: 'Step 2: Tax & Registration',
+        stepLabel: 'Step 2: Tax Details',
       });
     }
   }
 
-  // Step 3: Authorised Contact
+  // Step 3: Contact Details
   if (!application.contact_name || !application.contact_name.trim()) {
-    missingItems.push({ message: 'Contact Person Name is required', stepIdx: 2, stepLabel: 'Step 3: Authorised Contact' });
+    missingItems.push({ message: 'Contact Person Name is required', stepIdx: 2, stepLabel: 'Step 3: Contact Details' });
   }
   if (!application.contact_email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(application.contact_email.trim())) {
-    missingItems.push({ message: 'Valid Contact Email is required', stepIdx: 2, stepLabel: 'Step 3: Authorised Contact' });
+    missingItems.push({ message: 'Valid Contact Email is required', stepIdx: 2, stepLabel: 'Step 3: Contact Details' });
   }
   if (!application.contact_mobile || !/^(?:\+91|0)?[6-9]\d{9}$/.test(application.contact_mobile.trim().replace(/[\s-]/g, ''))) {
-    missingItems.push({ message: 'Valid 10-digit Indian Mobile Number is required', stepIdx: 2, stepLabel: 'Step 3: Authorised Contact' });
+    missingItems.push({ message: 'Valid 10-digit Indian Mobile Number is required', stepIdx: 2, stepLabel: 'Step 3: Contact Details' });
   }
 
-  // Step 4: Banking Details
+  // Step 4: Bank Account Details
   if (!application.bank_account_holder_name || !application.bank_account_holder_name.trim()) {
-    missingItems.push({ message: 'Bank Account Holder Name is required', stepIdx: 3, stepLabel: 'Step 4: Banking Details' });
+    missingItems.push({ message: 'Bank Account Holder Name is required', stepIdx: 3, stepLabel: 'Step 4: Bank Account Details' });
   }
   if (!application.bank_account_number || !application.bank_account_number.trim()) {
-    missingItems.push({ message: 'Bank Account Number is required', stepIdx: 3, stepLabel: 'Step 4: Banking Details' });
+    missingItems.push({ message: 'Bank Account Number is required', stepIdx: 3, stepLabel: 'Step 4: Bank Account Details' });
   }
   if (!application.bank_ifsc || !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(application.bank_ifsc.trim().toUpperCase())) {
-    missingItems.push({ message: 'Valid 11-character RBI IFSC Code is required', stepIdx: 3, stepLabel: 'Step 4: Banking Details' });
+    missingItems.push({ message: 'Valid 11-character RBI IFSC Code is required', stepIdx: 3, stepLabel: 'Step 4: Bank Account Details' });
   }
 
-  // Step 5: Business Classification
+  // Step 5: What Does Your Business Do?
   if (!application.categories || application.categories.length === 0) {
-    missingItems.push({ message: 'Select at least one business classification activity', stepIdx: 4, stepLabel: 'Step 5: Business Classification' });
+    missingItems.push({ message: 'Select at least one business activity', stepIdx: 4, stepLabel: 'Step 5: What Does Your Business Do?' });
+  }
+  if (application.categories?.includes('other') && (!application.other_business_activity_description || !application.other_business_activity_description.trim())) {
+    missingItems.push({ message: 'Please describe your other business activities', stepIdx: 4, stepLabel: 'Step 5: What Does Your Business Do?' });
   }
 
-  // Step 6: Mandatory Documents
+  // Step 6: Documents You Need to Provide
   missingDocs.forEach((doc) => {
-    missingItems.push({ message: `Mandatory document required: ${doc.title}`, stepIdx: 5, stepLabel: 'Step 6: Document Checklist' });
+    missingItems.push({ message: `Mandatory document required: ${doc.title}`, stepIdx: 5, stepLabel: 'Step 6: Documents You Need to Provide' });
   });
 
   const hasMissing = missingItems.length > 0;
@@ -131,26 +135,26 @@ export const StepReviewSubmit: React.FC<StepProps> = ({
   const mapBackendErrorToStep = (errStr: string): MissingItem => {
     const lower = errStr.toLowerCase();
     let stepIdx = 0;
-    let stepLabel = 'Step 1: Business Identity';
+    let stepLabel = 'Step 1: About Your Business';
 
     if (lower.includes('step 2') || lower.includes('section 2') || lower.includes('pan') || lower.includes('gstin') || lower.includes('udyam') || lower.includes('cin') || lower.includes('llpin')) {
       stepIdx = 1;
-      stepLabel = 'Step 2: Tax & Registration';
+      stepLabel = 'Step 2: Tax Details';
     } else if (lower.includes('step 3') || lower.includes('section 3') || lower.includes('contact') || lower.includes('email') || lower.includes('mobile')) {
       stepIdx = 2;
-      stepLabel = 'Step 3: Authorised Contact';
+      stepLabel = 'Step 3: Contact Details';
     } else if (lower.includes('step 4') || lower.includes('section 4') || lower.includes('bank') || lower.includes('ifsc') || lower.includes('account')) {
       stepIdx = 3;
-      stepLabel = 'Step 4: Banking Details';
+      stepLabel = 'Step 4: Bank Account Details';
     } else if (lower.includes('step 5') || lower.includes('section 5') || lower.includes('classification') || lower.includes('activity')) {
       stepIdx = 4;
-      stepLabel = 'Step 5: Business Classification';
+      stepLabel = 'Step 5: What Does Your Business Do?';
     } else if (lower.includes('step 6') || lower.includes('document') || lower.includes('checklist')) {
       stepIdx = 5;
-      stepLabel = 'Step 6: Document Checklist';
+      stepLabel = 'Step 6: Documents You Need to Provide';
     } else if (lower.includes('step 7') || lower.includes('declaration')) {
       stepIdx = 6;
-      stepLabel = 'Step 7: Declarations';
+      stepLabel = 'Step 7: Review and Submit';
     }
 
     return { message: errStr, stepIdx, stepLabel };
@@ -193,11 +197,11 @@ export const StepReviewSubmit: React.FC<StepProps> = ({
       <div>
         <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
           <ShieldCheck className="w-5 h-5 text-indigo-600" />
-          Section 7: Review Application & Final Declarations
+          Step 7: Review and Submit
         </h3>
         <p className="text-xs text-slate-500 mt-1">
-          Review all submitted details and uploaded statutory evidence before final submission. Once
-          submitted, the application is locked for buyer verification.
+          Review all the information you have provided and confirm the declarations before submitting
+          your application for approval.
         </p>
       </div>
 
@@ -275,7 +279,7 @@ export const StepReviewSubmit: React.FC<StepProps> = ({
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
               <Building className="w-4 h-4 text-indigo-600" />
-              1. Business Identity
+              1. About Your Business
             </h4>
             <button
               type="button"
@@ -309,18 +313,18 @@ export const StepReviewSubmit: React.FC<StepProps> = ({
             <div>
               <span className="text-slate-400">City / State:</span>{' '}
               {application.city && application.state
-                ? `${application.city}, ${application.state} - ${application.pincode || ''}`
+                 ? `${application.city}, ${application.state} - ${application.pincode || ''}`
                 : '—'}
             </div>
           </div>
         </div>
 
-        {/* Card 2: Tax & Statutory Registration */}
+        {/* Card 2: Tax Details */}
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-2 relative">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
               <FileCheck2 className="w-4 h-4 text-indigo-600" />
-              2. Tax & Statutory Registration
+              2. Tax Details
             </h4>
             <button
               type="button"
@@ -364,12 +368,12 @@ export const StepReviewSubmit: React.FC<StepProps> = ({
           </div>
         </div>
 
-        {/* Card 3: Authorised Contact */}
+        {/* Card 3: Contact Details */}
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-2 relative">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
               <UserCheck className="w-4 h-4 text-indigo-600" />
-              3. Authorised Contact
+              3. Contact Details
             </h4>
             <button
               type="button"
@@ -401,12 +405,12 @@ export const StepReviewSubmit: React.FC<StepProps> = ({
           </div>
         </div>
 
-        {/* Card 4: Banking Details */}
+        {/* Card 4: Bank Account Details */}
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-2 relative">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
               <Landmark className="w-4 h-4 text-indigo-600" />
-              4. Banking Details
+              4. Bank Account Details
             </h4>
             <button
               type="button"
@@ -436,6 +440,50 @@ export const StepReviewSubmit: React.FC<StepProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Card 5: Business Activities */}
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-2 relative col-span-1 md:col-span-2">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+            <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+              <Briefcase className="w-4 h-4 text-indigo-600" />
+              5. What Does Your Business Do?
+            </h4>
+            <button
+              type="button"
+              onClick={() => onGoToStep(4)}
+              className="text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold inline-flex items-center gap-1"
+            >
+              <Edit3 className="w-3 h-3" /> Edit
+            </button>
+          </div>
+          <div className="text-xs text-slate-600 space-y-2">
+            <div>
+              <span className="text-slate-400 font-medium block mb-1">Selected Activities / Categories:</span>
+              {application.categories && application.categories.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {application.categories.map((c) => (
+                    <span
+                      key={c}
+                      className="px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-800 text-[11px] font-semibold border border-indigo-200"
+                    >
+                      {c.replace(/_/g, ' ')}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-slate-400 italic">None selected</span>
+              )}
+            </div>
+            {application.categories?.includes('other') && application.other_business_activity_description && (
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 mt-2">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">
+                  Other Business Activity Description:
+                </span>
+                <p className="text-xs text-slate-800 font-medium">{application.other_business_activity_description}</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Document Uploads Summary with Clear Semantic Statuses */}
@@ -443,7 +491,7 @@ export const StepReviewSubmit: React.FC<StepProps> = ({
         <div className="flex items-center justify-between border-b border-slate-100 pb-2">
           <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
             <FileText className="w-4 h-4 text-indigo-600" />
-            Checklist Status ({mandatoryDocs.length - missingDocs.length} / {mandatoryDocs.length} Mandatory Uploaded)
+            6. Documents You Need to Provide ({mandatoryDocs.length - missingDocs.length} of {mandatoryDocs.length} Mandatory Uploaded)
           </h4>
           <button
             type="button"
@@ -468,15 +516,15 @@ export const StepReviewSubmit: React.FC<StepProps> = ({
                 {isUploaded ? (
                   isMismatch ? (
                     <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-300 shrink-0">
-                      Needs Attention (v{doc.current_version?.version_number || 1})
+                      Needs your attention (v{doc.current_version?.version_number || 1})
                     </span>
                   ) : isProcessing ? (
                     <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 shrink-0">
-                      Processing OCR...
+                      Being checked...
                     </span>
                   ) : (
                     <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shrink-0">
-                      Uploaded &amp; Parsed (v{doc.current_version?.version_number || 1})
+                      Uploaded &amp; Verified (v{doc.current_version?.version_number || 1})
                     </span>
                   )
                 ) : doc.is_required ? (
@@ -510,9 +558,8 @@ export const StepReviewSubmit: React.FC<StepProps> = ({
               className="mt-0.5 h-4 w-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
             />
             <span>
-              <strong>Accuracy Declaration:</strong> I certify that all information submitted in this
-              onboarding application, including statutory PAN, GST, MSME, and bank account numbers, is
-              true, complete, and accurate to the best of my knowledge.
+              <strong>Accuracy Declaration:</strong> I confirm that all the information provided in this
+              form, including PAN, GSTIN, and bank account details, is true, correct, and up to date.
             </span>
           </label>
 
@@ -524,8 +571,8 @@ export const StepReviewSubmit: React.FC<StepProps> = ({
               className="mt-0.5 h-4 w-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
             />
             <span>
-              <strong>Authorised Representation:</strong> I confirm that I am duly authorised to represent
-              and submit this onboarding application on behalf of the commercial entity named herein.
+              <strong>Authorised Representation:</strong> I confirm that I am authorised to submit this
+              vendor onboarding application on behalf of our business entity.
             </span>
           </label>
 
@@ -537,9 +584,8 @@ export const StepReviewSubmit: React.FC<StepProps> = ({
               className="mt-0.5 h-4 w-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
             />
             <span>
-              <strong>Verification Consent:</strong> I acknowledge the buyer&rsquo;s vendor due-diligence
-              process and consent to the lawful external verification of submitted PAN, GSTIN, MSME, and
-              beneficiary bank account details for vendor panel onboarding.
+              <strong>Verification Consent:</strong> I understand and agree that the buyer will verify our
+              PAN, GSTIN, and bank account details against official statutory records to complete our vendor onboarding.
             </span>
           </label>
         </div>
