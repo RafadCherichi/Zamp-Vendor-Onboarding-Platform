@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -386,5 +387,5 @@ with tempfile.TemporaryDirectory(prefix="zamp-scenarios-", ignore_cleanup_errors
     print(json.dumps(outcomes[-1]), flush=True)
 
     result_path = ROOT / "testdata/scenario_results.json"
-    result_path.write_text(json.dumps({"run": "2026-11-08", "cases": outcomes}, indent=2), encoding="utf-8")
+    result_path.write_text(json.dumps({"run": datetime.now().date().isoformat(), "cases": outcomes}, indent=2), encoding="utf-8")
     assert all(x["pass"] for x in outcomes), "At least one observed result differs from the scenario contract"

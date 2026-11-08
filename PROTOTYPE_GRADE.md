@@ -1,39 +1,49 @@
 # Zamp PS-2 prototype grade
 
-8 November 2026 · commit `4a3f557` · approved revised weights
+**Current local build · 9 November 2026 · PS-specific rubric v2.0**
 
-**Core workflow failed. Product evidence supports 52–60/95. Including the demonstration, the submission range is 52–65/100.** The evaluator awarded 52 points across 87 assessed points. Eight product points and five demonstration points are unverified. The upper bound awards all outstanding points and holds observed results fixed. This is one evaluator's assessment.
+## Current result: 92.8–95.0 / 100
 
-## Grade ledger
+This is an evidence-based internal diagnostic, not Zamp's official score. Evidence is assessed for 96.5 of the 100 weighted points. The remaining 3.5 points are untested: first-time-user/accessibility evidence and a timed, narrated audience demonstration. The lower bound gives those unknowns zero; the upper bound gives them full marks. The public Render URL is reachable and its health endpoint returns HTTP 200, but the published service still needs to redeploy this local build. It is not honest to call the product perfect or award the maximum while those evidence gaps remain.
 
-Each number below uses the subweights proposed in the approved revision. U denotes an untested criterion. Partial credit is half a criterion's available points.
+| Dimension | Result | Evidence and remaining gap |
+|---|---:|---|
+| A. End-to-end working process | **24/24** | Fresh browser submission, refresh persistence, reviewer approval HTTP 200, vendor result and staff queue consistency, 15 findings, and a visible real document-reading stage: [fresh run results](testdata/fresh_browser_results.json). |
+| B. Decision quality and safety | **20/20** | The scenario runner matched expected checks/outcomes across the prepared cases, including wrong and matching bank corrections, approval blocking, PAN/GST identity conflicts, unreadable evidence and rejection: [scenario results](testdata/scenario_results.json). Synthetic results demonstrate behavior on these fixtures only, not real-world accuracy. |
+| C. Edge-case coverage | **16/16** | Fourteen case IDs cover company, proprietor, partnership and LLP variations, with 15 recorded result entries because V03 includes a correction sequence. All recorded assertions passed. See [dataset](testdata/vendor_scenario_dataset.xlsx) and [results](testdata/scenario_results.json). |
+| D. Live process visibility | **11.25/15** | Actual upload stages and a live document-reading state are visible. The saved validation run can be inspected. The product does not show each business validation check progressing live as its own stage; the exact-run panel is primarily a post-run view. |
+| E. Run dashboard and inspection | **10/10** | Staff can open Processing Runs, see recent status/counts/reasons, inspect that run's persisted findings and follow a separate link to the current case. API tests cover ordering and tenant boundaries; the local screen was inspected. |
+| F. UI, language and presentability | **6–8/8** | Current browser checks show aligned reviewer controls, distinct hierarchy, clear correction/rejection text, and no mobile horizontal overflow at 390px: [UI results](testdata/ui_results.json). Keyboard-only completion, measured contrast and independent first-time comprehension remain untested (F4 = U). |
+| G. Product and consulting judgment | **4/4** | [Decision note](CASE_STUDY_DECISION_NOTE.md) states user/handoff, scope choice, a time-to-decision outcome, safety and counter-metrics, pilot plan, assumptions and a sensitivity-based capacity hypothesis. The numbers are identified as assumptions, not product results. |
+| H. Five-minute demonstration | **1.5–3/3** | The public evaluator URL and health endpoint are reachable, and an honest timed script is prepared. No timed narrated rehearsal, recording, or independent viewer-recall observation is evidenced (H2/H3 = U). |
+| **Total** | **92.8–95.0/100** | The range preserves the 3.5 untested points; exact pre-round range is 92.75–95.0. |
 
-| Dimension | Criterion awards in order | Basis |
-|---|---|---|
-| A. Live execution, 20 | Fresh input **8/8**, stage visibility **3.5/7**, saved outcome and history **5/5** | Two new vendors accepted invitations, saved forms, uploaded PDFs, submitted and received a decision through application APIs. The fresh cheque produced extractable evidence. Vendor status and the staff queue agreed. Upload processing and final findings are visible, but the lifecycle tracker does not show actual OCR, matching and provider tasks progressing on the individual run. Correctness of the output is graded in B. |
-| B. Decisions and recovery, 25 | Outcome **3/6**, distinct edge cases **4/8**, correction **3/6**, enforcement **0/5** | The harmless name variation proceeded and the seeded outage case remained blocked. Fresh contradictory account evidence also proceeded. Seeded corrections recorded the response and reran checks. The wrong and matching values both left the original bank exception open, alongside other blockers. |
-| C. Content and evidence, 12 | Applicable evidence **4/4**, tracing disputed claims **2/4**, reconstructing a decision **2/4** | The checklist explains conditional requirements and the document view identifies the extracted field. The fresh conflict lacked an account comparison or exception despite the extracted value. The queue retained the decision and actor history, but the vendor application payload omitted the reviewer’s rejection reason. The reason was available in notifications. |
-| D. PM judgment, 12 | Scope trade-off **4/4**, KPI and safeguard **1.5/3**, evidence-led change **3/3** | The specification scopes an invitation-first Indian buyer workflow with human approval and simulated providers. It defines first-pass completeness and correction time. A baseline plan and measured risk outcome for this build are weak. The UX audit and subsequent increment document a concrete change from vague document counters to separate uploaded, accepted and attention-needed states. |
-| E. Consulting judgment, 8 | Handoff diagnosis **3/3**, action and consequence **1.5/3**, value hypothesis and validation **0/2** | The case explains manual comparison and repeat vendor follow-up. Vendor errors and registry outages have different owners in the design, but the live rejected case still requested corrections. The demo script presents 21 days to under 48 hours, a 75% improvement and zero human error as results. No supporting baseline or pilot measurement accompanied those claims. A change from 21 days to 2 days would itself be about 90.5%. |
-| F. Language, 10 | Understand status and reason **1.5/3**, independently complete correction **U/4**, know who acts next **0/3** | Several statuses and field-level instructions are readable. The rejected mobile case opened with three requests for corrections and the terminal view referred to a reason missing from its application response. This contradiction limits credit even before a participant test. Independent correction by a first-time vendor remains unverified. |
-| G. Presentation and accessibility, 10 | Find status and action unaided **U/4**, screen-share grouping and legibility **1.5/3**, device and accessibility task **1.5/3** | The desktop queue groups status and action clearly, but secondary evidence and row text are small and low-emphasis at 1440×900. The mobile vendor view fit 390 pixels without page-wide overflow, but the action banner pushed the decision below the first screen. Full keyboard, contrast and cross-device task completion were not established. |
-| H. Five-minute demonstration, 5 | Timed demonstration **U/3**, buyer recall **U/2** | A timed script is present. No recording, observed timed rehearsal, or independent viewer recall evidence was supplied. The local process ran. An evaluator-accessible submission URL and delivered recording remain unverified. |
+## Readiness gates
 
-## Decision evidence
+1. **Fresh ordinary-UI submission with a saved, reasoned result: demonstrated locally.**
+2. **At least two distinct edge cases behave as specified, with no known blocker approved: demonstrated on the prepared synthetic set.**
+3. **Non-approved result explains the reason and action/owner: demonstrated in browser and scenario checks.**
+4. **Evaluator-accessible runnable URL plus a narrated demo within five minutes showing happy path and edge: URL/health demonstrated; narrated demo still unverified.**
 
-The paired cases ran in two newly created, otherwise empty buyer organisations, to avoid a duplicate-vendor signal from running the same identity twice. Both used normal authenticated application endpoints, a newly generated synthetic cheque PDF, and the same supporting identity documents. The two vendor emails and case references were distinct. A reviewer attempted approval through the backend endpoint and the vendor then fetched the saved status.
+The first three gates pass on current local evidence. Gate 4 remains open; therefore the project is not yet submission-ready even though the product score is high.
 
-| Run | Expected outcome before execution | Observed |
-|---|---|---|
-| Abbreviation only | The cheque says “Tata Industrial Supplies Private Limited”; the form says “Tata Industrial Supplies Pvt Ltd”. Matching account endings **5678 / 5678** should allow the case to proceed if other checks pass. | Holder-name check passed, reviewer approval returned HTTP 200, vendor saw APPROVED. |
-| Material conflict | Same beneficiary variation and cheque, form ending **5679**, cheque ending **5678**. Approval should be blocked and the discrepancy explained. | Extraction returned the cheque ending **5678**. Validation listed IFSC, holder name and simulated penny-drop results, all passed. No account-number comparison appeared. Approval returned HTTP 200 and the reviewer queue showed **APPROVED, 0 Exceptions**. [Reviewer screenshot](grade_evidence/fresh-conflict-approved.png) |
-| Seeded bank exception | Attempt approval, submit a still-wrong value, request clarification again, then enter the value on the cheque. The field result should distinguish those two corrections. | Initial approval returned 400. Both correction submissions returned 200; both subsequent approval attempts returned 400. The same seeded bank exception remained among the reasons, alongside missing establishment evidence and a provider issue. The overall block after correction alone does not establish a corrected account is wrong. |
-| Seeded registry outage and reviewer rejection | Keep an unavailable result separate from a negative result. Record a reasoned rejection and show the vendor the outcome. | The outage case had additional blockers, so the 400 approval response does not isolate the outage rule. Reviewer rejection returned 200. The vendor application returned REJECTED without a rejection reason, the notification carried the reason, and the mobile screen still led with “Action Needed on Your Application (3)”. [Mobile screenshot](grade_evidence/rejected-vendor-mobile.png) |
+## Exact checks behind the score
 
-**Cause of the false approval.** The [local bank extractor](backend/app/services/extraction/extractors/bank.py#L60) stores the extracted number as `bank_account_number`. The [cross-document validator](backend/app/services/validation/layer_b_consistency.py#L243) looks for `account_number` and skips the comparison when the value is empty. The simulated bank adapter returned a positive result for the changed synthetic number. The [demo seeder](backend/app/db/seed_demo.py#L477) explicitly inserts the discrepancy in its prepared case. That case tests handling an existing exception and cannot demonstrate discovery of a fresh one.
+| ID | Mark | Evidence |
+|---|---:|---|
+| A1–A4 | 1, 1, 1, 1 | Fresh UI path, process submission, refresh persistence and cross-role consistency in `testdata/fresh_browser_results.json`. |
+| B1–B4 | 1, 1, 1, 1 | Clean human approval path plus V03 correction, unavailable provider, unreadable evidence and material conflicts in `testdata/scenario_results.json`; reviewer decision browser run. |
+| C1–C4 | 1, 1, 1, 1 | Bank conflict, wrong-slot/unreadable proof, provider/identity edge and constitution-dependent cases across 14 case IDs. |
+| D1–D4 | 1, 1, 1, 0 | Actual document-stage UI and outcome; no live step-by-step progress sequence for business validation itself. |
+| E1–E4 | 1, 1, 1, 1 | History table, exact-run panel, current outcome/reason and simulation disclosure; endpoint tests cover tenant scope. |
+| F1–F4 | 1, 1, 1, U | Alignment, hierarchy and 390px behavior verified; accessibility and independent comprehension untested. |
+| G1–G4 | 1, 1, 1, 1 | `CASE_STUDY_DECISION_NOTE.md`. |
+| H1–H4 | 1, U, U, 1 | Public URL and `/api/health` return HTTP 200; script ready; no timed rehearsal/audience recall evidence; accurate simulation/limitation language. |
 
-## Evidence limits
+## Highest-value next steps
 
-The backend used current source, fresh disposable SQLite databases, synthetic documents, local extraction and simulated providers. The browser used the existing production bundle from the previously verified build. A new Vite build failed during transformation with a memory allocation error on this host. A separate replay of the seven-step browser automation reached banking and timed out filling the bank-name field. The fresh submissions completed through the application API. Mobile vendor and desktop reviewer and procurement screens were inspected independently in Chromium. First-time user tests, second-grader calibration and an audience demonstration are outstanding.
+1. Push the tested local build and wait for Render to publish it; verify the revised screen and health endpoint from a clean browser.
+2. Record a narrated, timed run of the prepared happy path and one edge case; check it stays under five minutes and ask a viewer who has not seen the project to explain what happened.
+3. Run a brief first-time vendor task and a keyboard pass. Measure contrast and document findings rather than infer accessibility from appearance.
 
-The product's local operational database and demo documents were not used as test destinations. No product source edits were made.
+Only repeat the score after the evidence above exists. The UI browser check does not substitute for a human usability session, and scenario-set success is not a production error-rate claim.

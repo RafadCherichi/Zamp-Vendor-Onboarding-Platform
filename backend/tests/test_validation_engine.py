@@ -31,6 +31,7 @@ from app.services.validation.checksums import (
 )
 from app.services.validation.name_matching import compare_names, NameMatchOutcome
 from app.services.validation.orchestrator import ValidationOrchestrator
+from app.services.verification.base import VerificationResult, VerificationStatus
 
 
 def test_gstin_mod36_checksum_and_structure():
@@ -48,6 +49,46 @@ def test_gstin_mod36_checksum_and_structure():
     is_valid, err = validate_gstin_structure("95AAACA1234A1ZG")
     assert is_valid is False
     assert "Invalid state code" in err
+
+
+def test_verified_pan_without_returned_name_is_not_reported_as_failed(db_session: Session, monkeypatch):
+    token = secrets.token_hex(4)
+    org = Organization(name=f"Org PAN Copy {token}", slug=f"org-pan-copy-{token}")
+    db_session.add(org)
+    db_session.flush()
+    user = User(email=f"pan-copy-{token}@vendor.com", full_name="PAN Test", hashed_password="pw")
+    db_session.add(user)
+    db_session.flush()
+    vendor = Vendor(organisation_id=org.id, legal_name="Example Components Private Limited", constitution=ConstitutionEnum.PVT_LTD.value)
+    db_session.add(vendor)
+    db_session.flush()
+    app = Application(
+        reference_number=f"APP-PAN-COPY-{token}", organisation_id=org.id, vendor_id=vendor.id,
+        created_by_user_id=user.id, legal_name=vendor.legal_name, constitution=ConstitutionEnum.PVT_LTD.value,
+        pan="AAACA1234A", is_gst_registered=False, is_udyam_registered=False,
+        contact_email=user.email, contact_mobile="9876543210", pincode="560001",
+    )
+    db_session.add(app)
+    db_session.flush()
+    orchestrator = ValidationOrchestrator(db_session)
+    monkeypatch.setattr(
+        orchestrator.pan_adapter,
+        "verify",
+        lambda identifier, context: VerificationResult(
+            verification_type="PAN", provider_name="Test sandbox", request_id="test-1",
+            submitted_identifier="XXXX1234A", status=VerificationStatus.VERIFIED,
+            is_simulated=True, returned_attributes={}, reason="Active record", duration_ms=1,
+        ),
+    )
+
+    pan_finding = next(
+        finding for finding in orchestrator.run_layer_c_verifications(app)
+        if finding["check_id"] == "C_PAN_EXTERNAL_VERIFICATION"
+    )
+
+    assert pan_finding["status"] == ValidationStatusEnum.PASSED.value
+    assert "failed" not in pan_finding["explanation"].lower()
+    assert "No registered taxpayer name" in pan_finding["explanation"]
 
     # Checksum mismatch
     is_valid, err = validate_gstin_structure("29AAACA1234A1Z9")

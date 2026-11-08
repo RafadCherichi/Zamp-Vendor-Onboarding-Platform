@@ -6,6 +6,7 @@ import type { Invitation } from '../../types/invitation';
 import type { DashboardMetrics } from '../../types/queue';
 import { ApplicationQueue } from '../queue/ApplicationQueue';
 import { ApplicationDetailsWorkspace } from '../review/ApplicationDetailsWorkspace';
+import { ProcessRunHistory } from '../runs/ProcessRunHistory';
 import {
   Plus,
   RefreshCw,
@@ -18,7 +19,7 @@ import {
 
 export const ProcurementDashboard: React.FC = () => {
   const { token, user } = useAuth();
-  const [activeView, setActiveView] = useState<'QUEUE' | 'INVITATIONS'>('QUEUE');
+  const [activeView, setActiveView] = useState<'QUEUE' | 'RUNS' | 'INVITATIONS'>('QUEUE');
   const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
 
   // Queue initial filters triggered by dashboard metric clicks
@@ -130,25 +131,26 @@ export const ProcurementDashboard: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs">
+      <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 overflow-hidden bg-[#1d382b] p-6 sm:p-7 rounded-2xl border border-[#294a37] shadow-sm text-[#f8f7f0]">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-24 h-64 w-64 rounded-full border border-[#ffffff18]" />
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-extrabold text-slate-900">Procurement &amp; Onboarding Operations</h2>
-            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
-              Operational Hub
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#c5d8c7]">Zamp · Vendor operations</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="font-serif text-2xl sm:text-3xl font-medium tracking-tight text-white">Good partnerships start here.</h2>
+            <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-full bg-[#ffffff14] text-[#e5ecdf] border border-[#ffffff2a]">
+              Operations
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            End-to-end management for <span className="font-semibold text-slate-700">{user?.organisation.name}</span> &bull;{' '}
-            Application queues, invitations dispatch, and statutory exception tracking.
+          <p className="text-sm text-[#d3ded3] mt-2 max-w-2xl">
+            Review each submission, see what the checks found, and help good vendors get moving. <span className="font-semibold text-white">{user?.organisation.name}</span>
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="relative flex items-center gap-2">
           <button
             onClick={fetchDashboardData}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition"
+            className="inline-flex h-10 items-center gap-1.5 px-3 rounded-lg text-xs font-semibold text-white bg-[#ffffff12] hover:bg-[#ffffff22] border border-[#ffffff30] transition"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
@@ -159,7 +161,7 @@ export const ProcurementDashboard: React.FC = () => {
               setFormError(null);
               setIsModalOpen(true);
             }}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs transition"
+            className="inline-flex h-10 items-center gap-1.5 px-4 rounded-lg text-xs font-semibold text-[#1d382b] bg-[#d8b76b] hover:bg-[#e5c984] shadow-xs transition"
           >
             <Plus className="w-4 h-4" />
             <span>Dispatch Invitation</span>
@@ -174,7 +176,7 @@ export const ProcurementDashboard: React.FC = () => {
       )}
 
       {/* Interactive Metric Cards (Click to Filter Queue) */}
-      {metrics && (
+      {metrics && activeView === 'QUEUE' && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {/* Total Applications */}
           <div
@@ -263,7 +265,7 @@ export const ProcurementDashboard: React.FC = () => {
       )}
 
       {/* Operational Widgets Row */}
-      {metrics && (
+      {metrics && activeView === 'QUEUE' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Widget 1: Recent Application Activity */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-3">
@@ -348,7 +350,7 @@ export const ProcurementDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Main Workspace Navigation: Queue vs Invitations */}
+      {/* Main Workspace Navigation */}
       <div className="flex items-center justify-between border-b border-slate-200 pt-2">
         <div className="flex gap-4 text-sm font-bold">
           <button
@@ -360,6 +362,12 @@ export const ProcurementDashboard: React.FC = () => {
             }`}
           >
             Vendor Application Queue
+          </button>
+          <button
+            onClick={() => setActiveView('RUNS')}
+            className={`pb-2.5 border-b-2 transition ${activeView === 'RUNS' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+          >
+            Processing Runs
           </button>
           <button
             onClick={() => setActiveView('INVITATIONS')}
@@ -382,6 +390,10 @@ export const ProcurementDashboard: React.FC = () => {
           initialReadyForApproval={queueReadyFilter}
           onSelectApplication={(appId) => setSelectedApplicationId(appId)}
         />
+      )}
+
+      {activeView === 'RUNS' && token && (
+        <ProcessRunHistory token={token} onOpenApplication={(id) => setSelectedApplicationId(id)} />
       )}
 
       {/* View 2: Invitations Register */}

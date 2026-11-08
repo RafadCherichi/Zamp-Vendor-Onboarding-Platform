@@ -227,6 +227,28 @@ class ValidationRunResponse(BaseModel):
         return sorted(v, key=get_key)
 
 
+class ValidationRunHistoryItemResponse(BaseModel):
+    """A compact, human-readable record of one real validation execution."""
+
+    id: str
+    application_id: str
+    application_reference: str
+    vendor_name: str
+    run_type: str
+    run_status: str
+    outcome: str
+    application_status: str
+    summary: Optional[str] = None
+    reason: str
+    passed_count: int
+    failed_count: int
+    warning_count: int
+    unverified_count: int
+    unavailable_count: int
+    is_current: bool
+    created_at: datetime
+
+
 class ValidationTriggerRequest(BaseModel):
     run_type: Optional[str] = "FULL"
     trigger_reason: Optional[str] = "Manual validation trigger"

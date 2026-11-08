@@ -3,9 +3,35 @@ import type {
   ExternalVerificationRecord,
   DuplicateSignal,
   AuditEvent,
+  ValidationRunHistoryItem,
 } from '../types/validation';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+
+export async function apiFetchValidationRunHistory(
+  token: string,
+  limit: number = 50
+): Promise<ValidationRunHistoryItem[]> {
+  const res = await fetch(`${API_BASE}/applications/runs?limit=${limit}`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Unable to load recent processing runs');
+  }
+  return res.json();
+}
+
+export async function apiFetchValidationRun(token: string, runId: string): Promise<ValidationRun> {
+  const res = await fetch(`${API_BASE}/applications/runs/${runId}`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Unable to open this processing run');
+  }
+  return res.json();
+}
 
 export async function apiFetchValidation(token: string, applicationId: string): Promise<ValidationRun> {
   const res = await fetch(`${API_BASE}/applications/${applicationId}/validation`, {

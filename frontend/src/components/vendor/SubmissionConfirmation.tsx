@@ -3,6 +3,7 @@ import type { Application } from '../../types/application';
 import { CheckCircle2, Clock, Lock, Copy, Check, XCircle, ShieldAlert } from 'lucide-react';
 import { VendorExceptionsBanner } from './VendorExceptionsBanner';
 import { apiFetchValidation } from '../../api/validation';
+import type { ValidationRun } from '../../types/validation';
 
 interface Props {
   application: Application;
@@ -13,21 +14,25 @@ interface Props {
 export const SubmissionConfirmation: React.FC<Props> = ({ application, token, onRefresh }) => {
   const [copied, setCopied] = React.useState(false);
   const [providerUnavailable, setProviderUnavailable] = React.useState(false);
+  const [validationRun, setValidationRun] = React.useState<ValidationRun | null>(null);
 
   React.useEffect(() => {
-    if (!token || application.status === 'APPROVED' || application.status === 'REJECTED') {
+    if (!token) {
       return;
     }
     let active = true;
     apiFetchValidation(token, application.id)
       .then((run) => {
-        if (active) setProviderUnavailable(run.findings.some((finding) =>
-          finding.check_id.startsWith('C_') && finding.status === 'UNAVAILABLE'
-        ));
+        if (active) {
+          setValidationRun(run);
+          setProviderUnavailable(run.findings.some((finding) =>
+            finding.check_id.startsWith('C_') && finding.status === 'UNAVAILABLE'
+          ));
+        }
       })
-      .catch(() => { if (active) setProviderUnavailable(false); });
+      .catch(() => { if (active) { setProviderUnavailable(false); setValidationRun(null); } });
     return () => { active = false; };
-  }, [token, application.id, application.status]);
+  }, [token, application.id, application.status, application.updated_at]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(application.reference_number);
@@ -182,12 +187,12 @@ export const SubmissionConfirmation: React.FC<Props> = ({ application, token, on
       {/* State-Aware 4-Step Onboarding Progress Tracker */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs space-y-5">
         <div>
-          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
             <Clock className="w-4 h-4 text-indigo-600" />
-            Onboarding Progress Tracker
+            Application status
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Track each stage of your vendor onboarding journey in real time.
+            See what has happened so far. The checks run on your submitted details; a person makes the final decision.
           </p>
         </div>
 
@@ -207,7 +212,7 @@ export const SubmissionConfirmation: React.FC<Props> = ({ application, token, on
             </p>
           </div>
 
-          {/* Step 2: Information & Document Review */}
+          {/* Step 2: Automated document and data checks */}
           <div
             className={`p-3.5 rounded-xl border space-y-1.5 relative ${
               isApproved
@@ -231,12 +236,16 @@ export const SubmissionConfirmation: React.FC<Props> = ({ application, token, on
               >
                 {isApproved ? '✓' : '2'}
               </span>
-              <span className="font-bold text-slate-900 text-xs">2. Document Review</span>
+              <span className="font-bold text-slate-900 text-xs">2. Automated checks</span>
             </div>
             <p className="text-[11px] text-slate-500 pl-8">
               {isApproved
-                ? 'Statutory documents verified'
-                : 'Checking PAN, GST, and bank proofs'}
+                ? 'Checks completed before approval'
+                : validationRun
+                ? validationRun.failed_count + validationRun.unverified_count + validationRun.unavailable_count + validationRun.warning_count === 0
+                  ? `All ${validationRun.passed_count} checks passed`
+                  : `${validationRun.passed_count} passed · ${validationRun.failed_count + validationRun.unverified_count + validationRun.unavailable_count + validationRun.warning_count} need review`
+                : 'Your submitted documents and details are being checked'}
             </p>
           </div>
 
@@ -266,10 +275,12 @@ export const SubmissionConfirmation: React.FC<Props> = ({ application, token, on
             </div>
             <p className="text-[11px] text-slate-500 pl-8">
               {isActionRequired
-                ? 'Action needed from you above'
+                ? 'We have asked you for more information'
                 : isApproved
-                ? 'No pending clarifications'
-                : 'Only if additional details needed'}
+                ? 'No vendor follow-up is outstanding'
+                : isRejected
+                ? 'No further information is needed for this decision'
+                : 'We will contact you here if anything is missing'}
             </p>
           </div>
 
@@ -302,7 +313,7 @@ export const SubmissionConfirmation: React.FC<Props> = ({ application, token, on
                 ? 'Approved & active on vendor panel'
                 : isRejected
                 ? 'Application not approved'
-                : 'Compliance approval & onboarding'}
+                : 'A reviewer will record the final decision'}
             </p>
           </div>
         </div>

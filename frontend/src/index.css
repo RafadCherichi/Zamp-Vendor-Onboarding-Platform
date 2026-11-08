@@ -40,14 +40,17 @@ body {
 ::selection { background: #b7d3c0; color: #1c2b23; }
 :focus-visible { outline: 3px solid #285940; outline-offset: 3px; }
 
-/* Existing task components share a consistent surface and edge treatment. */
-.rounded-2xl { border-radius: 0.5rem; }
-.rounded-xl { border-radius: 0.4rem; }
-.rounded-lg { border-radius: 0.3rem; }
-.shadow-sm, .shadow-xs, .shadow-2xs, .shadow-md { box-shadow: none; }
+/* A little depth and softer geometry make dense operations screens easier to scan. */
+.rounded-2xl { border-radius: 1rem; }
+.rounded-xl { border-radius: 0.75rem; }
+.rounded-lg { border-radius: 0.55rem; }
+.shadow-sm { box-shadow: 0 2px 8px rgb(28 43 35 / 0.06), 0 1px 2px rgb(28 43 35 / 0.04); }
+.shadow-xs, .shadow-2xs { box-shadow: 0 1px 3px rgb(28 43 35 / 0.05); }
+.shadow-md { box-shadow: 0 10px 28px rgb(28 43 35 / 0.12); }
 
 main h1, main h2, main h3 { letter-spacing: -0.025em; }
 main h2 { line-height: 1.2; }
+main button { transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }

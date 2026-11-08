@@ -100,6 +100,8 @@ class ValidationOrchestrator:
             elif val_status == ValidationStatusEnum.UNAVAILABLE.value:
                 sev = ValidationSeverityEnum.MEDIUM.value
                 explanation = f"Simulated external PAN registry was temporarily unavailable: {res.reason}. This is an infrastructure availability flag, not a verification failure."
+            elif val_status == ValidationStatusEnum.PASSED.value:
+                explanation = "Simulated PAN registry reported the PAN as active. No registered taxpayer name was returned for comparison."
             else:
                 explanation = f"Simulated PAN verification failed: {res.reason}."
 
@@ -111,7 +113,7 @@ class ValidationOrchestrator:
                 "severity": sev,
                 "submitted_value": mask_id(app.pan),
                 "extracted_value": None,
-                "external_value": taxpayer_name or ("UNAVAILABLE" if val_status == ValidationStatusEnum.UNAVAILABLE.value else "INVALID"),
+                "external_value": taxpayer_name or ("UNAVAILABLE" if val_status == ValidationStatusEnum.UNAVAILABLE.value else ("VERIFIED; name not returned" if val_status == ValidationStatusEnum.PASSED.value else "INVALID")),
                 "evidence": f"Provider: {res.provider_name} | ReqId: {res.request_id} | Status: {res.status.value}",
                 "explanation": f"[SIMULATED] {explanation}",
                 "recommended_action": "Retry verification later when provider recovers." if val_status == ValidationStatusEnum.UNAVAILABLE.value else ("No action required." if val_status == ValidationStatusEnum.PASSED.value else "Verify PAN details with vendor."),

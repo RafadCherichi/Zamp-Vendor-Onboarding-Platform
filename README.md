@@ -5,6 +5,17 @@
 
 This repository implements the India-focused Vendor Onboarding Platform based on the **Final Consolidated Product Specification (Version 1.0)**.
 
+## PS-2 evaluator quick start
+
+- **Live demo:** [zamp-vendor-onboarding-5i4e.onrender.com](https://zamp-vendor-onboarding-5i4e.onrender.com/). The free service may take about a minute to wake and its local demo data can reset after a restart.
+- **Health check:** [open `/api/health`](https://zamp-vendor-onboarding-5i4e.onrender.com/api/health). A healthy response reports the database and upload storage status.
+- **Try the workflow:** sign in as a seeded procurement or reviewer user, inspect the clean case, then open the bank-conflict case and its vendor correction. Use **Processing Runs** to inspect persisted validation output. The clean vendor portal can be used to inspect the result and next step.
+- **Demo roles:** `procurement@apex.com` and `reviewer@apex.com`; password `Password123!`.
+- **What is simulated:** PAN/GST/MCA/Udyam/bank registry responses are synthetic. Human reviewers remain responsible for the final approval or rejection.
+- **Grading and evidence:** [PS-2 rubric](PROTOTYPE_GRADING_RUBRIC.md), [current grade](PROTOTYPE_GRADE.md), [decision note](CASE_STUDY_DECISION_NOTE.md), [scenario workbook](testdata/vendor_scenario_dataset.xlsx), and [scenario results](testdata/scenario_results.json).
+
+The Render service follows the `main` branch. Confirm the latest deployment before using the public link for evaluation; the free tier uses temporary local storage and SQLite.
+
 ---
 
 ## 1. Architecture & Security Overview
@@ -112,7 +123,7 @@ From the project root:
 $env:PYTHONPATH='backend'
 backend\.venv\Scripts\pytest.exe backend/tests -v
 ```
-*Current test suite: 36 passing unit & integration tests.*
+*Current checked-in development suite: 117 passing tests, with one dependency deprecation warning. The case-study scenario runner and browser verification are separate; see the current grade and progress ledger.*
 
 ### Running Frontend Type-Check & Production Build
 From the `frontend` directory:
@@ -157,15 +168,13 @@ npm.cmd run build
 
 ---
 
-## 7. Build Sequence & Progress
+## 7. Current case-study scope and verification
 
-| Increment | Title | Scope | Status |
-| :--- | :--- | :--- | :--- |
-| **0** | **Foundation** | Workspace inspection, FastAPI, React + Vite, Alembic, Storage Adapter, Health verification | **Complete** |
-| **1** | **App Shell & Identity** | Multi-role RBAC, organisation scoping, secure expiring invitation tokens, demo switcher | **Complete** |
-| **2** | **Vendor Onboarding** | 6-section dynamic form, activity/constitution conditional checklist, save/resume, document uploads & preview | **Complete** |
-| **3** | **Document Processing** | Private storage versions, dual-path OCR & vision, classification, structured field extraction, evidence inspector | **Complete** |
-| **4** | **Validation & Verification**| Deterministic rules, PAN-GST matching, duplicate detection, simulated verification | *Next* |
-| **5** | **Exception Lifecycle** | Vendor-explainable corrections, versioned replacements, selective revalidation | *Upcoming* |
-| **6** | **Internal Workspace** | Reviewer dashboard, evidence side-by-side inspection, human decision recording | *Upcoming* |
-| **7** | **Hardening & Demo Data** | Append-only audit timeline, quarantine guards, acceptance test suite, synthetic demo data | *Upcoming* |
+The prototype currently covers the PS-2 path from invitation and vendor submission through document processing, saved validation results, vendor correction, reviewer decision, and procurement run history. Processing Runs opens the exact saved findings and links back to the current case. Approval remains human controlled; external registry responses are labelled as simulated.
+
+- **Regression suite:** 117 backend tests pass in the isolated development test database; one dependency deprecation warning remains.
+- **Scenario set:** 14 synthetic vendor case IDs across company, proprietor, partnership and LLP rules; 15 result records because the bank mismatch case includes multiple correction attempts. Current expected-result assertions pass in [`testdata/scenario_results.json`](testdata/scenario_results.json).
+- **Browser checks:** fresh submission/refresh/reviewer decision and 390px responsive vendor views are recorded in [`testdata/fresh_browser_results.json`](testdata/fresh_browser_results.json) and [`testdata/ui_results.json`](testdata/ui_results.json).
+- **Limits:** the public Render free tier uses temporary local SQLite and file storage; records can reset after restart. Synthetic cases do not establish real-world accuracy. Keyboard-only usability and first-time-user comprehension still need a human review.
+
+For score details and evidence, see [`PROTOTYPE_GRADE.md`](PROTOTYPE_GRADE.md) and [`PROTOTYPE_GRADING_RUBRIC.md`](PROTOTYPE_GRADING_RUBRIC.md). The narrated demo still needs a timed rehearsal before claiming submission readiness.

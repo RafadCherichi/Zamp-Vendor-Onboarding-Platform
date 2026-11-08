@@ -52,6 +52,26 @@ export interface ValidationRun {
   findings: ValidationFinding[];
 }
 
+export interface ValidationRunHistoryItem {
+  id: string;
+  application_id: string;
+  application_reference: string;
+  vendor_name: string;
+  run_type: string;
+  run_status: string;
+  outcome: 'APPROVED' | 'REJECTED' | 'PENDING';
+  application_status: string;
+  summary?: string | null;
+  reason: string;
+  passed_count: number;
+  failed_count: number;
+  warning_count: number;
+  unverified_count: number;
+  unavailable_count: number;
+  is_current: boolean;
+  created_at: string;
+}
+
 export interface ExternalVerificationRecord {
   id: string;
   verification_type: string;

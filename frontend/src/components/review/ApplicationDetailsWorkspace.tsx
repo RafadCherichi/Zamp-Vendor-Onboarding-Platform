@@ -303,14 +303,16 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
 
           {/* Action Toolbar */}
           {isReviewer && overview.status !== 'APPROVED' && overview.status !== 'REJECTED' && (
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex w-full flex-col gap-2 lg:w-auto lg:items-end">
+              <div className="flex flex-wrap items-center justify-end gap-2">
               {/* Quick Assign Dropdown */}
-              <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-1 text-xs">
+              <div className="flex h-10 min-w-0 items-center gap-2 bg-[#f5f4ee] border border-[#deded5] rounded-lg px-3 text-xs">
                 <User className="w-3.5 h-3.5 text-slate-500 ml-1" />
                 <select
                   value={selectedReviewerId}
                   onChange={(e) => handleAssign(e.target.value)}
-                  className="bg-transparent text-xs font-medium text-slate-700 focus:outline-none pr-1 cursor-pointer"
+                  aria-label="Assign reviewer"
+                  className="max-w-[220px] bg-transparent text-xs font-medium text-slate-700 focus:outline-none pr-1 cursor-pointer"
                 >
                   <option value="">Unassigned</option>
                   {reviewers.map((r) => (
@@ -321,13 +323,30 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
                 </select>
               </div>
 
+              {/* Approve is adjacent to ownership: the primary decision stays easy to find. */}
+              <button
+                disabled={!overview.is_approval_eligible}
+                onClick={() => {
+                  setActionError(null);
+                  setActiveModal('APPROVE');
+                }}
+                title={overview.is_approval_eligible ? 'Grant formal vendor approval' : 'Approval blocked: Unresolved high/blocking exceptions or incomplete statutory requirements'}
+                className={`inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-4 text-xs font-semibold text-white transition shadow-sm ${overview.is_approval_eligible ? 'bg-[#286344] hover:bg-[#204e36] cursor-pointer' : 'bg-slate-400 cursor-not-allowed opacity-80'}`}
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Approve Vendor</span>
+              </button>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-end gap-2">
+
               {/* Request Clarification */}
               <button
                 onClick={() => {
                   setActionError(null);
                   setActiveModal('CLARIFY');
                 }}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 transition flex items-center gap-1"
+                className="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-[#e3cc91] bg-[#fbf5e5] px-3 text-xs font-semibold text-[#765817] transition hover:bg-[#f5ebd1]"
               >
                 <HelpCircle className="w-3.5 h-3.5" />
                 <span>Request Clarification</span>
@@ -339,7 +358,7 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
                   setActionError(null);
                   setActiveModal('ESCALATE');
                 }}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 transition flex items-center gap-1"
+                className="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-[#deded5] bg-[#f5f4ee] px-3 text-xs font-semibold text-slate-700 transition hover:bg-[#eae9e1]"
               >
                 <AlertOctagon className="w-3.5 h-3.5" />
                 <span>Escalate</span>
@@ -351,33 +370,13 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
                   setActionError(null);
                   setActiveModal('REJECT');
                 }}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 transition flex items-center gap-1"
+                className="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-[#e9c9bf] bg-[#fbefeb] px-3 text-xs font-semibold text-[#873e2c] transition hover:bg-[#f6e2db]"
               >
                 <XCircle className="w-3.5 h-3.5" />
                 <span>Reject</span>
               </button>
 
-              {/* Approve */}
-              <button
-                disabled={!overview.is_approval_eligible}
-                onClick={() => {
-                  setActionError(null);
-                  setActiveModal('APPROVE');
-                }}
-                title={
-                  overview.is_approval_eligible
-                    ? 'Grant formal vendor approval'
-                    : 'Approval blocked: Unresolved high/blocking exceptions or incomplete statutory requirements'
-                }
-                className={`px-4 py-1.5 rounded-lg text-xs font-semibold text-white transition flex items-center gap-1.5 shadow-xs ${
-                  overview.is_approval_eligible
-                    ? 'bg-emerald-600 hover:bg-emerald-700 cursor-pointer'
-                    : 'bg-slate-400 cursor-not-allowed opacity-80'
-                }`}
-              >
-                <Check className="w-3.5 h-3.5" />
-                <span>Approve Vendor</span>
-              </button>
+              </div>
             </div>
           )}
         </div>

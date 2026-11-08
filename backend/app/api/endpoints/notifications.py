@@ -12,6 +12,22 @@ router = APIRouter()
 
 
 @router.get(
+    "/count",
+    summary="Get unread notification count",
+)
+def get_unread_notification_count(
+    db: Session = Depends(get_db),
+    member: OrganisationMember = Depends(get_current_member),
+) -> dict:
+    unread_count = db.query(Notification.id).filter(
+        Notification.organisation_id == member.organisation_id,
+        Notification.recipient_user_id == member.user_id,
+        Notification.is_read.is_(False),
+    ).count()
+    return {"unread_count": unread_count}
+
+
+@router.get(
     "/",
     response_model=List[NotificationResponse],
     summary="Get User Notifications",

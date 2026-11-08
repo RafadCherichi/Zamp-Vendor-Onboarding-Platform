@@ -18,6 +18,7 @@ from app.models.validation import (
 from app.models.audit import AuditEvent
 from app.schemas.validation import (
     ValidationRunResponse,
+    ValidationRunHistoryItemResponse,
     ValidationFindingResponse,
     ExternalVerificationResponse,
     DuplicateSignalResponse,
@@ -29,6 +30,120 @@ from app.api.endpoints.applications import get_scoped_application
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+@router.get(
+    "/runs",
+    response_model=List[ValidationRunHistoryItemResponse],
+    summary="List validation runs for the current organisation",
+    description="Returns real validation executions with the current human decision state and a concise reason.",
+)
+def list_validation_runs(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    member: OrganisationMember = Depends(require_roles([
+        RoleEnum.REVIEWER,
+        RoleEnum.PROCUREMENT_OFFICER,
+        RoleEnum.ADMIN,
+    ])),
+) -> List[ValidationRunHistoryItemResponse]:
+    bounded_limit = max(1, min(limit, 100))
+    runs = (
+        db.query(ValidationRun)
+        .join(Application, ValidationRun.application_id == Application.id)
+        .filter(
+            ValidationRun.organisation_id == member.organisation_id,
+            Application.organisation_id == member.organisation_id,
+        )
+        .order_by(ValidationRun.created_at.desc(), ValidationRun.id.desc())
+        .limit(bounded_limit)
+        .all()
+    )
+
+    items: List[ValidationRunHistoryItemResponse] = []
+    pending_statuses = {
+        "DRAFT", "IN_PROGRESS", "SUBMITTED", "ACTION_REQUIRED", "UNDER_REVIEW", "ESCALATED"
+    }
+    for run in runs:
+        application = run.application
+        if application.status == "APPROVED":
+            outcome = "APPROVED"
+        elif application.status == "REJECTED":
+            outcome = "REJECTED"
+        elif application.status in pending_statuses:
+            outcome = "PENDING"
+        else:
+            outcome = "PENDING"
+
+        reason = application.rejection_reason or ""
+        if not reason:
+            relevant = next(
+                (
+                    finding
+                    for finding in run.findings
+                    if finding.status in {"FAILED", "UNVERIFIED", "UNAVAILABLE"}
+                    or finding.is_stale
+                ),
+                None,
+            )
+            if relevant:
+                reason = relevant.explanation
+        if not reason:
+            if application.status == "APPROVED":
+                reason = "A reviewer approved this vendor after completing the checks."
+            elif application.status == "REJECTED":
+                reason = "A reviewer recorded a rejection decision."
+            elif run.failed_count == 0 and run.warning_count == 0 and run.unverified_count == 0 and run.unavailable_count == 0:
+                reason = f"All {run.passed_count} checks passed. A reviewer still needs to record the final decision."
+            else:
+                reason = run.summary or "Checks are recorded. A human reviewer makes the final decision."
+
+        items.append(
+            ValidationRunHistoryItemResponse(
+                id=run.id,
+                application_id=application.id,
+                application_reference=application.reference_number,
+                vendor_name=application.legal_name,
+                run_type=run.run_type,
+                run_status=run.status,
+                outcome=outcome,
+                application_status=application.status,
+                summary=run.summary,
+                reason=reason,
+                passed_count=run.passed_count,
+                failed_count=run.failed_count,
+                warning_count=run.warning_count,
+                unverified_count=run.unverified_count,
+                unavailable_count=run.unavailable_count,
+                is_current=run.is_current,
+                created_at=run.created_at,
+            )
+        )
+    return items
+
+
+@router.get(
+    "/runs/{run_id}",
+    response_model=ValidationRunResponse,
+    summary="Get one validation run and its findings",
+    description="Returns the exact saved execution selected from run history, scoped to the reviewer's organisation.",
+)
+def get_validation_run_history_detail(
+    run_id: str,
+    db: Session = Depends(get_db),
+    member: OrganisationMember = Depends(require_roles([
+        RoleEnum.REVIEWER,
+        RoleEnum.PROCUREMENT_OFFICER,
+        RoleEnum.ADMIN,
+    ])),
+) -> ValidationRunResponse:
+    run = db.query(ValidationRun).filter(
+        ValidationRun.id == run_id,
+        ValidationRun.organisation_id == member.organisation_id,
+    ).first()
+    if not run:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Validation run not found.")
+    return run
 
 
 @router.post(
