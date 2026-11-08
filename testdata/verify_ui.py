@@ -73,6 +73,7 @@ with tempfile.TemporaryDirectory(prefix="zamp-ui-", ignore_cleanup_errors=True) 
                 ("login", None, 1440),
                 ("vendor-rejected", "vendor.issue@apexlogistics.in", 390),
                 ("vendor-action", "vendor.mismatch@sharmaworks.in", 390),
+                ("procurement-runs", "procurement@apex.com", 1440),
                 ("reviewer", "reviewer@apex.com", 1440),
             ]
             for label, email, width in cases:
@@ -93,6 +94,12 @@ with tempfile.TemporaryDirectory(prefix="zamp-ui-", ignore_cleanup_errors=True) 
                     elif label == "reviewer":
                         page.get_by_text("Application decisions").wait_for()
                         page.get_by_text("APP-2026-CLEAN-001").wait_for()
+                    elif label == "procurement-runs":
+                        page.get_by_role("button", name="Processing Runs").click()
+                        page.get_by_role("heading", name="Processing runs").wait_for()
+                        clean_row = page.get_by_role("row").filter(has_text="Tata Industrial Supplies Private Limited")
+                        clean_row.get_by_role("button", name="Inspect run").click()
+                        page.get_by_role("heading", name="What the checks found").wait_for()
                 text = page.locator("body").inner_text()
                 page.screenshot(path=str(OUTPUT / f"iteration2-{label}.png"), full_page=True)
                 preview = text[:300].replace("\n", " | ").encode("ascii", "replace").decode("ascii")
@@ -108,6 +115,10 @@ with tempfile.TemporaryDirectory(prefix="zamp-ui-", ignore_cleanup_errors=True) 
                     assert "application status: action needed" in text.lower()
                 elif label == "reviewer":
                     assert "Application decisions" in text and "Case queue" in text
+                elif label == "procurement-runs":
+                    assert "findings recorded" in text.lower()
+                    assert "not applicable" in text.lower()
+                    assert "Demo notice: external tax, bank, and registry results shown here use simulated records." in text
                 if width == 390:
                     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
                 page.close()
@@ -120,6 +131,8 @@ with tempfile.TemporaryDirectory(prefix="zamp-ui-", ignore_cleanup_errors=True) 
             "rejected_correction_banner_hidden": True,
             "mobile_no_horizontal_overflow": True,
             "reviewer_queue_visible": True,
+            "run_history_detail_visible": True,
+            "not_applicable_findings_explicit": True,
             "high_severity_open_count_excludes_rejected": metrics["high_severity_exceptions_count"] == 2,
         }, indent=2), encoding="utf-8")
     finally:

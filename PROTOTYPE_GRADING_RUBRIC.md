@@ -6,7 +6,7 @@
 
 The candidate guide is the authority for the assignment. PS-2 asks for a working process that accepts vendor information, reaches an explained approved, pending or rejected result, shows what needs to happen when the result is not approval, exposes the process stages while they run, and gives staff a dashboard with run history, status and outputs. The submission should deliberately handle two to four realistic edge cases and demonstrate a happy path and at least one edge within five minutes.
 
-This score therefore gives 85 points to the product experience and its observable behavior, 4 to product/consulting judgment, and 3 to the constrained demo. The dimensions are not interchangeable: a beautiful dashboard cannot compensate for unsafe decisions, and a high score cannot waive the case-study requirements. It is an internal diagnostic, not an estimate of an evaluator's mark.
+This score therefore gives 93 points to the product experience and its observable behavior, 4 to product/consulting judgment, and 3 to the constrained demo. The dimensions are not interchangeable: a beautiful dashboard cannot compensate for unsafe decisions, and a high score cannot waive the case-study requirements. It is an internal diagnostic, not an estimate of an evaluator's mark.
 
 ## Weighted dimensions
 
