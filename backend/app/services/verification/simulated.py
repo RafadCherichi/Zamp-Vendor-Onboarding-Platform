@@ -332,7 +332,7 @@ class SimulatedMcaAdapter(BaseVerificationAdapter):
             status=VerificationStatus.UNVERIFIED,
             is_simulated=True,
             returned_attributes={},
-            reason="CIN/LLPIN not found in MCA company master database.",
+            reason="Identifier is not included in the demo sample registry.",
             duration_ms=int((time.time() - start) * 1000) + 40,
         )
 

@@ -123,7 +123,7 @@ From the project root:
 $env:PYTHONPATH='backend'
 backend\.venv\Scripts\pytest.exe backend/tests -v
 ```
-*Current checked-in development suite: 117 passing tests, with one dependency deprecation warning. The case-study scenario runner and browser verification are separate; see the current grade and progress ledger.*
+*Current checked-in development suite: 118 passing tests, with one dependency deprecation warning. The case-study scenario runner and browser verification are separate; see the current grade and progress ledger.*
 
 ### Running Frontend Type-Check & Production Build
 From the `frontend` directory:
@@ -172,7 +172,7 @@ npm.cmd run build
 
 The prototype currently covers the PS-2 path from invitation and vendor submission through document processing, saved validation results, vendor correction, reviewer decision, and procurement run history. Processing Runs opens the exact saved findings and links back to the current case. Approval remains human controlled; external registry responses are labelled as simulated.
 
-- **Regression suite:** 117 backend tests pass in the isolated development test database; one dependency deprecation warning remains.
+- **Regression suite:** 118 backend tests pass in the isolated development test database; one dependency deprecation warning remains.
 - **Scenario set:** 14 synthetic vendor case IDs across company, proprietor, partnership and LLP rules; 15 result records because the bank mismatch case includes multiple correction attempts. Current expected-result assertions pass in [`testdata/scenario_results.json`](testdata/scenario_results.json).
 - **Browser checks:** fresh submission/refresh/reviewer decision and 390px responsive vendor views are recorded in [`testdata/fresh_browser_results.json`](testdata/fresh_browser_results.json) and [`testdata/ui_results.json`](testdata/ui_results.json).
 - **Limits:** the public Render free tier uses temporary local SQLite and file storage; records can reset after restart. Synthetic cases do not establish real-world accuracy. Keyboard-only usability and first-time-user comprehension still need a human review.

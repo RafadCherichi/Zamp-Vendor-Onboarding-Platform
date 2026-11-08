@@ -96,6 +96,38 @@ def test_verified_pan_without_returned_name_is_not_reported_as_failed(db_session
     assert "checksum mismatch" in err
 
 
+def test_mca_sample_registry_no_match_is_explained_as_unconfirmed(db_session: Session):
+    token = secrets.token_hex(4)
+    org = Organization(name=f"Org MCA Copy {token}", slug=f"org-mca-copy-{token}")
+    db_session.add(org)
+    db_session.flush()
+    user = User(email=f"mca-copy-{token}@vendor.com", full_name="MCA Test", hashed_password="pw")
+    db_session.add(user)
+    db_session.flush()
+    vendor = Vendor(organisation_id=org.id, legal_name="Example Logistics LLP", constitution=ConstitutionEnum.LLP.value)
+    db_session.add(vendor)
+    db_session.flush()
+    app = Application(
+        reference_number=f"APP-MCA-COPY-{token}", organisation_id=org.id, vendor_id=vendor.id,
+        created_by_user_id=user.id, legal_name=vendor.legal_name, constitution=ConstitutionEnum.LLP.value,
+        cin_llpin="AAA-1234", is_gst_registered=False, is_udyam_registered=False,
+        contact_email=user.email, contact_mobile="9876543210", pincode="560001",
+    )
+    db_session.add(app)
+    db_session.flush()
+
+    finding = next(
+        finding for finding in ValidationOrchestrator(db_session).run_layer_c_verifications(app)
+        if finding["check_id"] == "C_MCA_EXTERNAL_VERIFICATION"
+    )
+
+    assert finding["status"] == ValidationStatusEnum.UNVERIFIED.value
+    assert "limited mca sample registry" in finding["explanation"].lower()
+    assert "cannot confirm" in finding["explanation"].lower()
+    assert "verification failed" not in finding["explanation"].lower()
+    assert "compare" in finding["recommended_action"].lower()
+
+
 def test_pan_constitution_aware_validation():
     """Verify 4th character of PAN conforms to business constitution."""
     # Individual / Sole Proprietor -> 4th char 'P'. Here 'C' is company, so should mismatch.

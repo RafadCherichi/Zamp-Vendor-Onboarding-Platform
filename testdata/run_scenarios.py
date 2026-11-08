@@ -3,6 +3,7 @@
 import io
 import json
 import os
+import re
 import sys
 import tempfile
 from datetime import datetime
@@ -387,5 +388,14 @@ with tempfile.TemporaryDirectory(prefix="zamp-scenarios-", ignore_cleanup_errors
     print(json.dumps(outcomes[-1]), flush=True)
 
     result_path = ROOT / "testdata/scenario_results.json"
-    result_path.write_text(json.dumps({"run": datetime.now().date().isoformat(), "cases": outcomes}, indent=2), encoding="utf-8")
+    stable_outcomes = json.loads(json.dumps(outcomes))
+    for outcome in stable_outcomes:
+        outcome["approval_reasons"] = [
+            re.sub(r"EXC-2026-[A-F0-9]{6}", "EXC-<generated>", reason)
+            for reason in outcome.get("approval_reasons", [])
+        ]
+    result_path.write_text(
+        json.dumps({"run": datetime.now().date().isoformat(), "cases": stable_outcomes}, indent=2) + "\n",
+        encoding="utf-8",
+    )
     assert all(x["pass"] for x in outcomes), "At least one observed result differs from the scenario contract"

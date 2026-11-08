@@ -194,6 +194,12 @@ class ValidationOrchestrator:
             elif val_status == ValidationStatusEnum.UNAVAILABLE.value:
                 sev = ValidationSeverityEnum.MEDIUM.value
                 explanation = f"Simulated MCA registry service unavailable: {res.reason}."
+            elif val_status == ValidationStatusEnum.UNVERIFIED.value:
+                sev = ValidationSeverityEnum.MEDIUM.value
+                explanation = (
+                    "The limited MCA sample registry returned no record for this identifier. "
+                    "This demo result cannot confirm whether the entity is officially registered."
+                )
             else:
                 explanation = f"Simulated MCA registry verification failed: {res.reason}."
 
@@ -205,10 +211,18 @@ class ValidationOrchestrator:
                 "severity": sev,
                 "submitted_value": app.cin_llpin,
                 "extracted_value": None,
-                "external_value": f"{comp_name} ({comp_status})" if comp_name else ("UNAVAILABLE" if val_status == ValidationStatusEnum.UNAVAILABLE.value else "INVALID"),
+                "external_value": f"{comp_name} ({comp_status})" if comp_name else (
+                    "UNAVAILABLE" if val_status == ValidationStatusEnum.UNAVAILABLE.value else
+                    "NO SAMPLE MATCH" if val_status == ValidationStatusEnum.UNVERIFIED.value else "INVALID"
+                ),
                 "evidence": f"Provider: {res.provider_name} | ReqId: {res.request_id} | Status: {res.status.value}",
                 "explanation": f"[SIMULATED] {explanation}",
-                "recommended_action": "Review incorporation details." if val_status != ValidationStatusEnum.PASSED.value else "No action required.",
+                "recommended_action": (
+                    "Compare the CIN/LLPIN with the incorporation documents or verify through an official source."
+                    if val_status == ValidationStatusEnum.UNVERIFIED.value else
+                    "Review incorporation details." if val_status != ValidationStatusEnum.PASSED.value else
+                    "No action required."
+                ),
             })
 
         # 4. Bank Account Penny-Drop Verification

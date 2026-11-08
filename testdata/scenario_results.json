@@ -38,7 +38,7 @@
       "vendor_status": "ACTION_REQUIRED",
       "vendor_action_count": 1,
       "approval_reasons": [
-        "Unresolved CRITICAL exception: EXC-2026-924DF1 (Bank Account Details Differ from Cancelled Cheque / Statement)"
+        "Unresolved CRITICAL exception: EXC-<generated> (Bank Account Details Differ from Cancelled Cheque / Statement)"
       ],
       "vendor_instruction": "The bank account details extracted from your bank document do not match the form input. Please re-check the account number/IFSC or upload a legible cancelled cheque."
     },
@@ -59,7 +59,8 @@
       "resolved_status": "RESOLVED",
       "final_approval_http": 200,
       "recorded_corrections": 2,
-      "pass": true
+      "pass": true,
+      "approval_reasons": []
     },
     {
       "id": "V04",
@@ -72,7 +73,7 @@
       "vendor_status": "ACTION_REQUIRED",
       "vendor_action_count": 1,
       "approval_reasons": [
-        "Unresolved CRITICAL exception: EXC-2026-9C9C07 (Bank Account Number Could Not Be Read)"
+        "Unresolved CRITICAL exception: EXC-<generated> (Bank Account Number Could Not Be Read)"
       ],
       "vendor_instruction": "Please upload a clearer bank proof that shows the full account number."
     },
@@ -87,7 +88,7 @@
       "vendor_status": "ACTION_REQUIRED",
       "vendor_action_count": 1,
       "approval_reasons": [
-        "Unresolved CRITICAL exception: EXC-2026-F5AE24 (Bank Account Details Differ from Cancelled Cheque / Statement)"
+        "Unresolved CRITICAL exception: EXC-<generated> (Bank Account Details Differ from Cancelled Cheque / Statement)"
       ],
       "vendor_instruction": "The bank account details extracted from your bank document do not match the form input. Please re-check the account number/IFSC or upload a legible cancelled cheque."
     },
@@ -102,7 +103,7 @@
       "vendor_status": "ACTION_REQUIRED",
       "vendor_action_count": 1,
       "approval_reasons": [
-        "Unresolved CRITICAL exception: EXC-2026-830EDD (PAN Document OCR Discrepancy)"
+        "Unresolved CRITICAL exception: EXC-<generated> (PAN Document OCR Discrepancy)"
       ],
       "vendor_instruction": "The PAN extracted from your uploaded PAN card proof differs from the PAN entered in your profile. Please upload the correct PAN card document or correct the application profile."
     },
@@ -117,7 +118,7 @@
       "vendor_status": "ACTION_REQUIRED",
       "vendor_action_count": 1,
       "approval_reasons": [
-        "Unresolved CRITICAL exception: EXC-2026-EE9A0F (GSTIN Embedded PAN Differs from Declared Business PAN)"
+        "Unresolved CRITICAL exception: EXC-<generated> (GSTIN Embedded PAN Differs from Declared Business PAN)"
       ],
       "vendor_instruction": "The PAN embedded within your GSTIN does not match your business PAN. If you operate multiple legal entities, please ensure the correct entity's PAN and GSTIN are provided."
     },
@@ -147,7 +148,8 @@
       "wrong_file_reviewer_gate": true,
       "vendor_status": "APPROVED",
       "vendor_action_count": 0,
-      "pass": true
+      "pass": true,
+      "approval_reasons": []
     },
     {
       "id": "V06",
@@ -158,7 +160,8 @@
       "pass": true,
       "approval_http": "not attempted; checklist only",
       "vendor_status": "IN_PROGRESS",
-      "vendor_action_count": 0
+      "vendor_action_count": 0,
+      "approval_reasons": []
     },
     {
       "id": "V07",
@@ -169,7 +172,8 @@
       "approval_http": "not attempted; checklist only",
       "vendor_status": "IN_PROGRESS",
       "vendor_action_count": 0,
-      "pass": true
+      "pass": true,
+      "approval_reasons": []
     },
     {
       "id": "V08",
@@ -180,7 +184,8 @@
       "approval_http": "not attempted; checklist only",
       "vendor_status": "IN_PROGRESS",
       "vendor_action_count": 0,
-      "pass": true
+      "pass": true,
+      "approval_reasons": []
     },
     {
       "id": "V13",
@@ -191,13 +196,15 @@
       "approval_http": "not attempted; submission blocked",
       "vendor_status": "IN_PROGRESS",
       "vendor_action_count": 0,
-      "pass": true
+      "pass": true,
+      "approval_reasons": []
     },
     {
       "id": "V14",
       "pass": true,
       "vendor_status": "REJECTED",
-      "rejection_reason_visible": true
+      "rejection_reason_visible": true,
+      "approval_reasons": []
     }
   ]
 }
