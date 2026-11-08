@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Response, status
 from app.config import settings
 from app.database import check_database_connection
 from app.storage.local import get_storage_adapter
@@ -15,11 +15,13 @@ router = APIRouter()
     summary="Application Health Check",
     description="Check the operational status of the API, database connectivity, and object storage.",
 )
-def get_health() -> HealthResponse:
+def get_health(response: Response) -> HealthResponse:
     db_info = check_database_connection()
     storage_info = get_storage_adapter().health_check()
 
     is_healthy = db_info.get("status") == "connected" and storage_info.get("status") == "ready"
+    if not is_healthy:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
 
     return HealthResponse(
         status="ok" if is_healthy else "degraded",

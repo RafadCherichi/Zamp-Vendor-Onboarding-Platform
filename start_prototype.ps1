@@ -36,14 +36,17 @@ if (-not (Test-Path "$ScriptDir\backend\.venv")) {
     $PythonExe = "$ScriptDir\backend\.venv\Scripts\python.exe"
 }
 
-# 3. Check / Seed DB
-if (-not (Test-Path "$ScriptDir\backend\app.db")) {
-    Write-Host "[INFO] Seeding pristine demo environment..." -ForegroundColor Yellow
-    $env:PYTHONPATH = "backend"
-    $env:OPENBLAS_NUM_THREADS = "1"
-    $env:OMP_NUM_THREADS = "1"
-    & $PythonExe -m app.db.seed_demo
+# 3. Create the database once, then preserve existing cases on later launches.
+$env:PYTHONPATH = "backend"
+$env:OPENBLAS_NUM_THREADS = "1"
+$env:OMP_NUM_THREADS = "1"
+if (-not (Test-Path "$ScriptDir\vendor_onboarding.db")) {
+    Write-Host "[INFO] Creating demo database..." -ForegroundColor Yellow
+    & $PythonExe -m alembic -c "$ScriptDir\backend\alembic.ini" upgrade head
+    if ($LASTEXITCODE -ne 0) { throw "Database migration failed." }
 }
+& $PythonExe -m app.db.initialize
+if ($LASTEXITCODE -ne 0) { throw "Demo initialization failed." }
 
 # 4. Check Node.js
 if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {

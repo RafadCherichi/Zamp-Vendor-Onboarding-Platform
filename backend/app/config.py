@@ -1,6 +1,6 @@
 import os
 from typing import List, Union, Optional
-from pydantic import AnyHttpUrl, field_validator
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -47,6 +47,16 @@ class Settings(BaseSettings):
         case_sensitive=True,
         extra="ignore",
     )
+
+    @model_validator(mode="after")
+    def validate_production_secret(self):
+        if self.ENVIRONMENT.lower() == "production" and (
+            len(self.SECRET_KEY) < 32
+            or "insecure-dev" in self.SECRET_KEY.lower()
+            or "change-in-production" in self.SECRET_KEY.lower()
+        ):
+            raise ValueError("SECRET_KEY must be a unique secret of at least 32 characters in production")
+        return self
 
 
 settings = Settings()

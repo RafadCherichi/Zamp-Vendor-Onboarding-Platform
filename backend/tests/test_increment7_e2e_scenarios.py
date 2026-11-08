@@ -659,7 +659,13 @@ def test_demo_reset_endpoint(db_session: Session, client: TestClient):
     """
     Verify POST /api/demo/reset cleanly resets and re-seeds the demo database.
     """
-    res = client.post("/api/demo/reset")
+    login_response = client.post(
+        "/api/auth/login",
+        json={"email": "admin@apex.com", "password": "Password123!"},
+    )
+    assert login_response.status_code == 200
+    admin_token = login_response.json()["access_token"]
+    res = client.post("/api/demo/reset", headers={"Authorization": f"Bearer {admin_token}"})
     assert res.status_code == 200
     data = res.json()
     assert data["success"] is True

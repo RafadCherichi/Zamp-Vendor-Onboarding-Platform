@@ -116,5 +116,4 @@ class LocalStorageAdapter(StorageAdapter):
 def get_storage_adapter() -> StorageAdapter:
     if settings.STORAGE_BACKEND == "local":
         return LocalStorageAdapter()
-    # Supabase or S3 adapters can be plugged in when credentials are provided
-    return LocalStorageAdapter()
+    raise ValueError(f"Unsupported STORAGE_BACKEND: {settings.STORAGE_BACKEND}")

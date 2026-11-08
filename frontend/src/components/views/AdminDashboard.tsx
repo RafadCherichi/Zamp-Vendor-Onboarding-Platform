@@ -14,20 +14,21 @@ import {
 } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState<boolean>(false);
   const [resetResult, setResetResult] = useState<any | null>(null);
   const [resetError, setResetError] = useState<string | null>(null);
 
   const handleResetDemo = async () => {
+    if (!token) return;
     if (!window.confirm('Reset demo environment? This will re-seed pristine demo accounts, 3 standard test cases, and synthetic documents.')) {
       return;
     }
     setIsResetting(true);
     setResetError(null);
     try {
-      const res = await apiResetDemo();
+      const res = await apiResetDemo(token);
       setResetResult(res);
     } catch (err: any) {
       setResetError(err?.message || 'Failed to reset demo environment.');
@@ -59,21 +60,21 @@ export const AdminDashboard: React.FC = () => {
             <div>
               <h2 className="text-xl font-bold text-slate-900">Administrator Control Center</h2>
               <p className="text-xs text-slate-500">
-                Governance, policy oversight, and demo orchestration for{' '}
+                Governance and policy oversight for{' '}
                 <span className="font-semibold text-slate-700">{user?.organisation.name}</span>
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <button
+            {import.meta.env.DEV && <button
               onClick={handleResetDemo}
               disabled={isResetting}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 shadow-xs transition disabled:opacity-50"
             >
               <RotateCcw className={`w-3.5 h-3.5 ${isResetting ? 'animate-spin' : ''}`} />
               <span>{isResetting ? 'Resetting Demo...' : 'Reset & Re-Seed Demo'}</span>
-            </button>
+            </button>}
             <div className="px-3 py-1.5 rounded-lg bg-purple-50 border border-purple-200 text-xs font-semibold text-purple-800">
               Organisation Admin
             </div>

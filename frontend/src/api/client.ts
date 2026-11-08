@@ -17,12 +17,13 @@ export async function fetchHealth(): Promise<HealthResponse> {
   return response.json();
 }
 
-export async function apiResetDemo(): Promise<any> {
+export async function apiResetDemo(token: string): Promise<any> {
   const response = await fetch(`${API_BASE_URL}/demo/reset`, {
     method: 'POST',
     headers: {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
     },
   });
 
