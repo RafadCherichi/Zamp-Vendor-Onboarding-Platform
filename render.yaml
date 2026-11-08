@@ -6,13 +6,9 @@ services:
     repo: https://github.com/RafadCherichi/Zamp-Vendor-Onboarding-Platform.git
     branch: main
     region: singapore
-    plan: 0.5c-512mb
+    plan: free
     autoDeployTrigger: commit
     healthCheckPath: /api/health
-    disk:
-      name: zamp-demo-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: ENVIRONMENT
         value: production
@@ -21,10 +17,10 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
-        value: sqlite:////var/data/vendor_onboarding.db
+        value: sqlite:////tmp/vendor_onboarding.db
       - key: STORAGE_BACKEND
         value: local
       - key: STORAGE_LOCAL_DIR
-        value: /var/data/uploads
+        value: /tmp/zamp-uploads
       - key: MAX_FILE_SIZE_BYTES
         value: "15728640"
