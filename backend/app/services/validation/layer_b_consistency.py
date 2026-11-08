@@ -240,7 +240,9 @@ def run_layer_b_checks(app: Application) -> List[Dict[str, Any]]:
     # 4. Bank Account vs Bank Proof Document
     bank_doc = doc_data.get(DocumentTypeEnum.BANK_PROOF.value)
     if bank_doc:
-        ext_acc = (bank_doc.get("account_number") or "").strip()
+        # The local bank extractor emits bank_account_number. Accept the older
+        # account_number key too for previously stored extraction results.
+        ext_acc = (bank_doc.get("bank_account_number") or bank_doc.get("account_number") or "").strip()
         ext_ifsc = (bank_doc.get("ifsc_code") or "").strip().upper()
         ext_holder = (bank_doc.get("account_holder_name") or "").strip()
         doc_id = bank_doc.get("__doc_id")
@@ -286,6 +288,23 @@ def run_layer_b_checks(app: Application) -> List[Dict[str, Any]]:
                     "explanation": "Discrepancy in bank account number between form input and bank document proof.",
                     "recommended_action": "Provide the correct bank account number or upload matching bank document.",
                 })
+
+        else:
+            findings.append({
+                "check_id": "B_BANK_ACCOUNT_NUM_MATCH",
+                "layer": ValidationLayerEnum.LAYER_B_CONSISTENCY.value,
+                "check_name": "Bank Account Number vs Bank Proof Document",
+                "status": ValidationStatusEnum.UNVERIFIED.value,
+                "severity": ValidationSeverityEnum.CRITICAL.value,
+                "source_document_id": doc_id,
+                "source_version_id": ver_id,
+                "submitted_value": mask_id(app_acc) if app_acc else None,
+                "extracted_value": None,
+                "external_value": None,
+                "evidence": "A readable account number was not available on the uploaded bank proof.",
+                "explanation": "We could not compare the account number on the bank proof with the number entered in the form.",
+                "recommended_action": "Upload a clear bank proof showing the account number, or ask the review team to verify it manually.",
+            })
 
         # IFSC match
         if ext_ifsc and app_ifsc:

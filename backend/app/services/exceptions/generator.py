@@ -80,12 +80,15 @@ class ExceptionGenerator:
             if finding.is_stale:
                 continue
 
-            # Only FAILED, WARNING, or UNAVAILABLE findings generate exceptions
+            # A missing readable bank account must also create an actionable issue.
             if finding.status not in [
                 ValidationStatusEnum.FAILED.value,
                 ValidationStatusEnum.WARNING.value,
                 ValidationStatusEnum.UNAVAILABLE.value,
-            ]:
+            ] and not (
+                finding.check_id == "B_BANK_ACCOUNT_NUM_MATCH"
+                and finding.status == ValidationStatusEnum.UNVERIFIED.value
+            ):
                 continue
 
             check_id = finding.check_id
@@ -258,9 +261,13 @@ class ExceptionGenerator:
 
         # 8. Bank Account Number / IFSC Match with Document
         if cid in ["B_BANK_ACCOUNT_NUM_MATCH", "B_BANK_IFSC_MATCH"]:
+            unreadable_account = (
+                cid == "B_BANK_ACCOUNT_NUM_MATCH"
+                and status == ValidationStatusEnum.UNVERIFIED.value
+            )
             return {
                 "category": ExceptionCategoryEnum.BANK_DETAIL_MISMATCH.value,
-                "title": "Bank Account Details Differ from Cancelled Cheque / Statement",
+                "title": "Bank Account Number Could Not Be Read" if unreadable_account else "Bank Account Details Differ from Cancelled Cheque / Statement",
                 "description": finding.explanation,
                 "severity": ExceptionSeverityEnum.CRITICAL.value,
                 "related_document_id": finding.source_document_id,
@@ -268,7 +275,7 @@ class ExceptionGenerator:
                 "related_field_name": "bank_account_number" if "ACCOUNT_NUM" in cid else "bank_ifsc",
                 "assigned_role": RoleEnum.VENDOR.value,
                 "initial_status": ExceptionStatusEnum.ACTION_REQUIRED_FROM_VENDOR.value,
-                "vendor_action_instruction": "The bank account details extracted from your bank document do not match the form input. Please re-check the account number/IFSC or upload a legible cancelled cheque.",
+                "vendor_action_instruction": "Please upload a clearer bank proof that shows the full account number." if unreadable_account else "The bank account details extracted from your bank document do not match the form input. Please re-check the account number/IFSC or upload a legible cancelled cheque.",
             }
 
         # 9. External Verification Provider Unavailable

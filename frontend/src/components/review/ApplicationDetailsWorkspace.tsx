@@ -37,6 +37,16 @@ interface Props {
   isReviewer?: boolean;
 }
 
+const humanLabel = (value: string) => value.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const humanValue = (value: unknown): string => {
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (Array.isArray(value)) return value.map(String).join(', ');
+  if (typeof value === 'object') return Object.entries(value as Record<string, unknown>).map(([key, item]) => `${humanLabel(key)}: ${humanValue(item)}`).join(' · ');
+  return String(value).replace(/_/g, ' ');
+};
+
 export const ApplicationDetailsWorkspace: React.FC<Props> = ({
   applicationId,
   onBack,
@@ -263,7 +273,12 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
                 <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${getStatusBadge(overview.status)}`}>
                   {overview.status.replace(/_/g, ' ')}
                 </span>
-                {overview.is_approval_eligible ? (
+                {overview.status === 'APPROVED' || overview.status === 'REJECTED' ? (
+                  <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded border ${overview.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
+                    <CheckCircle2 className="w-3 h-3" />
+                    Decision recorded
+                  </span>
+                ) : overview.is_approval_eligible ? (
                   <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
                     <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                     Ready for Approval
@@ -344,6 +359,7 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
 
               {/* Approve */}
               <button
+                disabled={!overview.is_approval_eligible}
                 onClick={() => {
                   setActionError(null);
                   setActiveModal('APPROVE');
@@ -356,7 +372,7 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
                 className={`px-4 py-1.5 rounded-lg text-xs font-semibold text-white transition flex items-center gap-1.5 shadow-xs ${
                   overview.is_approval_eligible
                     ? 'bg-emerald-600 hover:bg-emerald-700 cursor-pointer'
-                    : 'bg-slate-400 hover:bg-slate-500 cursor-not-allowed opacity-90'
+                    : 'bg-slate-400 cursor-not-allowed opacity-80'
                 }`}
               >
                 <Check className="w-3.5 h-3.5" />
@@ -407,7 +423,14 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
               </p>
 
               <div className="space-y-2 pt-2">
-                {overview.blocking_reasons.length === 0 ? (
+                {overview.status === 'APPROVED' || overview.status === 'REJECTED' ? (
+                  <div className={`p-3 rounded-lg border text-xs flex items-center gap-2 ${overview.status === 'APPROVED' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'}`}>
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span className="font-semibold">
+                      This application has a final decision. The approval-readiness checks below no longer apply to its current state.
+                    </span>
+                  </div>
+                ) : overview.blocking_reasons.length === 0 ? (
                   <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                     <span className="font-semibold">
@@ -782,6 +805,19 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
                       </div>
                       <p className="text-slate-600 mt-0.5">{f.explanation}</p>
                       {f.evidence && <div className="text-[11px] text-slate-500 font-mono mt-1">{f.evidence}</div>}
+                      {(f.submitted_value || f.extracted_value || f.external_value) && (
+                        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                          {f.submitted_value && <div className="rounded-md border border-slate-200 bg-white p-2"><span className="block text-[10px] uppercase tracking-wide text-slate-500">Vendor entered</span><span className="mt-1 block break-all font-mono text-slate-900">{f.submitted_value}</span></div>}
+                          {f.extracted_value && <div className="rounded-md border border-slate-200 bg-white p-2"><span className="block text-[10px] uppercase tracking-wide text-slate-500">Read from document</span><span className="mt-1 block break-all font-mono text-slate-900">{f.extracted_value}</span></div>}
+                          {f.external_value && <div className="rounded-md border border-slate-200 bg-white p-2"><span className="block text-[10px] uppercase tracking-wide text-slate-500">{f.layer === 'LAYER_C_EXTERNAL' ? 'Simulated registry result' : 'External result'}</span><span className="mt-1 block break-all font-mono text-slate-900">{f.external_value}</span></div>}
+                        </div>
+                      )}
+                      {f.source_document_id && f.source_version_id ? (() => {
+                        const sourceDoc = documents.find((doc) => doc.id === f.source_document_id);
+                        const sourceVersion = sourceDoc?.versions.find((version) => version.id === f.source_version_id);
+                        if (!sourceDoc || !sourceVersion) return <p className="mt-2 text-[11px] text-slate-500">Source document version is no longer available.</p>;
+                        return <button type="button" onClick={() => { const url = sourceVersion.preview_url.includes('?') ? `${sourceVersion.preview_url}&token=${encodeURIComponent(token)}` : `${sourceVersion.preview_url}?token=${encodeURIComponent(token)}`; setPreviewUrl(url); setPreviewTitle(`${sourceDoc.title} (v${sourceVersion.version_number})`); }} className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-slate-800 underline underline-offset-2"><Eye className="h-3 w-3" />Open source: {sourceDoc.title}, version {sourceVersion.version_number}</button>;
+                      })() : f.extracted_value ? <p className="mt-2 text-[11px] text-slate-500">No source document version was recorded for this comparison.</p> : null}
                     </div>
                     {f.recommended_action && (
                       <span className="text-[11px] text-slate-500 italic shrink-0">
@@ -806,9 +842,9 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-4 text-xs">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div>
-              <h4 className="text-sm font-bold text-slate-900">External Registry Authoritative Verifications</h4>
+              <h4 className="text-sm font-bold text-slate-900">External Registry Simulations</h4>
               <p className="text-slate-500 mt-0.5">
-                Authoritative queries against statutory PAN, GSTIN, MCA, and Bank penny-drop gateways.
+                Simulated responses for statutory PAN, GSTIN, MCA, and bank checks. No official registry is contacted in this prototype.
               </p>
             </div>
             <span className="px-2.5 py-1 bg-amber-100 text-amber-800 rounded font-bold text-[10px] border border-amber-300">
@@ -856,7 +892,7 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-4 text-xs">
           <div className="border-b border-slate-100 pb-2">
             <h4 className="text-sm font-bold text-slate-900">Application Chronological Activity Trail</h4>
-            <p className="text-slate-500 mt-0.5">Immutable audit events recorded across application lifecycle.</p>
+            <p className="text-slate-500 mt-0.5">A readable record of who changed the case, what changed and when.</p>
           </div>
           <div className="divide-y divide-slate-100">
             {activity_trail.length === 0 ? (
@@ -865,12 +901,17 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
               activity_trail.map((evt) => (
                 <div key={evt.id} className="py-2.5 flex items-start justify-between">
                   <div>
-                    <span className="font-mono font-bold text-slate-900">{evt.event_type}</span>
-                    <span className="text-slate-400 text-[11px] ml-2">by {evt.actor_role}</span>
-                    {evt.details && (
-                      <pre className="mt-1 text-[10px] text-slate-600 font-mono bg-slate-50 p-1.5 rounded">
-                        {JSON.stringify(evt.details)}
-                      </pre>
+                    <span className="font-semibold text-slate-900">{humanLabel(evt.event_type)}</span>
+                    <span className="text-slate-500 text-[11px] ml-2">by {humanLabel(evt.actor_role)}</span>
+                    {evt.details && Object.keys(evt.details).length > 0 && (
+                      <dl className="mt-2 grid gap-x-5 gap-y-1 sm:grid-cols-2">
+                        {Object.entries(evt.details).map(([key, value]) => (
+                          <div key={key} className="flex gap-2 text-[11px]">
+                            <dt className="text-slate-500">{humanLabel(key)}:</dt>
+                            <dd className="text-slate-800 break-words">{humanValue(value)}</dd>
+                          </div>
+                        ))}
+                      </dl>
                     )}
                   </div>
                   <span className="text-[11px] text-slate-400 font-mono shrink-0">

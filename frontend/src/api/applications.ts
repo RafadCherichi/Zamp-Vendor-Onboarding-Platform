@@ -4,6 +4,7 @@ import type {
   ApplicationSubmitResponse,
   DocumentSlot,
   DocumentExtractionDetail,
+  ProcessingProgress,
 } from '../types/application';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -86,6 +87,21 @@ export async function apiUploadDocument(
     throw new Error(errorData.detail || 'Failed to upload document file');
   }
 
+  return res.json();
+}
+
+export async function apiFetchProcessingProgress(
+  token: string,
+  applicationId: string,
+  documentType: string,
+  afterVersion: number
+): Promise<ProcessingProgress> {
+  const query = new URLSearchParams({ after_version: String(afterVersion) });
+  const res = await fetch(
+    `${API_BASE}/applications/${applicationId}/documents/${documentType}/processing?${query}`,
+    { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
+  );
+  if (!res.ok) throw new Error('Could not read document progress');
   return res.json();
 }
 

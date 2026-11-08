@@ -68,6 +68,7 @@ def run_pipeline_for_document_version(
         job = DocumentProcessingJob(
             document_version_id=version.id,
             status=ProcessingStatusEnum.PROCESSING.value,
+            stage="READING_TEXT",
             attempt_count=1,
             started_at=datetime.now(timezone.utc),
         )
@@ -75,6 +76,7 @@ def run_pipeline_for_document_version(
     else:
         job.attempt_count += 1
         job.status = ProcessingStatusEnum.PROCESSING.value
+        job.stage = "READING_TEXT"
         job.started_at = datetime.now(timezone.utc)
         job.error_message = None
 
@@ -93,15 +95,21 @@ def run_pipeline_for_document_version(
         ocr_res = extract_document_text(file_bytes, version.content_type)
 
         # 5. Stage 2: Document classification
+        job.stage = "CLASSIFYING"
+        db.commit()
         classification = classify_document(ocr_res.full_text, doc.document_type)
 
         # 6. Stage 3: Structured field extraction
+        job.stage = "EXTRACTING_FIELDS"
+        db.commit()
         provider = GeminiExtractionProvider()
         # Use predicted type or target document type for field extraction
         extraction_type = doc.document_type if classification.is_type_match else classification.predicted_type
         extracted_fields_data = provider.extract(ocr_res.full_text, extraction_type)
 
         # 7. Stage 4: Review flags and ambiguity detection
+        job.stage = "CHECKING_RESULT"
+        db.commit()
         review_flags: List[str] = []
 
         if ocr_res.is_unreadable:
@@ -177,6 +185,7 @@ def run_pipeline_for_document_version(
 
         # 12. Complete processing job
         job.status = final_status
+        job.stage = "COMPLETE" if final_status == ProcessingStatusEnum.EXTRACTED.value else "NEEDS_REVIEW"
         job.completed_at = datetime.now(timezone.utc)
         job.duration_ms = duration_ms
         db.commit()
@@ -193,6 +202,7 @@ def run_pipeline_for_document_version(
         fail_job = db.query(DocumentProcessingJob).filter(DocumentProcessingJob.document_version_id == version.id).first()
         if fail_job:
             fail_job.status = ProcessingStatusEnum.FAILED.value
+            fail_job.stage = "FAILED"
             fail_job.error_message = str(e)
             fail_job.completed_at = datetime.now(timezone.utc)
             db.commit()

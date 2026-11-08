@@ -1,0 +1,14 @@
+{
+  "build": "current frontend/dist",
+  "screens": [
+    "login",
+    "vendor-rejected",
+    "vendor-action",
+    "reviewer"
+  ],
+  "rejection_reason_visible": true,
+  "rejected_correction_banner_hidden": true,
+  "mobile_no_horizontal_overflow": true,
+  "reviewer_queue_visible": true,
+  "high_severity_open_count_excludes_rejected": true
+}

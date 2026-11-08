@@ -389,7 +389,8 @@ def test_full_application_submission_and_locking(client):
     assert submit_resp.status_code == 200
     res = submit_resp.json()
     assert res["success"] is True
-    assert res["status"] == "SUBMITTED"
+    # The dummy documents trigger immediate correction requests after submission.
+    assert res["status"] == "ACTION_REQUIRED"
     assert "reference_number" in res
 
     # 4. Locking test: After submission, edits must be blocked

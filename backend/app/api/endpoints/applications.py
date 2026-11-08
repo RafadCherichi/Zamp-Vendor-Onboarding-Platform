@@ -7,9 +7,10 @@ from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, BackgroundTasks, Query
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPAuthorizationCredentials
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -29,6 +30,7 @@ from app.services.checklist import (
     sync_application_documents,
     parse_categories,
 )
+from app.services.validation.document_slot import mismatched_required_document_slots
 from app.services.extraction.pipeline import (
     background_process_document,
     run_pipeline_for_document_version,
@@ -154,6 +156,7 @@ def build_application_response(app: Application, db: Optional[Session] = None) -
         submitted_at=app.submitted_at,
         created_at=app.created_at,
         updated_at=app.updated_at,
+        rejection_reason=app.rejection_reason,
         legal_name=app.legal_name,
         trade_name=app.trade_name,
         constitution=app.constitution,
@@ -596,6 +599,7 @@ def update_application_draft(
     if app.status in [
         ApplicationStatusEnum.SUBMITTED.value,
         ApplicationStatusEnum.UNDER_REVIEW.value,
+        ApplicationStatusEnum.ACTION_REQUIRED.value,
         ApplicationStatusEnum.APPROVED.value,
         ApplicationStatusEnum.REJECTED.value,
         ApplicationStatusEnum.ESCALATED.value,
@@ -693,7 +697,6 @@ ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png"}
 async def upload_document(
     application_id: str,
     document_type: str,
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     member: OrganisationMember = Depends(get_current_member),
@@ -845,10 +848,11 @@ async def upload_document(
     except Exception as e:
         logger.warning(f"Error marking stale findings for document {doc.id}: {e}")
 
-    # 9. Trigger processing pipeline
-    # Process synchronously so upload response has instant extraction insights; background task ensures async resilience
-    background_tasks.add_task(background_process_document, version.id)
-    extraction = run_pipeline_for_document_version(version.id, db)
+    # 9. Run CPU-heavy document checks without blocking status requests.
+    # The worker owns its database session; the request reloads the committed result.
+    await run_in_threadpool(background_process_document, version.id)
+    db.expire_all()
+    extraction = db.query(DocumentExtractionResult).filter_by(document_version_id=version.id).first()
 
     # If linked to an active exception requiring vendor action, update exception
     if active_exc:
@@ -1037,6 +1041,7 @@ def reprocess_document(
 def preview_document(
     application_id: str,
     document_id: str,
+    version_id: Optional[str] = Query(None, description="Exact document version to inspect"),
     token: Optional[str] = Query(None, description="Bearer token for authenticated inline preview in iframe/img"),
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
     db: Session = Depends(get_db),
@@ -1087,14 +1092,16 @@ def preview_document(
     if not doc or not doc.versions:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document file not found.")
 
-    latest_version = doc.versions[0]
+    selected_version = next((version for version in doc.versions if version.id == version_id), None) if version_id else doc.versions[0]
+    if selected_version is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document version not found.")
     storage = get_storage_adapter()
-    file_path = storage._resolve_path(latest_version.storage_key)
+    file_path = storage._resolve_path(selected_version.storage_key)
 
     if not file_path.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Underlying storage file not found.")
 
-    media_type = latest_version.content_type
+    media_type = selected_version.content_type
     ext = file_path.suffix.lower()
     if not media_type or media_type == "application/octet-stream":
         if ext == ".pdf":
@@ -1109,7 +1116,7 @@ def preview_document(
     return FileResponse(
         path=str(file_path),
         media_type=media_type,
-        filename=latest_version.original_filename,
+        filename=selected_version.original_filename,
         content_disposition_type="inline",
     )
 
@@ -1199,6 +1206,12 @@ def submit_application(
     for doc in app.documents:
         if doc.is_required and doc.status != "UPLOADED":
             missing_docs.append(f"Step 6 (Checklist): Document missing - {doc.title}")
+    for doc, extraction in mismatched_required_document_slots(db, app):
+        detected = extraction.detected_document_type.replace("_", " ").lower()
+        missing_docs.append(
+            f"Step 6 (Checklist): {doc.title} needs a matching file. "
+            f"The current upload appears to be a {detected}. Replace it in this document slot."
+        )
 
     all_errors = missing_fields + missing_docs
     if all_errors:
@@ -1253,6 +1266,16 @@ def submit_application(
     except Exception as e:
         logger.warning(f"Error running validation on submission: {e}")
 
+    # Validation may immediately produce a vendor-owned correction. Reflect
+    # that in the application state so the vendor and staff queue agree.
+    from app.models.exception import OnboardingException, ExceptionStatusEnum
+    has_vendor_action = db.query(OnboardingException.id).filter(
+        OnboardingException.application_id == app.id,
+        OnboardingException.status == ExceptionStatusEnum.ACTION_REQUIRED_FROM_VENDOR.value,
+    ).first() is not None
+    if has_vendor_action:
+        app.status = ApplicationStatusEnum.ACTION_REQUIRED.value
+
     db.commit()
     db.refresh(app)
 
@@ -1261,5 +1284,9 @@ def submit_application(
         reference_number=app.reference_number,
         status=app.status,
         submitted_at=app.submitted_at,
-        message="Application submitted successfully. It is now queued for verification and human review.",
+        message=(
+            "Application received. Please review the correction request shown in your workspace."
+            if has_vendor_action else
+            "Application submitted successfully. It is now queued for verification and human review."
+        ),
     )

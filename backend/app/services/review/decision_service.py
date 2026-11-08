@@ -14,6 +14,7 @@ from app.models.validation import ValidationRun, ValidationFinding, ValidationSt
 from app.models.audit import AuditEvent
 from app.services.notifications.service import NotificationService
 from app.services.exceptions.state_machine import validate_transition
+from app.services.validation.document_slot import mismatched_required_document_slots
 
 
 class ReviewerDecisionService:
@@ -44,6 +45,11 @@ class ReviewerDecisionService:
         for doc in app.documents:
             if doc.is_required and doc.status != "UPLOADED":
                 blocking_reasons.append(f"Mandatory document missing: {doc.title}")
+        for doc, extraction in mismatched_required_document_slots(self.db, app):
+            blocking_reasons.append(
+                f"Required document has the wrong file type: {doc.title}. "
+                f"The latest upload appears to be {extraction.detected_document_type.replace('_', ' ')}."
+            )
 
         # 3. Unresolved Exceptions check (Critical and High strictly block approval)
         unresolved_exceptions = (
@@ -80,6 +86,18 @@ class ReviewerDecisionService:
         if not current_run:
             blocking_reasons.append("No completed validation evaluation on file for this application.")
         else:
+            # A provider timeout is unknown evidence, not a clean verification.
+            # Staff can retry or document a policy path before approval.
+            unavailable_checks = [
+                finding for finding in current_run.findings
+                if finding.status == ValidationStatusEnum.UNAVAILABLE.value
+                and finding.check_id.startswith("C_")
+                and not finding.is_stale
+            ]
+            for finding in unavailable_checks:
+                blocking_reasons.append(
+                    f"Verification unavailable: {finding.check_name}. Procurement must retry or escalate before approval."
+                )
             # Check for unaddressed failed checks that have no corresponding exception or resolution
             unaddressed_failures = [
                 f for f in current_run.findings

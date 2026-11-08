@@ -161,6 +161,9 @@ def test_queue_search_filter_and_pagination(db_session: Session, client: TestCli
     items_search = res_search.json()["items"]
     assert len(items_search) == 2
     assert all("Acme" in it["legal_name"] for it in items_search)
+    by_name = {item["legal_name"]: item for item in items_search}
+    assert by_name["Acme Engineering"]["next_action"] == "Reviewer: assess the evidence"
+    assert by_name["Acme Logistics"]["next_action"] == "Procurement: assign a reviewer"
 
     # 2. Filter by status "UNDER_REVIEW" -> Should return 2
     res_status = client.get(
@@ -345,6 +348,12 @@ def test_scenario_1_clean_application_approval(db_session: Session, client: Test
     assert app.status == ApplicationStatusEnum.APPROVED.value
     assert app.reviewed_by_user_id == rev_user.id
     assert app.reviewed_at is not None
+
+    queue = client.get("/api/applications/queue", headers={"Authorization": f"Bearer {rev_token}"})
+    assert queue.status_code == 200
+    queue_item = next(item for item in queue.json()["items"] if item["id"] == app.id)
+    assert queue_item["decision_maker_name"] == "Clean Reviewer"
+    assert queue_item["next_action"] == "No action: approval recorded"
 
     # Audit event verified
     audit = (

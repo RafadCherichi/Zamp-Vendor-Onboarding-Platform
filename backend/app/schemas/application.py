@@ -88,6 +88,7 @@ class ApplicationResponse(BaseModel):
     submitted_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
+    rejection_reason: Optional[str] = None
 
     # Section 1
     legal_name: str

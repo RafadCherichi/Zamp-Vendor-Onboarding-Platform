@@ -12,6 +12,13 @@ export type ApplicationStatus =
 
 export type ProcessingStatus = 'QUEUED' | 'PROCESSING' | 'EXTRACTED' | 'NEEDS_REVIEW' | 'FAILED';
 
+export interface ProcessingProgress {
+  status: ProcessingStatus | 'WAITING_FOR_UPLOAD';
+  stage: 'SENDING_FILE' | 'QUEUED' | 'READING_TEXT' | 'CLASSIFYING' | 'EXTRACTING_FIELDS' | 'CHECKING_RESULT' | 'COMPLETE' | 'NEEDS_REVIEW' | 'FAILED';
+  message: string;
+  version_number: number;
+}
+
 export interface ExtractedFieldDetail {
   id: string;
   field_name: string;

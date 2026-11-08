@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Building2, Lock, Mail, ShieldAlert, ArrowRight, UserCheck } from 'lucide-react';
+import { Lock, Mail, ShieldAlert, ArrowRight } from 'lucide-react';
 
 interface DemoAccount {
   email: string;
@@ -90,21 +90,34 @@ export const LoginView: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <div className="mx-auto w-12 h-12 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md mb-4">
-          <Building2 className="w-7 h-7" />
+    <div className="min-h-screen bg-slate-50 lg:grid lg:grid-cols-2">
+      <div className="bg-indigo-700 text-white px-6 py-12 sm:px-12 lg:px-16 lg:py-20 flex flex-col justify-between">
+        <div className="font-serif text-3xl font-bold tracking-tight">zamp.</div>
+        <div className="max-w-lg py-10 lg:py-20">
+          <p className="text-xs uppercase tracking-[0.2em] text-indigo-200 mb-5">Vendor operations</p>
+          <h1 className="font-serif text-4xl sm:text-5xl leading-tight tracking-tight">
+            A clearer path from invitation to decision.
+          </h1>
+          <p className="mt-6 text-base leading-relaxed text-indigo-100 max-w-md">
+            Share your business details once. See what needs attention, what is under review, and why a decision was made.
+          </p>
         </div>
-        <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-          Vendor Onboarding Platform
-        </h1>
-        <p className="mt-1 text-sm text-slate-500">
-          India-focused &bull; Invitation-first &bull; Human-controlled
-        </p>
+        <p className="text-xs text-indigo-200">A working case study prototype for Indian vendor onboarding.</p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-        <div className="bg-white py-8 px-6 shadow-sm border border-slate-200 rounded-2xl sm:px-8">
+      <div className="w-full px-4 py-10 sm:px-10 lg:px-16 lg:py-16 flex flex-col justify-center">
+        <div className="w-full max-w-md mx-auto">
+          <p className="text-xs uppercase tracking-[0.16em] font-semibold text-indigo-700">Workspace access</p>
+          <h2 className="text-3xl font-semibold text-slate-900 mt-2">
+            Sign in
+          </h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Continue with your invitation or choose a demo role below.
+          </p>
+        </div>
+
+      <div className="mt-8 w-full max-w-md mx-auto">
+        <div className="bg-white py-8 px-6 border border-slate-200 rounded-lg sm:px-8">
           <form className="space-y-4" onSubmit={handleSubmit}>
             {error && (
               <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 flex items-start gap-2.5 text-xs text-rose-700">
@@ -183,7 +196,6 @@ export const LoginView: React.FC = () => {
                   className="w-full text-left p-2.5 rounded-lg border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40 transition-all flex items-center justify-between group"
                 >
                   <div className="flex items-center gap-2.5">
-                    <UserCheck className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 shrink-0" />
                     <div>
                       <div className="text-xs font-semibold text-slate-900 leading-tight">
                         {acc.name}
@@ -194,7 +206,7 @@ export const LoginView: React.FC = () => {
                     </div>
                   </div>
                   <span
-                    className={`text-[10px] font-semibold px-2 py-0.5 rounded border uppercase tracking-wider ${acc.tagColor}`}
+                    className="text-[11px] font-medium px-2 py-0.5 rounded border border-slate-200 bg-slate-50 text-slate-600"
                   >
                     {acc.role}
                   </span>
@@ -203,6 +215,7 @@ export const LoginView: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

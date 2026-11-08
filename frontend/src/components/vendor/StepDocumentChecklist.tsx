@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import type { Application, DocumentSlot, DocumentExtractionDetail } from '../../types/application';
+import type { Application, DocumentSlot, DocumentExtractionDetail, ProcessingProgress } from '../../types/application';
+import { hasWrongDocumentType, isAcceptedAlternative } from '../../utils/documentSlots';
 import {
   apiUploadDocument,
   getDocumentPreviewUrl,
   apiFetchDocumentExtraction,
   apiReprocessDocument,
+  apiFetchProcessingProgress,
 } from '../../api/applications';
 import {
   FileText,
@@ -27,8 +29,17 @@ interface StepProps {
   onRefresh: () => void;
 }
 
+const PROCESS_STEPS = [
+  { stage: 'SENDING_FILE', label: 'Send file' },
+  { stage: 'READING_TEXT', label: 'Read text' },
+  { stage: 'CLASSIFYING', label: 'Identify proof' },
+  { stage: 'EXTRACTING_FIELDS', label: 'Read details' },
+  { stage: 'CHECKING_RESULT', label: 'Check result' },
+] as const;
+
 export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application, onRefresh }) => {
   const [uploadingType, setUploadingType] = useState<string | null>(null);
+  const [liveProgress, setLiveProgress] = useState<ProcessingProgress | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [previewDoc, setPreviewDoc] = useState<DocumentSlot | null>(null);
   const [previewError, setPreviewError] = useState<boolean>(false);
@@ -38,16 +49,31 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
   const [reprocessing, setReprocessing] = useState(false);
   const [revealedFields, setRevealedFields] = useState<Record<string, boolean>>({});
 
-  const handleFileUpload = async (documentType: string, file: File) => {
+  const handleFileUpload = async (documentType: string, file: File, afterVersion: number) => {
     setUploadingType(documentType);
+    setLiveProgress({ status: 'WAITING_FOR_UPLOAD', stage: 'SENDING_FILE', message: 'Sending your document', version_number: afterVersion });
     setUploadError(null);
+    let active = true;
+    const readProgress = async () => {
+      try {
+        const current = await apiFetchProcessingProgress(token, application.id, documentType, afterVersion);
+        if (active) setLiveProgress(current);
+      } catch {
+        // The upload request remains authoritative; a missed status poll must not interrupt it.
+      }
+    };
+    const poll = window.setInterval(readProgress, 400);
+    void readProgress();
     try {
       await apiUploadDocument(token, application.id, documentType, file);
       onRefresh();
     } catch (err: any) {
       setUploadError(err?.message || `Failed to upload ${documentType}`);
     } finally {
+      active = false;
+      window.clearInterval(poll);
       setUploadingType(null);
+      setLiveProgress(null);
     }
   };
 
@@ -92,14 +118,17 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
   const needsAttentionDocs = documents.filter(
     (d) =>
       d.status === 'UPLOADED' &&
-      (d.is_type_match === false || d.processing_status === 'NEEDS_REVIEW' || d.processing_status === 'FAILED')
+      (hasWrongDocumentType(d, application.constitution) ||
+        (d.is_type_match === false && d.detected_document_type === 'UNKNOWN') ||
+        (d.processing_status === 'NEEDS_REVIEW' && !(isAcceptedAlternative(d, application.constitution) && (d.review_flags || []).every((flag) => flag.startsWith('Document type mismatch')))) ||
+        d.processing_status === 'FAILED')
   );
 
   const acceptedDocs = documents.filter(
     (d) =>
       d.status === 'UPLOADED' &&
-      d.is_type_match !== false &&
-      d.processing_status !== 'NEEDS_REVIEW' &&
+      (d.is_type_match !== false || isAcceptedAlternative(d, application.constitution)) &&
+      (d.processing_status !== 'NEEDS_REVIEW' || (isAcceptedAlternative(d, application.constitution) && (d.review_flags || []).every((flag) => flag.startsWith('Document type mismatch')))) &&
       d.processing_status !== 'FAILED'
   );
 
@@ -111,9 +140,9 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
           Step 6: Documents You Need to Provide
         </h3>
         <p className="text-xs text-slate-500 mt-1">
-          Upload statutory evidence required for your business entity (
+          Upload the evidence required for your business entity (
           <span className="font-semibold text-slate-700">{application.constitution.replace(/_/g, ' ')}</span>
-          ). Our automated system checks these documents to verify details like your PAN, GSTIN, and bank account.
+          ). We compare what you enter with the documents you provide. Registry results in this demo are simulated and labelled.
         </p>
       </div>
 
@@ -123,6 +152,25 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
           <div>
             <span className="font-bold">Error:</span> {uploadError}
           </div>
+        </div>
+      )}
+
+      {uploadingType && liveProgress && (
+        <div role="status" aria-live="polite" className="border-l-4 border-slate-900 bg-white px-4 py-3 text-sm text-slate-800">
+          <p className="font-semibold">Checking your document</p>
+          <p className="mt-1 text-slate-600">{liveProgress.message}</p>
+          <ol className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5" aria-label="Document check stages">
+            {PROCESS_STEPS.map((step, index) => {
+              const activeIndex = PROCESS_STEPS.findIndex((item) => item.stage === liveProgress.stage);
+              const done = activeIndex > index || liveProgress.stage === 'COMPLETE';
+              const current = activeIndex === index || (liveProgress.stage === 'QUEUED' && index === 0);
+              return (
+                <li key={step.stage} aria-current={current ? 'step' : undefined} className={`border-t-2 pt-1 text-xs ${done ? 'border-emerald-600 text-slate-700' : current ? 'border-slate-900 font-semibold text-slate-900' : 'border-slate-200 text-slate-400'}`}>
+                  {done ? '✓ ' : ''}{step.label}
+                </li>
+              );
+            })}
+          </ol>
         </div>
       )}
 
@@ -184,11 +232,13 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
           const isUploaded = slot.status === 'UPLOADED';
           const isBusy = uploadingType === slot.document_type;
           const procStatus = slot.processing_status;
-          const hasFlags = slot.review_flags && slot.review_flags.length > 0;
-          const hasTypeMismatch = slot.is_type_match === false;
+          const hasTypeMismatch = hasWrongDocumentType(slot, application.constitution);
 
           // Determine distinct semantic status
-          const isNeedsAttention = isUploaded && (hasTypeMismatch || procStatus === 'NEEDS_REVIEW' || procStatus === 'FAILED');
+          const acceptedAlternative = isAcceptedAlternative(slot, application.constitution);
+          const visibleFlags = (slot.review_flags || []).filter((flag) => !(acceptedAlternative && flag.startsWith('Document type mismatch')));
+          const hasFlags = visibleFlags.length > 0;
+          const isNeedsAttention = isUploaded && (hasTypeMismatch || (slot.is_type_match === false && slot.detected_document_type === 'UNKNOWN') || (procStatus === 'NEEDS_REVIEW' && !(acceptedAlternative && (slot.review_flags || []).every((flag) => flag.startsWith('Document type mismatch')))) || procStatus === 'FAILED');
           const isProcessing = isUploaded && (procStatus === 'PROCESSING' || procStatus === 'QUEUED');
           const isVerifiedExtracted = isUploaded && !isNeedsAttention && !isProcessing;
 
@@ -239,7 +289,7 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
                     ) : (
                       <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                        Uploaded &amp; Verified (v{slot.current_version?.version_number || 1})
+                        Read and checked (v{slot.current_version?.version_number || 1})
                       </span>
                     )}
                   </div>
@@ -327,7 +377,7 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
                   {/* Review Flags */}
                   {hasFlags && (
                     <div className="mt-2 space-y-1">
-                      {slot.review_flags!.map((flag, idx) => (
+                      {visibleFlags.map((flag, idx) => (
                         <div
                           key={idx}
                           className="text-[11px] text-amber-800 bg-amber-50/80 px-2 py-1 rounded border border-amber-200 flex items-center gap-1.5"
@@ -370,7 +420,7 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
                   <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-2xs cursor-pointer transition-colors disabled:opacity-50">
                     {isBusy ? (
                       <>
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Uploading...
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Checking...
                       </>
                     ) : isUploaded ? (
                       <>
@@ -383,12 +433,12 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
                     )}
                     <input
                       type="file"
-                      disabled={isBusy}
+                      disabled={uploadingType !== null}
                       accept=".pdf,.jpg,.jpeg,.png"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          handleFileUpload(slot.document_type, file);
+                          handleFileUpload(slot.document_type, file, slot.versions_count);
                           e.target.value = '';
                         }
                       }}

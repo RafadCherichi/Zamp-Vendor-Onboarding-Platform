@@ -44,9 +44,11 @@ export interface QueueItem {
   updated_at?: string;
   assigned_reviewer_id?: string;
   assigned_reviewer_name?: string;
+  decision_maker_name?: string;
   open_exceptions_count: number;
   critical_exceptions_count: number;
   ready_for_approval: boolean;
+  next_action: string;
 }
 
 export interface QueueResponse {
@@ -179,6 +181,8 @@ export interface ApplicationComprehensiveDetails {
         check_name: string;
         status: string;
         severity: string;
+        source_document_id?: string | null;
+        source_version_id?: string | null;
         submitted_value?: string;
         extracted_value?: string;
         external_value?: string;

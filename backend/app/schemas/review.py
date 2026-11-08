@@ -34,9 +34,11 @@ class QueueItemResponse(BaseModel):
     updated_at: Optional[str] = None
     assigned_reviewer_id: Optional[str] = None
     assigned_reviewer_name: Optional[str] = None
+    decision_maker_name: Optional[str] = None
     open_exceptions_count: int
     critical_exceptions_count: int
     ready_for_approval: bool
+    next_action: str
 
 
 class QueueResponse(BaseModel):

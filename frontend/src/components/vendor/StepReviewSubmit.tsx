@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { Application, ApplicationDraftUpdate } from '../../types/application';
+import { hasWrongDocumentType } from '../../utils/documentSlots';
 import { apiSubmitApplication } from '../../api/applications';
 import { ValidationFindingsCard } from './ValidationFindingsCard';
 import {
@@ -125,6 +126,9 @@ export const StepReviewSubmit: React.FC<StepProps> = ({
   missingDocs.forEach((doc) => {
     missingItems.push({ message: `Mandatory document required: ${doc.title}`, stepIdx: 5, stepLabel: 'Step 6: Documents You Need to Provide' });
   });
+  mandatoryDocs.filter((doc) => hasWrongDocumentType(doc, application.constitution)).forEach((doc) => {
+    missingItems.push({ message: `Replace ${doc.title}: the uploaded file appears to be a different document.`, stepIdx: 5, stepLabel: 'Step 6: Documents You Need to Provide' });
+  });
 
   const hasMissing = missingItems.length > 0;
   const allDeclarationsChecked =
@@ -137,7 +141,10 @@ export const StepReviewSubmit: React.FC<StepProps> = ({
     let stepIdx = 0;
     let stepLabel = 'Step 1: About Your Business';
 
-    if (lower.includes('step 2') || lower.includes('section 2') || lower.includes('pan') || lower.includes('gstin') || lower.includes('udyam') || lower.includes('cin') || lower.includes('llpin')) {
+    if (lower.includes('step 6')) {
+      stepIdx = 5;
+      stepLabel = 'Step 6: Documents You Need to Provide';
+    } else if (lower.includes('step 2') || lower.includes('section 2') || lower.includes('pan') || lower.includes('gstin') || lower.includes('udyam') || lower.includes('cin') || lower.includes('llpin')) {
       stepIdx = 1;
       stepLabel = 'Step 2: Tax Details';
     } else if (lower.includes('step 3') || lower.includes('section 3') || lower.includes('contact') || lower.includes('email') || lower.includes('mobile')) {

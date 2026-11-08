@@ -1,0 +1,11 @@
+{
+  "browser_submitted": true,
+  "refresh_preserved_status": true,
+  "reviewer_approval_http": 200,
+  "finding_count": 15,
+  "vendor_approved_visible": true,
+  "staff_queue_consistent": true,
+  "live_reading_seen": true,
+  "reviewer_source_comparison_visible": true,
+  "bank_conflict_and_source_visible": true
+}

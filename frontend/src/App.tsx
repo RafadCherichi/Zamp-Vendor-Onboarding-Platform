@@ -66,7 +66,7 @@ const MainAppContent: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center text-xs text-slate-500 gap-3">
         <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-        Initializing session and verifying organisation context...
+        Opening your workspace...
       </div>
     );
   }
@@ -95,7 +95,7 @@ const MainAppContent: React.FC = () => {
             >
               <div className="flex items-center gap-2">
                 <Activity className="w-4 h-4 text-indigo-600" />
-                <span>Foundation Environment Diagnostics (Database & Object Storage Health)</span>
+                <span>System health</span>
               </div>
               {showDiagnostics ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
@@ -117,7 +117,7 @@ const MainAppContent: React.FC = () => {
       <footer className="bg-white border-t border-slate-200 py-4 mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
           <div>
-            Vendor Onboarding &amp; Statutory Compliance Platform &bull; India Edition
+            Vendor onboarding
           </div>
           <div>
             Organisation: <span className="font-semibold text-slate-700">{user.organisation.name}</span>

@@ -332,7 +332,8 @@ def test_non_gst_registered_vendor_onboarding(db_session: Session, client: TestC
     assert r_sub.status_code == 200
     sub_data = r_sub.json()
     assert sub_data["success"] is True
-    assert sub_data["status"] == "SUBMITTED"
+    # Dummy proofs are unreadable, so the application is received but needs correction.
+    assert sub_data["status"] == "ACTION_REQUIRED"
 
 
 def test_gst_registered_vendor_enforces_gstin_and_document(db_session: Session, client: TestClient):

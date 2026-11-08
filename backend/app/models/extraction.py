@@ -32,6 +32,7 @@ class DocumentProcessingJob(Base, TimestampMixin):
     document_version_id = Column(String(36), ForeignKey("document_versions.id", ondelete="CASCADE"), nullable=False, index=True)
 
     status = Column(String(20), default=ProcessingStatusEnum.QUEUED.value, nullable=False, index=True)
+    stage = Column(String(32), nullable=True)
     attempt_count = Column(Integer, default=0, nullable=False)
     max_attempts = Column(Integer, default=3, nullable=False)
     error_message = Column(Text, nullable=True)

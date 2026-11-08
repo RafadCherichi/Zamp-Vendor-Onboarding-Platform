@@ -75,9 +75,14 @@ class QueueAndDashboardService:
         exceptions_query = self.db.query(OnboardingException).filter(OnboardingException.organisation_id == organisation_id)
         all_exceptions = exceptions_query.all()
 
+        active_app_ids = {
+            app.id for app in all_apps
+            if app.status not in [ApplicationStatusEnum.APPROVED.value, ApplicationStatusEnum.REJECTED.value]
+        }
         open_exceptions = [
             e for e in all_exceptions
             if e.status not in [ExceptionStatusEnum.RESOLVED.value, ExceptionStatusEnum.CLOSED.value]
+            and e.application_id in active_app_ids
         ]
         open_exceptions_count = len(open_exceptions)
         high_severity_exceptions_count = sum(
@@ -240,6 +245,10 @@ class QueueAndDashboardService:
 
         # 5. Exception Severity / Category filtering
         if (exception_severity and exception_severity != "ALL") or (exception_category and exception_category != "ALL"):
+            query = query.filter(Application.status.notin_([
+                ApplicationStatusEnum.APPROVED.value,
+                ApplicationStatusEnum.REJECTED.value,
+            ]))
             exc_filter = [
                 OnboardingException.status.notin_([
                     ExceptionStatusEnum.RESOLVED.value,
@@ -311,7 +320,12 @@ class QueueAndDashboardService:
         for e in exceptions:
             exc_by_app.setdefault(e.application_id, []).append(e)
 
-        reviewer_ids = list({a.assigned_reviewer_id for a in applications if a.assigned_reviewer_id})
+        reviewer_ids = list({
+            user_id
+            for app in applications
+            for user_id in (app.assigned_reviewer_id, app.reviewed_by_user_id)
+            if user_id
+        })
         reviewers = (
             self.db.query(User)
             .filter(User.id.in_(reviewer_ids))
@@ -321,13 +335,28 @@ class QueueAndDashboardService:
 
         items = []
         for app in applications:
-            app_excs = exc_by_app.get(app.id, [])
+            app_excs = [] if app.status in [ApplicationStatusEnum.APPROVED.value, ApplicationStatusEnum.REJECTED.value] else exc_by_app.get(app.id, [])
             open_count = len(app_excs)
             crit_count = sum(1 for e in app_excs if e.severity in ["CRITICAL", "HIGH"])
             is_ready = (
                 app.status in [ApplicationStatusEnum.SUBMITTED.value, ApplicationStatusEnum.UNDER_REVIEW.value]
                 and open_count == 0
             )
+            next_action_by_status = {
+                ApplicationStatusEnum.DRAFT.value: "Vendor: complete the application",
+                ApplicationStatusEnum.IN_PROGRESS.value: "Vendor: complete the application",
+                ApplicationStatusEnum.ACTION_REQUIRED.value: "Vendor: respond to the requested correction",
+                ApplicationStatusEnum.ESCALATED.value: "Specialist reviewer: resolve the escalation",
+                ApplicationStatusEnum.APPROVED.value: "No action: approval recorded",
+                ApplicationStatusEnum.REJECTED.value: "No action: decision recorded",
+            }
+            next_action = next_action_by_status.get(app.status)
+            if app.status in [ApplicationStatusEnum.SUBMITTED.value, ApplicationStatusEnum.UNDER_REVIEW.value]:
+                next_action = (
+                    "Reviewer: assess the evidence"
+                    if app.assigned_reviewer_id
+                    else "Procurement: assign a reviewer"
+                )
 
             items.append({
                 "id": app.id,
@@ -341,9 +370,11 @@ class QueueAndDashboardService:
                 "updated_at": app.updated_at.isoformat() if app.updated_at else None,
                 "assigned_reviewer_id": app.assigned_reviewer_id,
                 "assigned_reviewer_name": reviewer_map.get(app.assigned_reviewer_id) if app.assigned_reviewer_id else None,
+                "decision_maker_name": reviewer_map.get(app.reviewed_by_user_id) if app.reviewed_by_user_id else None,
                 "open_exceptions_count": open_count,
                 "critical_exceptions_count": crit_count,
                 "ready_for_approval": is_ready,
+                "next_action": next_action or "Review the current case status",
             })
 
         total_pages = (total + page_size - 1) // page_size if page_size > 0 else 1
@@ -474,7 +505,7 @@ class QueueAndDashboardService:
                     "file_size": v.file_size_bytes,
                     "content_type": v.content_type,
                     "created_at": v.created_at.isoformat() if v.created_at else None,
-                    "preview_url": f"/api/applications/{app.id}/documents/{d.id}/preview",
+                    "preview_url": f"/api/applications/{app.id}/documents/{d.id}/preview?version_id={v.id}",
                     "extraction": {
                         "status": ext_res.status if ext_res else "QUEUED",
                         "detected_document_type": ext_res.detected_document_type if ext_res else None,
@@ -519,6 +550,8 @@ class QueueAndDashboardService:
                     "check_name": f.check_name,
                     "status": f.status,
                     "severity": f.severity,
+                    "source_document_id": f.source_document_id,
+                    "source_version_id": f.source_version_id,
                     "submitted_value": mask_identifier("submitted", f.submitted_value),
                     "extracted_value": mask_identifier("extracted", f.extracted_value),
                     "external_value": mask_identifier("external", f.external_value),

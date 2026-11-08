@@ -2,6 +2,7 @@ import React from 'react';
 import type { Application } from '../../types/application';
 import { CheckCircle2, Clock, Lock, Copy, Check, XCircle, ShieldAlert } from 'lucide-react';
 import { VendorExceptionsBanner } from './VendorExceptionsBanner';
+import { apiFetchValidation } from '../../api/validation';
 
 interface Props {
   application: Application;
@@ -11,6 +12,22 @@ interface Props {
 
 export const SubmissionConfirmation: React.FC<Props> = ({ application, token, onRefresh }) => {
   const [copied, setCopied] = React.useState(false);
+  const [providerUnavailable, setProviderUnavailable] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!token || application.status === 'APPROVED' || application.status === 'REJECTED') {
+      return;
+    }
+    let active = true;
+    apiFetchValidation(token, application.id)
+      .then((run) => {
+        if (active) setProviderUnavailable(run.findings.some((finding) =>
+          finding.check_id.startsWith('C_') && finding.status === 'UNAVAILABLE'
+        ));
+      })
+      .catch(() => { if (active) setProviderUnavailable(false); });
+    return () => { active = false; };
+  }, [token, application.id, application.status]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(application.reference_number);
@@ -31,31 +48,33 @@ export const SubmissionConfirmation: React.FC<Props> = ({ application, token, on
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 py-6">
+    <div className="max-w-3xl mx-auto space-y-6 py-4">
       {/* Priority Vendor Exception Clarifications & Corrections */}
-      <VendorExceptionsBanner
-        token={token}
-        applicationId={application.id}
-        onCorrectionSubmitted={onRefresh || (() => {})}
-      />
+      {!isRejected && !isApproved && (
+        <VendorExceptionsBanner
+          token={token}
+          applicationId={application.id}
+          onCorrectionSubmitted={onRefresh || (() => {})}
+        />
+      )}
 
-      <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center space-y-4">
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 text-left space-y-4">
         {/* Status Icon */}
         {isApproved ? (
-          <div className="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
-            <CheckCircle2 className="w-10 h-10" />
+          <div className="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center">
+            <CheckCircle2 className="w-6 h-6" />
           </div>
         ) : isRejected ? (
-          <div className="w-16 h-16 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
-            <XCircle className="w-10 h-10" />
+          <div className="w-10 h-10 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center">
+            <XCircle className="w-6 h-6" />
           </div>
         ) : isActionRequired ? (
-          <div className="w-16 h-16 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto shadow-inner">
-            <ShieldAlert className="w-10 h-10" />
+          <div className="w-10 h-10 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center">
+            <ShieldAlert className="w-6 h-6" />
           </div>
         ) : (
-          <div className="w-16 h-16 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center mx-auto shadow-inner">
-            <CheckCircle2 className="w-10 h-10" />
+          <div className="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
+            <CheckCircle2 className="w-6 h-6" />
           </div>
         )}
 
@@ -74,7 +93,7 @@ export const SubmissionConfirmation: React.FC<Props> = ({ application, token, on
             Application Status: {getFriendlyStatusText()}
           </span>
 
-          <h2 className="text-2xl font-extrabold text-slate-900 mt-3">
+          <h2 className="text-2xl font-semibold text-slate-900 mt-3">
             {isApproved
               ? 'Onboarding Application Approved!'
               : isRejected
@@ -84,24 +103,33 @@ export const SubmissionConfirmation: React.FC<Props> = ({ application, token, on
               : 'Thank You! Application Submitted Successfully'}
           </h2>
 
-          <p className="text-xs text-slate-500 max-w-lg mx-auto mt-1">
+          <p className="text-sm text-slate-600 max-w-lg mt-2 leading-relaxed">
             {isApproved
-              ? `Congratulations, ${application.legal_name}. Your vendor registration has passed all statutory checks and your vendor record is active.`
+              ? `The review team has approved the application for ${application.legal_name}. Keep this reference for your records.`
               : isRejected
               ? `Your application for ${application.legal_name} could not be approved at this time. Please review the reason below.`
               : isActionRequired
-              ? 'Our compliance team has requested clarification or a replacement document. Please review the notice above.'
-              : `Your onboarding application for ${application.legal_name} has been received. Our compliance team is reviewing your documents and statutory registrations.`}
+              ? 'We need one more detail before review can continue. Follow the request above and send your response.'
+              : `Your application for ${application.legal_name} has been received. The review team is checking your details and documents.`}
           </p>
         </div>
 
+        {providerUnavailable && !isApproved && !isRejected && (
+          <div className="max-w-lg p-4 border border-slate-200 bg-slate-50 rounded-lg text-left">
+            <p className="text-sm font-semibold text-slate-900">A verification service is temporarily unavailable</p>
+            <p className="text-sm text-slate-600 mt-1 leading-relaxed">
+              Our team will retry the check. You do not need to upload the same document again.
+            </p>
+          </div>
+        )}
+
         {/* If Rejected, display mandatory rejection reason */}
         {isRejected && application.rejection_reason && (
-          <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 max-w-lg mx-auto text-left space-y-1">
+          <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 max-w-lg text-left space-y-1">
             <span className="text-[11px] font-bold text-rose-800 uppercase tracking-wider block">
               Official Reason for Decision
             </span>
-            <p className="text-xs text-rose-900 leading-relaxed font-medium">
+            <p className="text-sm text-rose-900 leading-relaxed font-medium">
               {application.rejection_reason}
             </p>
             <p className="text-[11px] text-rose-600 pt-1">
@@ -111,12 +139,12 @@ export const SubmissionConfirmation: React.FC<Props> = ({ application, token, on
         )}
 
         {/* Reference Number Card */}
-        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 max-w-md mx-auto space-y-1">
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 max-w-md space-y-1">
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
             Official Application Reference
           </span>
           <div className="flex items-center justify-center gap-2">
-            <span className="text-xl font-mono font-bold text-indigo-700">
+            <span className="text-lg font-mono font-semibold text-indigo-700">
               {application.reference_number}
             </span>
             <button
@@ -279,14 +307,17 @@ export const SubmissionConfirmation: React.FC<Props> = ({ application, token, on
           </div>
         </div>
 
-        {/* Helpful What Happens Next Callout */}
-        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2 text-xs">
-          <span className="font-bold text-slate-800 block">What happens next?</span>
-          <ul className="space-y-1 text-slate-600 text-[11px] list-disc list-inside">
-            <li>Our compliance team reviews applications within 1–2 business days.</li>
-            <li>If any replacement document or clarification is required, an action notice will appear right here on your dashboard.</li>
-            <li>Once approved, your vendor account will be activated to receive purchase orders and payment disbursements.</li>
-          </ul>
+        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2 text-sm">
+          <span className="font-semibold text-slate-800 block">What happens next?</span>
+          <p className="text-slate-600 leading-relaxed">
+            {isRejected
+              ? 'This decision is final in this application. Contact your procurement representative if you need the reason explained or want the decision reviewed.'
+              : isApproved
+              ? 'Keep your application reference. Your procurement representative will contact you about the next business step.'
+              : isActionRequired
+              ? 'Send the corrected detail or document above. The review team will check your response and update this page.'
+              : 'The review team is checking your details. If we need anything else, a request will appear here.'}
+          </p>
         </div>
       </div>
     </div>

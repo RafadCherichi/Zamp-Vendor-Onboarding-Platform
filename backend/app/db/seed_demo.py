@@ -474,27 +474,25 @@ def reset_and_seed_demo(db: Session = None) -> dict:
 
         bank_doc = db.query(Document).filter(Document.application_id == app2.id, Document.document_type == "BANK_PROOF").first()
 
-        # Seed Exception for Case 2: Bank Account Mismatch
-        exc2 = OnboardingException(
-            id="exc-mism-001",
-            reference_number="EXC-2026-0001",
-            organisation_id=apex_org.id,
-            application_id=app2.id,
-            vendor_id=app2.vendor_id,
-            title="Bank Account Number Mismatch between Form and Cancelled Cheque",
-            description="The registered bank account number '9876543210123' does not match the account number '50200012345678' extracted from the uploaded cheque.",
-            category=ExceptionCategoryEnum.BANK_DETAIL_MISMATCH.value,
-            severity=ExceptionSeverityEnum.HIGH.value,
-            status=ExceptionStatusEnum.ACTION_REQUIRED_FROM_VENDOR.value,
-            related_document_id=bank_doc.id if bank_doc else None,
-            related_version_id=bank_v2.id if bank_v2 else None,
-            related_field_name="bank_account_number",
-            source_check_ids_json=json.dumps(["RULE-4.1-BANK-ACCOUNT-MATCH"]),
-            assigned_user_id=rev_user.id,
-            assigned_role=RoleEnum.REVIEWER.value,
-            vendor_action_instruction="Please verify your current bank account number. Your application form specifies 9876543210123, while the uploaded cancelled cheque shows 50200012345678. Please update your account number or upload a matching cancelled cheque.",
-        )
-        db.add(exc2)
+        # Reuse the exception generated from the real validation finding.
+        # A second manually inserted bank issue would ask the vendor twice.
+        exc2 = db.query(OnboardingException).filter(
+            OnboardingException.application_id == app2.id,
+            OnboardingException.related_field_name == "bank_account_number",
+        ).first()
+        if exc2 is None:
+            raise RuntimeError("Seeded bank mismatch did not produce an exception")
+        exc2.reference_number = "EXC-2026-0001"
+        exc2.title = "Bank Account Number Mismatch between Form and Cancelled Cheque"
+        exc2.description = "The registered bank account number '9876543210123' does not match the account number '50200012345678' extracted from the uploaded cheque."
+        exc2.severity = ExceptionSeverityEnum.HIGH.value
+        exc2.status = ExceptionStatusEnum.ACTION_REQUIRED_FROM_VENDOR.value
+        exc2.related_document_id = bank_doc.id if bank_doc else None
+        exc2.related_version_id = bank_v2.id if bank_v2 else None
+        exc2.source_check_ids_json = json.dumps(["B_BANK_ACCOUNT_NUM_MATCH"])
+        exc2.assigned_user_id = rev_user.id
+        exc2.assigned_role = RoleEnum.REVIEWER.value
+        exc2.vendor_action_instruction = "Please check your bank account number. The form shows 9876543210123, while your cheque shows 50200012345678. Update the number or upload a matching cheque."
         db.flush()
 
         # Transitions & Comments

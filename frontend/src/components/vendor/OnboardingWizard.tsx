@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Application, ApplicationDraftUpdate } from '../../types/application';
 import { apiUpdateApplicationDraft } from '../../api/applications';
 import { StepBusinessIdentity } from './StepBusinessIdentity';
@@ -8,6 +8,7 @@ import { StepBankingDetails } from './StepBankingDetails';
 import { StepBusinessClassification } from './StepBusinessClassification';
 import { StepDocumentChecklist } from './StepDocumentChecklist';
 import { StepReviewSubmit } from './StepReviewSubmit';
+import { hasWrongDocumentType } from '../../utils/documentSlots';
 import { VendorExceptionsBanner } from './VendorExceptionsBanner';
 import {
   Building,
@@ -129,6 +130,9 @@ export function isStepValid(stepIdx: number, app: Application): { isValid: boole
       if (missingDocs.length > 0) {
         missingDocs.forEach((d) => errors.push(`Please upload: ${d.title}.`));
       }
+      mandatoryDocs.filter((d) => hasWrongDocumentType(d, app.constitution)).forEach((d) => {
+        errors.push(`Replace ${d.title}: the current file appears to be a different document.`);
+      });
       break;
 
     case 6: // Review and Submit
@@ -172,12 +176,19 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
   });
 
   const [application, setApplication] = useState<Application>(initialApplication);
+  const unsavedDraftRef = useRef<ApplicationDraftUpdate>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
   const [stepErrors, setStepErrors] = useState<{ stepId: number; errors: string[] } | null>(null);
 
   useEffect(() => {
-    setApplication(initialApplication);
+    setApplication((current) => {
+      if (current.id !== initialApplication.id) {
+        unsavedDraftRef.current = {};
+        return initialApplication;
+      }
+      return { ...initialApplication, ...unsavedDraftRef.current } as Application;
+    });
   }, [initialApplication]);
 
   const updateStep = (newStep: number) => {
@@ -188,6 +199,7 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
   };
 
   const handleFieldChange = async (updates: ApplicationDraftUpdate) => {
+    unsavedDraftRef.current = { ...unsavedDraftRef.current, ...updates };
     setStepErrors(null);
     setApplication((prev) => ({
       ...prev,
@@ -197,8 +209,9 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
     }));
 
     try {
-      const updated = await apiUpdateApplicationDraft(token, application.id, updates);
-      setApplication(updated);
+      // Responses can arrive out of order while someone fills successive fields.
+      // Keep the newer local draft; the full save before advancing reconciles it.
+      await apiUpdateApplicationDraft(token, application.id, updates);
     } catch {
       // Local changes remain for explicit save
     }
@@ -239,7 +252,14 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
         declaration_authorised_rep: application.declaration_authorised_rep,
         declaration_verification_consent: application.declaration_verification_consent,
       });
-      setApplication(updated);
+      const changesMadeWhileSaving = unsavedDraftRef.current;
+      for (const [key, value] of Object.entries(changesMadeWhileSaving)) {
+        if (value === (application as any)[key]) {
+          delete (changesMadeWhileSaving as any)[key];
+        }
+      }
+      unsavedDraftRef.current = changesMadeWhileSaving;
+      setApplication({ ...updated, ...changesMadeWhileSaving } as Application);
       setSaveSuccessMsg(`Progress saved at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
       setTimeout(() => setSaveSuccessMsg(null), 3000);
       onRefresh(true);

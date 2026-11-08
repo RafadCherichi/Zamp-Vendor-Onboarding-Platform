@@ -139,11 +139,11 @@ export const ApplicationQueue: React.FC<Props> = ({
       case 'ACTION_REQUIRED':
         return 'bg-amber-100 text-amber-800 border-amber-300';
       case 'UNDER_REVIEW':
-        return 'bg-purple-100 text-purple-800 border-purple-300';
+        return 'bg-slate-100 text-slate-700 border-slate-200';
       case 'SUBMITTED':
-        return 'bg-blue-100 text-blue-800 border-blue-300';
+        return 'bg-slate-100 text-slate-700 border-slate-200';
       case 'ESCALATED':
-        return 'bg-orange-100 text-orange-800 border-orange-300';
+        return 'bg-amber-100 text-amber-800 border-amber-300';
       default:
         return 'bg-slate-100 text-slate-700 border-slate-200';
     }
@@ -161,9 +161,9 @@ export const ApplicationQueue: React.FC<Props> = ({
       {/* Header and Search Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-4">
         <div>
-          <h3 className="text-base font-bold text-slate-900">Application Management Queue</h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Real-time queue scoped to your organisation with multi-filter search and evidence inspection.
+          <h3 className="text-base font-semibold text-slate-900">Case queue</h3>
+          <p className="text-sm text-slate-600 mt-0.5">
+            Find a vendor, review its status, and open the evidence behind the decision.
           </p>
         </div>
 
@@ -177,7 +177,7 @@ export const ApplicationQueue: React.FC<Props> = ({
               setSearch(e.target.value);
               setPage(1);
             }}
-            placeholder="Search vendor name, ref, or email..."
+            placeholder="Search vendor, reference, or email"
             className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
           />
         </div>
@@ -305,8 +305,8 @@ export const ApplicationQueue: React.FC<Props> = ({
               <th className="px-4 py-3">Constitution</th>
               <th className="px-4 py-3">Submitted</th>
               <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Active Exceptions</th>
-              <th className="px-4 py-3">Assigned Reviewer</th>
+              <th className="px-4 py-3">Current issue &amp; next action</th>
+              <th className="px-4 py-3">Owner / decision maker</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
@@ -341,7 +341,7 @@ export const ApplicationQueue: React.FC<Props> = ({
               items.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50/80 transition">
                   <td className="px-4 py-3">
-                    <span className="font-mono text-[11px] font-bold text-indigo-700 block">
+                    <span className="font-mono text-xs font-bold text-indigo-700 block">
                       {item.reference_number}
                     </span>
                     <span className="font-bold text-slate-900 text-sm line-clamp-1">
@@ -365,7 +365,9 @@ export const ApplicationQueue: React.FC<Props> = ({
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    {item.open_exceptions_count > 0 ? (
+                    {item.status === 'REJECTED' ? (
+                      <span className="text-xs text-slate-600">Decision recorded</span>
+                    ) : item.open_exceptions_count > 0 ? (
                       <span
                         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold border ${
                           item.critical_exceptions_count > 0
@@ -384,20 +386,35 @@ export const ApplicationQueue: React.FC<Props> = ({
                     ) : (
                       <span className="text-slate-400">0 Exceptions</span>
                     )}
+                    <span className="mt-1.5 block text-[11px] leading-snug text-slate-600">
+                      <strong className="font-semibold text-slate-700">Next:</strong> {item.next_action}
+                    </span>
+                    {item.updated_at && (
+                      <span className="mt-0.5 block text-[10px] text-slate-400">
+                        Updated {new Date(item.updated_at).toLocaleDateString()}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
-                    <select
-                      value={item.assigned_reviewer_id || ''}
-                      onChange={(e) => handleQuickAssign(item.id, e.target.value)}
-                      className="bg-slate-50 hover:bg-white text-xs border border-slate-200 rounded p-1 font-medium text-slate-700 focus:outline-none"
-                    >
-                      <option value="">Unassigned</option>
-                      {reviewers.map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.full_name}
-                        </option>
-                      ))}
-                    </select>
+                    {item.status === 'APPROVED' || item.status === 'REJECTED' ? (
+                      <span className="text-xs text-slate-600">
+                        Decision by <strong className="text-slate-800">{item.decision_maker_name || 'Reviewer'}</strong>
+                      </span>
+                    ) : (
+                      <select
+                        aria-label={`Assign reviewer for ${item.reference_number}`}
+                        value={item.assigned_reviewer_id || ''}
+                        onChange={(e) => handleQuickAssign(item.id, e.target.value)}
+                        className="bg-slate-50 hover:bg-white text-xs border border-slate-200 rounded p-1 font-medium text-slate-700 focus:outline-none"
+                      >
+                        <option value="">Unassigned</option>
+                        {reviewers.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.full_name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
