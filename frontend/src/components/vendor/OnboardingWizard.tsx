@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Application, ApplicationDraftUpdate } from '../../types/application';
-import { apiUpdateApplicationDraft } from '../../api/applications';
+import { apiFetchChecklist, apiUpdateApplicationDraft, apiUploadDocument } from '../../api/applications';
 import { StepBusinessIdentity } from './StepBusinessIdentity';
 import { StepTaxRegistration } from './StepTaxRegistration';
 import { StepAuthorisedContact } from './StepAuthorisedContact';
@@ -23,7 +23,10 @@ import {
   Save,
   CheckCircle2,
   AlertTriangle,
+  LoaderCircle,
+  FlaskConical,
 } from 'lucide-react';
+import { DEMO_AUTOFILL_PROFILES } from './demoAutofill';
 
 interface WizardProps {
   token: string;
@@ -180,6 +183,9 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
   const [stepErrors, setStepErrors] = useState<{ stepId: number; errors: string[] } | null>(null);
+  const [autofillProfile, setAutofillProfile] = useState<string | null>(null);
+  const [autofillMessage, setAutofillMessage] = useState<string | null>(null);
+  const [autofillError, setAutofillError] = useState<string | null>(null);
 
   useEffect(() => {
     setApplication((current) => {
@@ -326,6 +332,53 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
     }
   };
 
+  const handleDemoAutofill = async (profileId: string) => {
+    const profile = DEMO_AUTOFILL_PROFILES.find((item) => item.id === profileId);
+    if (!profile || autofillProfile) return;
+
+    setAutofillProfile(profile.id);
+    setAutofillMessage('Adding fictional vendor details…');
+    setAutofillError(null);
+    setStepErrors(null);
+    unsavedDraftRef.current = {};
+    try {
+      const updated = await apiUpdateApplicationDraft(token, application.id, {
+        ...profile.draft,
+        declaration_accurate_info: false,
+        declaration_authorised_rep: false,
+        declaration_verification_consent: false,
+      });
+      setApplication(updated);
+
+      const checklist = await apiFetchChecklist(token, application.id);
+      const requiredSlots = checklist.filter((slot) => slot.is_required);
+      const missingExample = requiredSlots.find((slot) => !profile.documents[slot.document_type]);
+      if (missingExample) {
+        throw new Error(`The ${profile.name} example is missing a sample for ${missingExample.title}.`);
+      }
+
+      for (let index = 0; index < requiredSlots.length; index += 1) {
+        const slot = requiredSlots[index];
+        const filename = profile.documents[slot.document_type];
+        setAutofillMessage(`Adding sample documents… ${index + 1} of ${requiredSlots.length}`);
+        const response = await fetch(`/demo-documents/${filename}`);
+        if (!response.ok) throw new Error(`Could not load the sample file for ${slot.title}.`);
+        const file = new File([await response.blob()], filename, { type: 'application/pdf' });
+        await apiUploadDocument(token, application.id, slot.document_type, file);
+      }
+
+      const refreshed = await apiUpdateApplicationDraft(token, application.id, {});
+      setApplication(refreshed);
+      setAutofillMessage(`${profile.name} details and ${requiredSlots.length} required sample documents are ready to review.`);
+      onRefresh(true);
+    } catch (error: any) {
+      setAutofillError(error?.message || 'Demo details could not be added. Please retry or continue manually.');
+      setAutofillMessage(null);
+    } finally {
+      setAutofillProfile(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Priority Vendor Exception Clarifications & Corrections */}
@@ -423,6 +476,37 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
 
       {/* Active Step Container */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-2xs">
+        {currentStep === 0 && (
+          <section aria-labelledby="demo-autofill-heading" className="mb-7 rounded-2xl border border-amber-200 bg-[#fbf7ed] p-4 sm:p-5">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 rounded-xl bg-white p-2 text-amber-800 border border-amber-200"><FlaskConical className="h-4 w-4" /></span>
+              <div className="min-w-0 flex-1">
+                <h3 id="demo-autofill-heading" className="text-sm font-semibold text-slate-900">Need to see the flow first?</h3>
+                <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-600">Load a fictional vendor example with its sample documents. Check every detail, edit it if you like, and make your own declarations before submitting.</p>
+                <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-3">
+                  {DEMO_AUTOFILL_PROFILES.map((profile) => (
+                    <div key={profile.id} className="rounded-xl border border-amber-100 bg-white/80 p-3">
+                      <p className="text-xs font-semibold text-slate-800">{profile.name}</p>
+                      <p className="mt-1 min-h-8 text-[11px] leading-snug text-slate-500">{profile.description}</p>
+                      <button
+                        type="button"
+                        aria-label={`Fill with demo data: ${profile.name}`}
+                        disabled={autofillProfile !== null}
+                        onClick={() => void handleDemoAutofill(profile.id)}
+                        className="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 transition-colors hover:border-slate-400 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60"
+                      >
+                        {autofillProfile === profile.id ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : null}
+                        {autofillProfile === profile.id ? 'Loading example…' : 'Use this example'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {autofillMessage && <p role="status" className="mt-3 text-xs font-medium text-emerald-800">{autofillMessage}</p>}
+                {autofillError && <p role="alert" className="mt-3 text-xs font-medium text-rose-700">{autofillError}</p>}
+              </div>
+            </div>
+          </section>
+        )}
         {currentStep === 0 && (
           <StepBusinessIdentity application={application} onChange={handleFieldChange} />
         )}

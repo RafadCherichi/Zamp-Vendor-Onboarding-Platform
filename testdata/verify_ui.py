@@ -52,6 +52,8 @@ with tempfile.TemporaryDirectory(prefix="zamp-ui-", ignore_cleanup_errors=True) 
 
     app.mount("/assets", StaticFiles(directory=str(ROOT / "frontend/dist/assets")), name="assets")
     app.mount("/web", StaticFiles(directory=str(ROOT / "frontend/dist"), html=True), name="web")
+    sample_file = client.get("/demo-documents/pan_tata.pdf")
+    assert sample_file.status_code == 200 and sample_file.content.startswith(b"%PDF"), sample_file.status_code
     sock = socket.socket()
     sock.bind(("127.0.0.1", 0))
     port = sock.getsockname()[1]
@@ -73,6 +75,7 @@ with tempfile.TemporaryDirectory(prefix="zamp-ui-", ignore_cleanup_errors=True) 
                 ("login", None, 1440),
                 ("vendor-rejected", "vendor.issue@apexlogistics.in", 390),
                 ("vendor-action", "vendor.mismatch@sharmaworks.in", 390),
+                ("vendor-autofill", "vendor@apexcomponents.com", 390),
                 ("procurement-runs", "procurement@apex.com", 1440),
                 ("reviewer", "reviewer@apex.com", 1440),
             ]
@@ -89,6 +92,19 @@ with tempfile.TemporaryDirectory(prefix="zamp-ui-", ignore_cleanup_errors=True) 
                     page.wait_for_load_state("networkidle")
                     if label == "vendor-action":
                         page.locator("h3").filter(has_text=re.compile(r"items? needs? your attention")).wait_for()
+                    elif label == "vendor-autofill":
+                        page.get_by_role("button", name=re.compile(r"Fill with demo data: Established goods company")).wait_for()
+                        page.get_by_role("button", name=re.compile(r"Fill with demo data: Proprietor with a bank mismatch")).wait_for()
+                        page.get_by_role("button", name=re.compile(r"Fill with demo data: LLP service provider")).wait_for()
+                        page.get_by_role("button", name=re.compile(r"Fill with demo data: Established goods company")).click()
+                        page.get_by_role("status").filter(has_text="ready to review").wait_for(timeout=60000)
+                        assert "fictional" in page.locator("body").inner_text().lower()
+                        page.get_by_role("button", name=re.compile(r"Step 6 Documents")).click()
+                        required = page.get_by_text("Required:", exact=True).locator("xpath=..").inner_text().split()[-1]
+                        uploaded = page.get_by_text("Uploaded:", exact=True).locator("xpath=..").inner_text().split()[-1]
+                        assert required == uploaded == "5", (required, uploaded)
+                        page.get_by_role("button", name=re.compile(r"Step 7 Review")).click()
+                        assert page.locator('input[type="checkbox"]').evaluate_all("els => els.length === 3 && els.every(el => !el.checked)")
                     elif label == "vendor-rejected":
                         page.get_by_text("Onboarding Application Declined").wait_for()
                     elif label == "reviewer":
@@ -97,8 +113,8 @@ with tempfile.TemporaryDirectory(prefix="zamp-ui-", ignore_cleanup_errors=True) 
                     elif label == "procurement-runs":
                         page.get_by_role("button", name="Processing Runs").click()
                         page.get_by_role("heading", name="Processing runs").wait_for()
-                        clean_row = page.get_by_role("row").filter(has_text="Tata Industrial Supplies Private Limited")
-                        clean_row.get_by_role("button", name="Inspect run").click()
+                        clean_row = page.get_by_role("row").filter(has_text="APP-2026-CLEAN-001")
+                        clean_row.get_by_role("button", name="Inspect run").first.click()
                         page.get_by_role("heading", name="What the checks found").wait_for()
                 text = page.locator("body").inner_text()
                 page.screenshot(path=str(OUTPUT / f"iteration2-{label}.png"), full_page=True)
@@ -113,6 +129,9 @@ with tempfile.TemporaryDirectory(prefix="zamp-ui-", ignore_cleanup_errors=True) 
                 elif label == "vendor-action":
                     assert "item needs your attention" in text.lower() or "items need your attention" in text.lower()
                     assert "application status: action needed" in text.lower()
+                elif label == "vendor-autofill":
+                    assert "Review and Submit" in text
+                    assert "DRAFT IN PROGRESS" in text
                 elif label == "reviewer":
                     assert "Application decisions" in text and "Case queue" in text
                 elif label == "procurement-runs":

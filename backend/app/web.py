@@ -26,7 +26,7 @@ def register_frontend(app: FastAPI, directory: Path) -> None:
             return await call_next(request)
 
         requested_file = (build_dir / path).resolve() if path else index_path
-        if requested_file.parent == build_dir and requested_file.is_file():
+        if requested_file.is_relative_to(build_dir) and requested_file.is_file():
             return FileResponse(requested_file)
         if "." in Path(path).name:
             return PlainTextResponse("Not Found", status_code=404)
