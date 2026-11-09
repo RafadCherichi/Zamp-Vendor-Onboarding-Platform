@@ -8,7 +8,7 @@ This repository implements the India-focused Vendor Onboarding Platform based on
 ## PS-2 evaluator quick start
 
 - **Live demo:** [zamp-vendor-onboarding-5i4e.onrender.com](https://zamp-vendor-onboarding-5i4e.onrender.com/). The free service may take about a minute to wake and its local demo data can reset after a restart.
-- **Narrated video (under five minutes):** [Watch or download the submission demo](grade_evidence/zamp-submission-demo.mp4) and [read its captions](grade_evidence/zamp-submission-demo.srt). It shows a live clean submission, procurement assignment, human approval, vendor notice, a fresh GSTIN/PAN conflict submission, correction and saved run history.
+- **Live screen walkthrough (4:40):** [Watch the narrated demo](grade_evidence/zamp-live-demo-narrated.mp4). The browser recording begins at each role's sign-in, follows visible clicks, and has subtitles burned into the picture. The guide voice is synthetic; [use this subtitled copy without narration](grade_evidence/zamp-live-demo-voiceover-ready.mp4) and the [voiceover guide](grade_evidence/zamp-live-demo-voiceover-guide.md) if recording a human voice.
 - **Health check:** [open `/api/health`](https://zamp-vendor-onboarding-5i4e.onrender.com/api/health). A healthy response reports the database and upload storage status.
 - **Try the workflow:** sign in as a seeded procurement or reviewer user, inspect the clean case, then open the bank-conflict case and its vendor correction. Use **Processing Runs** to inspect persisted validation output. The clean vendor portal can be used to inspect the result and next step.
 - **Demo roles:** `procurement@apex.com` and `reviewer@apex.com`; password `Password123!`.

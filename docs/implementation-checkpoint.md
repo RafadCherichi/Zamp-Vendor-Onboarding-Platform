@@ -1,5 +1,9 @@
 # Implementation checkpoint — 9 November 2026
 
+## Video handoff update
+
+The final 4:40 browser walkthrough has been recorded from a disposable database, with visible role sign-ins, pointer movement, live clean and conflict submissions, burned subtitles, and an optional neural guide track. A silent subtitled copy and timed script are available for a human voiceover. This section supersedes the older video-export status below.
+
 Approved scope: prototype-audit-2026-11-09.md. Changes remain local and uncommitted; hosted demo has not been updated.
 
 ## Current checkpoint — resumed, conserving remaining usage

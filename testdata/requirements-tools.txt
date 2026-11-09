@@ -1,3 +1,4 @@
 # Optional isolated browser evidence and narrated recording tools.
 playwright>=1.49
 imageio-ffmpeg>=0.6
+edge-tts>=7.3,<8

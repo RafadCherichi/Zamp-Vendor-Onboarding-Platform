@@ -1,0 +1,70 @@
+{
+  "duration_seconds": 280.8,
+  "within_five_minutes": true,
+  "visible_role_sign_ins": true,
+  "live_browser_recording": true,
+  "fresh_ui_submission": true,
+  "procurement_assignment": true,
+  "happy_decision_recorded": true,
+  "vendor_notice_opened": true,
+  "draft_validation_runs_before_recording": 0,
+  "edge_failed_checks": [
+    "B_GSTIN_EMBEDDED_PAN_MATCH"
+  ],
+  "edge_response_saved": true,
+  "reviewer_reply_visible": true,
+  "narration": "Optional neural guide; script in testdata/live_demo_script.json",
+  "recording": "grade_evidence/zamp-live-demo-narrated.mp4",
+  "scenes": [
+    {
+      "title": "Supplier sign-in",
+      "start": 0.0,
+      "duration": 16.44
+    },
+    {
+      "title": "Clean application submitted live",
+      "start": 16.93700000003446,
+      "duration": 33.191972789115646
+    },
+    {
+      "title": "Procurement assigns ownership",
+      "start": 50.95299999997951,
+      "duration": 22.871972789115645
+    },
+    {
+      "title": "Reviewer checks and decides",
+      "start": 75.95299999997951,
+      "duration": 33.31197278911564
+    },
+    {
+      "title": "Supplier receives the decision",
+      "start": 114.96799999999348,
+      "duration": 18.551972789115645
+    },
+    {
+      "title": "Second supplier signs in",
+      "start": 134.98400000005495,
+      "duration": 13.8
+    },
+    {
+      "title": "GST identity conflict submitted live",
+      "start": 150.0,
+      "duration": 40.128027210884355
+    },
+    {
+      "title": "Reviewer sees the blocker",
+      "start": 193.01500000001397,
+      "duration": 21.624036281179137
+    },
+    {
+      "title": "Supplier responds; reviewer sees it",
+      "start": 219.03100000007544,
+      "duration": 25.536009070294785
+    },
+    {
+      "title": "Saved history and uncertainty",
+      "start": 252.0470000000205,
+      "duration": 28.8
+    }
+  ]
+}
