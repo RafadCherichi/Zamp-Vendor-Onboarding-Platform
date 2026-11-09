@@ -7,6 +7,9 @@ New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 $speaker = New-Object System.Speech.Synthesis.SpeechSynthesizer
 try {
     $speaker.Rate = 1
+    $voices = @($speaker.GetInstalledVoices() | ForEach-Object { $_.VoiceInfo.Name })
+    if ($voices -contains 'Microsoft Heera') { $speaker.SelectVoice('Microsoft Heera') }
+    elseif ($voices -contains 'Microsoft Zira') { $speaker.SelectVoice('Microsoft Zira') }
     for ($sceneIndex = 0; $sceneIndex -lt $scenes.Count; $sceneIndex++) {
         $speaker.SetOutputToWaveFile((Join-Path $outputDirectory "scene-$sceneIndex.wav"))
         $speaker.Speak($scenes[$sceneIndex].text)

@@ -1,8 +1,59 @@
 {
-  "duration_seconds": 16.5,
+  "duration_seconds": 276.5,
   "within_five_minutes": true,
+  "fresh_ui_submission": true,
+  "procurement_assignment": true,
   "happy_decision_recorded": true,
-  "edge_response_clicked": true,
-  "edge_screen_excerpt": "zamp.\nVendor onboarding\nApex Enterprises Ltd.\nVendor Contact\nRamesh Sharma\nvendor.mismatch@sharmaworks.in\nSign Out\nResponses Submitted \u2014 Awaiting Review (1)\n\nWe have your response. The review team will check it; you do not need to send it a",
-  "recording": "C:\\Users\\91994\\OneDrive\\Desktop\\IITM\\Placement Prep\\PM-Consult\\Zamp\\grade_evidence\\iteration2-demo-rehearsal.webm"
+  "vendor_notice_opened": true,
+  "edge_response_saved": true,
+  "reviewer_reply_visible": true,
+  "narration": "Synthetic voice; script in testdata/demo_script.json",
+  "recording": "grade_evidence/zamp-submission-demo.mp4",
+  "scenes": [
+    {
+      "title": "Why this matters",
+      "start": 2.1089999999385327,
+      "duration": 15.33374149659864
+    },
+    {
+      "title": "A clean submission runs",
+      "start": 19.125,
+      "duration": 31.76671201814059
+    },
+    {
+      "title": "Procurement sets ownership",
+      "start": 65.14099999994505,
+      "duration": 23.915056689342403
+    },
+    {
+      "title": "Human decision and evidence",
+      "start": 91.15599999995902,
+      "duration": 31.13814058956916
+    },
+    {
+      "title": "The supplier hears back",
+      "start": 127.15599999995902,
+      "duration": 23.25360544217687
+    },
+    {
+      "title": "A subtle conflict runs",
+      "start": 150.9220000000205,
+      "duration": 47.41732426303855
+    },
+    {
+      "title": "Correction remains a review",
+      "start": 213.9220000000205,
+      "duration": 29.00308390022676
+    },
+    {
+      "title": "History and honest uncertainty",
+      "start": 247.93799999996554,
+      "duration": 30.700498866213152
+    }
+  ],
+  "draft_validation_runs_before_recording": 0,
+  "edge_failed_checks": [
+    "B_GSTIN_EMBEDDED_PAN_MATCH"
+  ],
+  "captions": "grade_evidence/zamp-submission-demo.srt"
 }

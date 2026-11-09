@@ -8,10 +8,12 @@ This repository implements the India-focused Vendor Onboarding Platform based on
 ## PS-2 evaluator quick start
 
 - **Live demo:** [zamp-vendor-onboarding-5i4e.onrender.com](https://zamp-vendor-onboarding-5i4e.onrender.com/). The free service may take about a minute to wake and its local demo data can reset after a restart.
+- **Narrated video (under five minutes):** [Watch or download the submission demo](grade_evidence/zamp-submission-demo.mp4) and [read its captions](grade_evidence/zamp-submission-demo.srt). It shows a live clean submission, procurement assignment, human approval, vendor notice, a fresh GSTIN/PAN conflict submission, correction and saved run history.
 - **Health check:** [open `/api/health`](https://zamp-vendor-onboarding-5i4e.onrender.com/api/health). A healthy response reports the database and upload storage status.
 - **Try the workflow:** sign in as a seeded procurement or reviewer user, inspect the clean case, then open the bank-conflict case and its vendor correction. Use **Processing Runs** to inspect persisted validation output. The clean vendor portal can be used to inspect the result and next step.
 - **Demo roles:** `procurement@apex.com` and `reviewer@apex.com`; password `Password123!`.
 - **What is simulated:** PAN/GST/MCA/Udyam/bank registry responses are synthetic. Human reviewers remain responsible for the final approval or rejection.
+- **Recording setup:** The video uses the same built frontend and backend in a disposable local database. The GST conflict draft has no validation run before the recorded submission; its sole failed check is the embedded PAN mismatch. The registry timeout is a separate prepared example.
 - **Grading and evidence:** [PS-2 rubric](PROTOTYPE_GRADING_RUBRIC.md), [current grade](PROTOTYPE_GRADE.md), [decision note](CASE_STUDY_DECISION_NOTE.md), [scenario workbook](testdata/vendor_scenario_dataset.xlsx), and [scenario results](testdata/scenario_results.json).
 
 The Render service follows the `main` branch. Confirm the latest deployment before using the public link for evaluation; the free tier uses temporary local storage and SQLite.

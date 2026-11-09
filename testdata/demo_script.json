@@ -1,10 +1,42 @@
 [
-  {"title":"Vendor starts", "text":"Zamp makes vendor onboarding a clear handoff between the supplier, procurement, and the assigned reviewer. This is a fictional practice account. The sample details belong to this company, and its required proof is uploaded with the form. The vendor still reviews the information and makes the declarations before submitting."},
-  {"title":"Submission", "text":"The review screen brings the business details, document checklist, and declarations together. Submission runs the checks and saves an application reference. The vendor can see the current stage and who acts next, rather than wondering whether the application disappeared."},
-  {"title":"Procurement routes work", "text":"Procurement sees the organisation's applications and assigns the decision maker. This role coordinates invitations and handoffs. It does not approve vendors. A reviewer can access only the cases currently assigned to them, even through a copied link."},
-  {"title":"Reviewer decides", "text":"The assigned reviewer opens the case, checks its evidence and readiness, and records the human decision. Automated checks support the review; they do not replace it. Known blockers and incomplete verification prevent approval, and competing stale decisions cannot overwrite the saved result."},
-  {"title":"Vendor receives decision", "text":"The vendor receives an in-app approval notice that opens the decision receipt. The receipt includes the application reference and decision date, and confirms that no application tasks remain. Onboarding approval is separate from purchasing access or payment activation. Email delivery is not implemented in this prototype."},
-  {"title":"A specific correction", "text":"Here is the edge case. The bank account entered on the form differs from the uploaded cheque. The vendor sees both the problem and the requested next step. They can correct the requested value or replace the requested proof. Earlier evidence stays on record. This response corrects the number to match the cheque."},
-  {"title":"Reviewer sees the reply", "text":"The reviewer's queue now identifies the vendor reply. Opening the case shows what changed and the vendor's explanation, before the reviewer enters the detailed evidence workspace. A reply alone does not approve the application. Each outstanding request still needs assessment, and the original and replacement evidence remain traceable."},
-  {"title":"Scope and limits", "text":"This walkthrough uses synthetic documents and independent simulated registry records. Unknown identifiers stay unverified. The test workbook records expected and observed outcomes, including deliberate errors. The hosted demonstration uses a free service, so it can sleep and its temporary data can reset. The submission evidence should be read with those limits in mind."}
+  {
+    "title": "Why this matters",
+    "seconds": 17,
+    "text": "Before a buyer can work with a new supplier, someone needs to know whether the business details and supporting proof describe the same entity. When they do not, the supplier and reviewer both need a clear next step. This demo follows that decision from submission through resolution."
+  },
+  {
+    "title": "A clean submission runs",
+    "seconds": 46,
+    "text": "Here is Apex Components, a fictional practice supplier. The demo fill uses only details linked to this account; the vendor still reviews the business information, required documents and legal declarations before submitting. Watch the document reading and validation stages run after the click. The application reference and processing result are then saved. A supplier can return to see what happened, while the buyer can inspect the evidence behind the outcome. The form is an entry point into a real review workflow, rather than a decorative success screen."
+  },
+  {
+    "title": "Procurement sets ownership",
+    "seconds": 26,
+    "text": "The procurement desk sees the new application alongside the rest of its organisation's queue. Each case shows its status, priority and next action, so staff can quickly work out what needs attention. Procurement assigns Rajesh Iyer as the reviewer. That creates an accountable handoff and makes the case visible in his review desk. Procurement coordinates the work, while the final approval is reserved for a reviewer."
+  },
+  {
+    "title": "Human decision and evidence",
+    "seconds": 36,
+    "text": "Rajesh opens a case assigned to him. The case brings the submitted business details, uploaded proof, automated findings and decision controls together. He can trace why a check passed or failed before making a judgment. A green check is useful preparation; it is not an autonomous approval. For this clean supplier, the documents and declared details are consistent. Rajesh records an approval with a reason, and the decision becomes part of the activity trail. The same controls would block approval while a serious issue remains open."
+  },
+  {
+    "title": "The supplier hears back",
+    "seconds": 23,
+    "text": "The vendor sees the approval on its own dashboard and receives an in-app notice that opens the decision receipt. The receipt includes the application reference and decision date, and says there are no remaining application tasks. That closes the loop for the supplier instead of leaving them staring at a submitted status. Approval here means the onboarding review is complete; it does not claim to activate purchasing access or payments."
+  },
+  {
+    "title": "A subtle conflict runs",
+    "seconds": 63,
+    "text": "Now watch a second prepared draft being submitted live. It sits in a separate fictional buyer workspace, so there is no unrelated duplicate supplier signal. The company PAN looks plausible. The GST number also looks plausible at a glance. But a GST number contains the taxpayer PAN, and this one embeds a different company's PAN. The draft has no validation result before this submission. When the vendor clicks Submit, Zamp runs the checks, saves the failed cross-field finding and holds approval. The case tells the vendor to confirm which entity's credentials were supplied. This is more useful than rejecting a field just because its format looks wrong: both fields have the right shape, yet together they tell a contradictory story. A reviewer can see the issue and the evidence without hunting through a technical log."
+  },
+  {
+    "title": "Correction remains a review",
+    "seconds": 34,
+    "text": "The vendor can respond in the same place as the request. Here they enter the GST number that matches the declared company PAN and explain the correction. A new check runs against the revised value. The reviewer queue then marks the case as having a supplier reply, and the response is visible inside the case. The previous failed run stays in history, so the change can be understood later. This reply does not silently turn into an approval: the assigned reviewer must assess the new evidence and record the decision."
+  },
+  {
+    "title": "History and honest uncertainty",
+    "seconds": 28,
+    "text": "Processing Runs keeps the conflict result and the check that produced it. A separate prepared case shows a registry timeout. That is unknown evidence, rather than proof the vendor is wrong, so staff should retry or review it. The supplier is not asked to repair a registry outage. Every document and registry response in this recording is synthetic. In a pilot, I would measure decision time, unsafe approvals, and valid suppliers held unnecessarily. The goal is a faster, clearer decision with a defensible record."
+  }
 ]
