@@ -25,6 +25,18 @@ export async function apiFetchCurrentApplication(token: string): Promise<Applica
   return res.json();
 }
 
+export async function apiResetOwnDraft(token: string, applicationId: string): Promise<Application> {
+  const res = await fetch(`${API_BASE}/applications/${applicationId}/reset-draft`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || 'Could not start this draft again.');
+  }
+  return res.json();
+}
+
 export async function apiUpdateApplicationDraft(
   token: string,
   applicationId: string,

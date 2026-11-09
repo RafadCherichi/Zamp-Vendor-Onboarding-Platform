@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Application, ApplicationDraftUpdate } from '../../types/application';
-import { apiFetchChecklist, apiUpdateApplicationDraft, apiUploadDocument } from '../../api/applications';
+import { apiFetchChecklist, apiResetOwnDraft, apiUpdateApplicationDraft, apiUploadDocument } from '../../api/applications';
 import { StepBusinessIdentity } from './StepBusinessIdentity';
 import { StepTaxRegistration } from './StepTaxRegistration';
 import { StepAuthorisedContact } from './StepAuthorisedContact';
@@ -25,6 +25,7 @@ import {
   AlertTriangle,
   LoaderCircle,
   FlaskConical,
+  RotateCcw,
 } from 'lucide-react';
 import { getDemoAutofillProfilesForVendor } from './demoAutofill';
 
@@ -181,6 +182,7 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
   const [application, setApplication] = useState<Application>(initialApplication);
   const unsavedDraftRef = useRef<ApplicationDraftUpdate>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
   const [stepErrors, setStepErrors] = useState<{ stepId: number; errors: string[] } | null>(null);
   const [autofillProfile, setAutofillProfile] = useState<string | null>(null);
@@ -379,6 +381,26 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
     }
   };
 
+  const handleResetDraft = async () => {
+    if (!window.confirm('Start this draft again? Your entered details and uploaded documents will be cleared. Your company account and the other demo cases will stay as they are.')) return;
+    setIsResetting(true);
+    try {
+      const reset = await apiResetOwnDraft(token, application.id);
+      unsavedDraftRef.current = {};
+      setApplication(reset);
+      setStepErrors(null);
+      setAutofillMessage(null);
+      setAutofillError(null);
+      updateStep(0);
+      onRefresh(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error: any) {
+      alert(error?.message || 'Could not start this draft again.');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Priority Vendor Exception Clarifications & Corrections */}
@@ -407,6 +429,15 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
                 {saveSuccessMsg}
               </span>
             )}
+            <button
+              type="button"
+              onClick={handleResetDraft}
+              disabled={isResetting || isSaving || Boolean(autofillProfile)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              {isResetting ? 'Starting again…' : 'Start again'}
+            </button>
             <button
               type="button"
               onClick={handleExplicitSave}

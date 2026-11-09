@@ -24,6 +24,10 @@ from app.models.vendor import Vendor
 from app.models.application import Application, ApplicationStatusEnum, ConstitutionEnum
 from app.models.document import Document, DocumentVersion, DocumentTypeEnum
 from app.models.extraction import DocumentExtractionResult, ExtractedField, ProcessingStatusEnum
+from app.models.extraction import DocumentProcessingJob
+from app.models.validation import ValidationRun
+from app.models.exception import OnboardingException
+from app.models.audit import AuditEvent
 from app.storage.local import get_storage_adapter
 from app.services.checklist import (
     evaluate_checklist_rules,
@@ -302,6 +306,88 @@ def get_current_application(
     db.refresh(application)
 
     return build_application_response(application, db)
+
+
+@router.post(
+    "/{application_id}/reset-draft",
+    response_model=ApplicationResponse,
+    summary="Start Own Vendor Draft Again",
+)
+def reset_own_draft(
+    application_id: str,
+    db: Session = Depends(get_db),
+    member: OrganisationMember = Depends(require_roles([RoleEnum.VENDOR])),
+) -> ApplicationResponse:
+    app = get_scoped_application(application_id, member, db)
+    if app.created_by_user_id != member.user_id or app.vendor.created_by_user_id != member.user_id:
+        raise HTTPException(status_code=403, detail="Only the draft owner can start this application again.")
+    if app.status not in (ApplicationStatusEnum.DRAFT.value, ApplicationStatusEnum.IN_PROGRESS.value):
+        raise HTTPException(status_code=409, detail="Submitted applications cannot be reset.")
+    if db.query(ValidationRun.id).filter(ValidationRun.application_id == app.id).first() or db.query(OnboardingException.id).filter(OnboardingException.application_id == app.id).first():
+        raise HTTPException(status_code=409, detail="This application has review history and cannot be reset.")
+
+    documents = db.query(Document).filter(Document.application_id == app.id).all()
+    document_ids = [document.id for document in documents]
+    versions = db.query(DocumentVersion).filter(DocumentVersion.document_id.in_(document_ids)).all() if document_ids else []
+    version_ids = [version.id for version in versions]
+    storage_keys = [version.storage_key for version in versions]
+    if version_ids:
+        active_job = db.query(DocumentProcessingJob.id).filter(
+            DocumentProcessingJob.document_version_id.in_(version_ids),
+            DocumentProcessingJob.status.in_([ProcessingStatusEnum.QUEUED.value, ProcessingStatusEnum.PROCESSING.value]),
+        ).first()
+        if active_job:
+            raise HTTPException(status_code=409, detail="A document is still processing. Try again shortly.")
+        extraction_ids = [row.id for row in db.query(DocumentExtractionResult.id).filter(DocumentExtractionResult.document_version_id.in_(version_ids)).all()]
+        if extraction_ids:
+            db.query(ExtractedField).filter(ExtractedField.extraction_result_id.in_(extraction_ids)).delete(synchronize_session=False)
+        db.query(DocumentExtractionResult).filter(DocumentExtractionResult.document_version_id.in_(version_ids)).delete(synchronize_session=False)
+        db.query(DocumentProcessingJob).filter(DocumentProcessingJob.document_version_id.in_(version_ids)).delete(synchronize_session=False)
+        db.flush()
+        db.query(DocumentVersion).filter(DocumentVersion.id.in_(version_ids)).delete(synchronize_session=False)
+    for document in documents:
+        document.current_version_id = None
+        document.status = "PENDING"
+
+    app.legal_name = app.vendor.legal_name
+    app.trade_name = app.vendor.trade_name
+    app.constitution = app.vendor.constitution
+    app.pan = app.vendor.pan
+    for field in (
+        "date_of_establishment", "registered_address", "operating_address", "city", "state", "pincode",
+        "gstin", "udyam_number", "cin_llpin", "contact_name", "contact_designation", "contact_mobile",
+        "authorised_signatory_name", "bank_account_holder_name", "bank_account_number", "bank_ifsc",
+        "bank_name", "other_business_activity_description", "declaration_timestamp",
+    ):
+        setattr(app, field, None)
+    app.contact_email = member.user.email
+    app.is_gst_registered = False
+    app.is_udyam_registered = False
+    app.bank_account_type = "CURRENT"
+    app.categories_json = "[]"
+    app.declaration_accurate_info = False
+    app.declaration_authorised_rep = False
+    app.declaration_verification_consent = False
+    app.status = ApplicationStatusEnum.IN_PROGRESS.value
+    sync_application_documents(db, app)
+    db.add(AuditEvent(
+        organisation_id=app.organisation_id,
+        application_id=app.id,
+        actor_user_id=member.user_id,
+        actor_role=member.role,
+        event_type="DRAFT_RESET",
+        entity_type="APPLICATION",
+        entity_id=app.id,
+        details_json=json.dumps({"cleared_document_versions": len(versions)}),
+    ))
+    db.commit()
+    db.expire_all()
+    for storage_key in storage_keys:
+        try:
+            get_storage_adapter().delete_file(storage_key)
+        except Exception:
+            logger.exception("Could not remove reset draft file")
+    return build_application_response(db.get(Application, application_id), db)
 
 
 @router.get(
