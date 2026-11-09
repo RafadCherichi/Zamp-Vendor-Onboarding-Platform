@@ -170,6 +170,69 @@ export const ApplicationQueue: React.FC<Props> = ({
     assignedReviewerId !== 'ALL' ||
     readyForApprovalOnly;
 
+  const renderIssue = (item: QueueItem) => (
+    <>
+      {item.blocking_reasons?.length && !item.ready_for_approval && !['APPROVED', 'REJECTED'].includes(item.status) ? (
+        <div className="mb-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] leading-snug text-amber-950">
+          <strong className="font-semibold">Approval blocked</strong>
+          <span className="mt-0.5 block">{item.blocking_reasons[0]}</span>
+        </div>
+      ) : null}
+      {item.vendor_replied && (
+        <span className="mb-1.5 inline-flex rounded-full border border-[#9fc9ab] bg-[#edf5ee] px-2.5 py-1 text-[10px] font-semibold text-[#285b43]">
+          Vendor replied · review response
+        </span>
+      )}
+      {item.status === 'REJECTED' ? (
+        <span className="text-xs text-slate-600">Decision recorded</span>
+      ) : item.open_exceptions_count > 0 ? (
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold border ${
+          item.critical_exceptions_count > 0
+            ? 'bg-rose-50 text-rose-800 border-rose-300'
+            : 'bg-amber-50 text-amber-800 border-amber-300'
+        }`}>
+          <AlertTriangle className="w-3 h-3" />
+          {item.open_exceptions_count} Open ({item.critical_exceptions_count} Crit)
+        </span>
+      ) : item.ready_for_approval ? (
+        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+          Clean / Ready
+        </span>
+      ) : (
+        <span className="text-slate-400">0 Exceptions</span>
+      )}
+      <span className="mt-1.5 block text-[11px] leading-snug text-slate-600">
+        <strong className="font-semibold text-slate-700">Next:</strong> {item.next_action}
+      </span>
+      {item.updated_at && (
+        <span className="mt-0.5 block text-[10px] text-slate-400">
+          Updated {new Date(item.updated_at).toLocaleDateString()}
+        </span>
+      )}
+    </>
+  );
+
+  const renderOwner = (item: QueueItem) => (
+    item.status === 'APPROVED' || item.status === 'REJECTED' ? (
+      <span className="text-xs text-slate-600">
+        Decision by <strong className="text-slate-800">{item.decision_maker_name || 'Reviewer'}</strong>
+      </span>
+    ) : user?.role === 'procurement_officer' || user?.role === 'admin' ? (
+      <select
+        aria-label={`Assign reviewer for ${item.reference_number}`}
+        value={item.assigned_reviewer_id || ''}
+        onChange={(e) => handleQuickAssign(item.id, e.target.value)}
+        className="bg-slate-50 hover:bg-white text-xs border border-slate-200 rounded p-1 font-medium text-slate-700 focus:outline-none"
+      >
+        <option value="">Unassigned</option>
+        {reviewers.map((r) => <option key={r.id} value={r.id}>{r.full_name}</option>)}
+      </select>
+    ) : (
+      <span className="text-xs text-slate-600">{item.assigned_reviewer_name || 'Unassigned'}</span>
+    )
+  );
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden space-y-4 p-5">
       {/* Header and Search Bar */}
@@ -312,7 +375,7 @@ export const ApplicationQueue: React.FC<Props> = ({
       )}
 
       {/* Applications Queue Table */}
-      <div className="overflow-x-auto border border-slate-200 rounded-xl">
+      <div className="hidden md:block overflow-x-auto border border-slate-200 rounded-xl">
         <table className="w-full text-left text-xs">
           <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 font-semibold uppercase tracking-wider">
             <tr>
@@ -380,69 +443,10 @@ export const ApplicationQueue: React.FC<Props> = ({
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    {item.blocking_reasons?.length && !item.ready_for_approval && !['APPROVED', 'REJECTED'].includes(item.status) ? (
-                      <div className="mb-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] leading-snug text-amber-950">
-                        <strong className="font-semibold">Approval blocked</strong>
-                        <span className="mt-0.5 block">{item.blocking_reasons[0]}</span>
-                      </div>
-                    ) : null}
-                    {item.vendor_replied && (
-                      <span className="mb-1.5 inline-flex rounded-full border border-[#9fc9ab] bg-[#edf5ee] px-2.5 py-1 text-[10px] font-semibold text-[#285b43]">
-                        Vendor replied · review response
-                      </span>
-                    )}
-                    {item.status === 'REJECTED' ? (
-                      <span className="text-xs text-slate-600">Decision recorded</span>
-                    ) : item.open_exceptions_count > 0 ? (
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold border ${
-                          item.critical_exceptions_count > 0
-                            ? 'bg-rose-50 text-rose-800 border-rose-300'
-                            : 'bg-amber-50 text-amber-800 border-amber-300'
-                        }`}
-                      >
-                        <AlertTriangle className="w-3 h-3" />
-                        {item.open_exceptions_count} Open ({item.critical_exceptions_count} Crit)
-                      </span>
-                    ) : item.ready_for_approval ? (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        Clean / Ready
-                      </span>
-                    ) : (
-                      <span className="text-slate-400">0 Exceptions</span>
-                    )}
-                    <span className="mt-1.5 block text-[11px] leading-snug text-slate-600">
-                      <strong className="font-semibold text-slate-700">Next:</strong> {item.next_action}
-                    </span>
-                    {item.updated_at && (
-                      <span className="mt-0.5 block text-[10px] text-slate-400">
-                        Updated {new Date(item.updated_at).toLocaleDateString()}
-                      </span>
-                    )}
+                    {renderIssue(item)}
                   </td>
                   <td className="px-4 py-3">
-                    {item.status === 'APPROVED' || item.status === 'REJECTED' ? (
-                      <span className="text-xs text-slate-600">
-                        Decision by <strong className="text-slate-800">{item.decision_maker_name || 'Reviewer'}</strong>
-                      </span>
-                    ) : user?.role === 'procurement_officer' || user?.role === 'admin' ? (
-                      <select
-                        aria-label={`Assign reviewer for ${item.reference_number}`}
-                        value={item.assigned_reviewer_id || ''}
-                        onChange={(e) => handleQuickAssign(item.id, e.target.value)}
-                        className="bg-slate-50 hover:bg-white text-xs border border-slate-200 rounded p-1 font-medium text-slate-700 focus:outline-none"
-                      >
-                        <option value="">Unassigned</option>
-                        {reviewers.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.full_name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span className="text-xs text-slate-600">{item.assigned_reviewer_name || 'Unassigned'}</span>
-                    )}
+                    {renderOwner(item)}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
@@ -458,6 +462,40 @@ export const ApplicationQueue: React.FC<Props> = ({
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="space-y-3 md:hidden" aria-label="Application cases">
+        {loading ? <p className="py-6 text-center text-sm text-slate-500">Loading application queue...</p> : null}
+        {!loading && items.length === 0 ? (
+          <div className="rounded-xl border border-slate-200 p-5 text-center text-sm text-slate-600">
+            <p>No applications matched the selected filters.</p>
+            <button onClick={handleClearFilters} className="mt-3 font-semibold text-emerald-800 underline">Clear filters</button>
+          </div>
+        ) : null}
+        {!loading && items.map((item) => (
+          <article key={item.id} className="rounded-xl border border-slate-200 bg-[#fbfaf7] p-4 shadow-xs">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <span className="font-mono text-[11px] font-semibold text-emerald-900 break-all">{item.reference_number}</span>
+              <span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getStatusBadge(item.status)}`}>
+                {getStatusLabel(item.status)}
+              </span>
+            </div>
+            <h4 className="mt-2 text-base font-semibold leading-snug text-slate-900">{item.legal_name}</h4>
+            <p className="mt-1 text-xs text-slate-500">
+              {item.constitution.replace(/_/g, ' ')} · {item.submitted_at ? `Submitted ${new Date(item.submitted_at).toLocaleDateString()}` : 'Draft'}
+            </p>
+            <div className="mt-4 border-t border-slate-200 pt-3">{renderIssue(item)}</div>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-3">
+              <div>
+                <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Owner</span>
+                {renderOwner(item)}
+              </div>
+              <button onClick={() => onSelectApplication(item.id)} className="inline-flex items-center gap-1.5 rounded-lg bg-[#285b43] px-4 py-2 text-xs font-semibold text-white">
+                <Eye className="h-3.5 w-3.5" /> Open case
+              </button>
+            </div>
+          </article>
+        ))}
       </div>
 
       {/* Pagination Bar */}
