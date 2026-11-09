@@ -7,18 +7,10 @@ import { VendorDashboard } from './components/views/VendorDashboard';
 import { ReviewerDashboard } from './components/views/ReviewerDashboard';
 import { AdminDashboard } from './components/views/AdminDashboard';
 import { InviteLandingView } from './components/views/InviteLandingView';
-import { HealthCard } from './components/HealthCard';
-import { fetchHealth } from './api/client';
-import type { HealthResponse } from './types/api';
-import { Activity, ChevronDown, ChevronUp } from 'lucide-react';
 
 const MainAppContent: React.FC = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [inviteToken, setInviteToken] = useState<string | null>(null);
-  const [showDiagnostics, setShowDiagnostics] = useState<boolean>(false);
-  const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [healthLoading, setHealthLoading] = useState<boolean>(false);
-  const [healthError, setHealthError] = useState<string | null>(null);
 
   useEffect(() => {
     // Check if the current browser path is an invitation link: /invite/<token>
@@ -30,25 +22,6 @@ const MainAppContent: React.FC = () => {
       }
     }
   }, []);
-
-  const loadHealthData = async () => {
-    setHealthLoading(true);
-    setHealthError(null);
-    try {
-      const data = await fetchHealth();
-      setHealth(data);
-    } catch (err: any) {
-      setHealthError(err?.message || 'Failed to ping health endpoint');
-    } finally {
-      setHealthLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (showDiagnostics && !health) {
-      loadHealthData();
-    }
-  }, [showDiagnostics, health]);
 
   if (inviteToken) {
     return (
@@ -86,32 +59,6 @@ const MainAppContent: React.FC = () => {
         {user.role === 'reviewer' && <ReviewerDashboard />}
         {user.role === 'admin' && <AdminDashboard />}
 
-        {/* Collapsible System Health & Diagnostics (Admin & Internal Staff Only; Hidden from Vendors) */}
-        {user.role !== 'vendor' && (
-          <div className="pt-4 border-t border-slate-200">
-            <button
-              onClick={() => setShowDiagnostics((prev) => !prev)}
-              className="flex items-center justify-between w-full p-3 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
-            >
-              <div className="flex items-center gap-2">
-                <Activity className="w-4 h-4 text-indigo-600" />
-                <span>System health</span>
-              </div>
-              {showDiagnostics ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </button>
-
-            {showDiagnostics && (
-              <div className="mt-3">
-                <HealthCard
-                  health={health}
-                  loading={healthLoading}
-                  error={healthError}
-                  onRefresh={loadHealthData}
-                />
-              </div>
-            )}
-          </div>
-        )}
       </main>
 
       <footer className="bg-white border-t border-slate-200 py-4 mt-auto">

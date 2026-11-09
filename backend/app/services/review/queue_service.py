@@ -69,7 +69,7 @@ class QueueAndDashboardService:
         rejected_count = sum(1 for a in all_apps if a.status == ApplicationStatusEnum.REJECTED.value)
         escalated_count = sum(1 for a in all_apps if a.status == ApplicationStatusEnum.ESCALATED.value)
 
-        awaiting_review_count = submitted_count + under_review_count + escalated_count
+        awaiting_review_count = submitted_count + under_review_count
 
         # Exceptions query
         exceptions_query = self.db.query(OnboardingException).filter(OnboardingException.organisation_id == organisation_id)
@@ -84,21 +84,22 @@ class QueueAndDashboardService:
             if e.status not in [ExceptionStatusEnum.RESOLVED.value, ExceptionStatusEnum.CLOSED.value]
             and e.application_id in active_app_ids
         ]
+        app_open_exc_map: Dict[str, int] = {}
+        for exception in open_exceptions:
+            app_open_exc_map[exception.application_id] = app_open_exc_map.get(exception.application_id, 0) + 1
         open_exceptions_count = len(open_exceptions)
         high_severity_exceptions_count = sum(
             1 for e in open_exceptions
             if e.severity in [ExceptionSeverityEnum.CRITICAL.value, ExceptionSeverityEnum.HIGH.value]
         )
 
-        # Ready for approval count: submitted or under_review applications with zero open exceptions
-        app_open_exc_map: Dict[str, int] = {}
-        for e in open_exceptions:
-            app_open_exc_map[e.application_id] = app_open_exc_map.get(e.application_id, 0) + 1
-
+        # Use the approval policy gate itself. A resolved exception does not make
+        # a case ready when a blocking validation finding remains current.
+        decision_service = ReviewerDecisionService(self.db)
         ready_for_approval_count = sum(
             1 for a in all_apps
             if a.status in [ApplicationStatusEnum.SUBMITTED.value, ApplicationStatusEnum.UNDER_REVIEW.value]
-            and app_open_exc_map.get(a.id, 0) == 0
+            and decision_service.check_approval_eligibility(a)[0]
         )
 
         # Extended review wait: submitted > 3 days ago still awaiting review
@@ -214,6 +215,7 @@ class QueueAndDashboardService:
         Paginated, multi-filtered query for internal reviewer and procurement queues.
         """
         query = self.db.query(Application).filter(Application.organisation_id == organisation_id)
+        decision_service = ReviewerDecisionService(self.db)
 
         # 1. Search term (matches vendor legal name, trade name, reference number, contact email)
         if search and search.strip():
@@ -229,7 +231,13 @@ class QueueAndDashboardService:
 
         # 2. Lifecycle Status filter
         if status and status.strip() and status != "ALL":
-            query = query.filter(Application.status == status.strip())
+            if status.strip() == "AWAITING_REVIEW":
+                query = query.filter(Application.status.in_([
+                    ApplicationStatusEnum.SUBMITTED.value,
+                    ApplicationStatusEnum.UNDER_REVIEW.value,
+                ]))
+            else:
+                query = query.filter(Application.status == status.strip())
 
         # 3. Assigned Reviewer filter
         if unassigned_only:
@@ -268,29 +276,14 @@ class QueueAndDashboardService:
             )
             query = query.filter(Application.id.in_(matching_app_ids))
 
-        # 6. Ready for approval filter (has 0 active open exceptions and status in SUBMITTED or UNDER_REVIEW)
+        # 6. Ready for approval filter (evaluate the same policy gate used by approve)
         if ready_for_approval_only:
-            active_exc_app_ids = (
-                self.db.query(OnboardingException.application_id)
-                .filter(
-                    OnboardingException.status.notin_([
-                        ExceptionStatusEnum.RESOLVED.value,
-                        ExceptionStatusEnum.CLOSED.value,
-                    ])
-                )
-                .distinct()
-                .subquery()
-            )
             query = query.filter(
                 Application.status.in_([
                     ApplicationStatusEnum.SUBMITTED.value,
                     ApplicationStatusEnum.UNDER_REVIEW.value,
-                ]),
-                Application.id.notin_(active_exc_app_ids),
+                ])
             )
-
-        # Count total
-        total = query.count()
 
         # 7. Sorting
         sort_col = getattr(Application, sort_by, Application.submitted_at)
@@ -299,9 +292,19 @@ class QueueAndDashboardService:
         else:
             query = query.order_by(desc(sort_col).nullslast())
 
-        # 8. Pagination
+        # Readiness includes documents and the current validation result, not just
+        # exception count. Evaluate candidates through the same gate as approval.
         offset = max(0, (page - 1) * page_size)
-        applications = query.offset(offset).limit(page_size).all()
+        if ready_for_approval_only:
+            eligible_candidates = [
+                app for app in query.all()
+                if decision_service.check_approval_eligibility(app)[0]
+            ]
+            total = len(eligible_candidates)
+            applications = eligible_candidates[offset:offset + page_size]
+        else:
+            total = query.count()
+            applications = query.offset(offset).limit(page_size).all()
 
         # Batch load active exceptions and reviewer names for items
         app_ids = [a.id for a in applications]
@@ -338,9 +341,11 @@ class QueueAndDashboardService:
             app_excs = [] if app.status in [ApplicationStatusEnum.APPROVED.value, ApplicationStatusEnum.REJECTED.value] else exc_by_app.get(app.id, [])
             open_count = len(app_excs)
             crit_count = sum(1 for e in app_excs if e.severity in ["CRITICAL", "HIGH"])
+            vendor_replied = any(e.status == ExceptionStatusEnum.RESPONSE_SUBMITTED.value for e in app_excs)
+            is_ready, blocking_reasons = decision_service.check_approval_eligibility(app)
             is_ready = (
                 app.status in [ApplicationStatusEnum.SUBMITTED.value, ApplicationStatusEnum.UNDER_REVIEW.value]
-                and open_count == 0
+                and is_ready
             )
             next_action_by_status = {
                 ApplicationStatusEnum.DRAFT.value: "Vendor: complete the application",
@@ -352,7 +357,7 @@ class QueueAndDashboardService:
             }
             next_action = next_action_by_status.get(app.status)
             if app.status in [ApplicationStatusEnum.SUBMITTED.value, ApplicationStatusEnum.UNDER_REVIEW.value]:
-                next_action = (
+                next_action = "Reviewer: review the vendor's response" if vendor_replied else (
                     "Reviewer: assess the evidence"
                     if app.assigned_reviewer_id
                     else "Procurement: assign a reviewer"
@@ -374,6 +379,8 @@ class QueueAndDashboardService:
                 "open_exceptions_count": open_count,
                 "critical_exceptions_count": crit_count,
                 "ready_for_approval": is_ready,
+                "blocking_reasons": blocking_reasons,
+                "vendor_replied": vendor_replied,
                 "next_action": next_action or "Review the current case status",
             })
 

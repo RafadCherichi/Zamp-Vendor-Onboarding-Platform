@@ -1,4 +1,5 @@
 import json
+import secrets
 from datetime import datetime, timezone
 from typing import List, Tuple, Optional, Dict, Any
 from fastapi import HTTPException, status
@@ -9,7 +10,7 @@ from app.models.member import OrganisationMember
 from app.models.role import RoleEnum
 from app.models.user import User
 from app.models.document import Document
-from app.models.exception import OnboardingException, ExceptionStatusEnum, ExceptionSeverityEnum
+from app.models.exception import OnboardingException, ExceptionStatusEnum, ExceptionSeverityEnum, ExceptionTransition
 from app.models.validation import ValidationRun, ValidationFinding, ValidationStatusEnum
 from app.models.audit import AuditEvent
 from app.services.notifications.service import NotificationService
@@ -98,16 +99,47 @@ class ReviewerDecisionService:
                 blocking_reasons.append(
                     f"Verification unavailable: {finding.check_name}. Procurement must retry or escalate before approval."
                 )
-            # Check for unaddressed failed checks that have no corresponding exception or resolution
-            unaddressed_failures = [
-                f for f in current_run.findings
-                if f.status == ValidationStatusEnum.FAILED.value and not f.is_stale
-            ]
-            # If there are failed checks and no exceptions were raised/resolved for them
-            if unaddressed_failures and not unresolved_exceptions:
-                # Any active failures should be investigated
-                for uf in unaddressed_failures[:3]:
-                    blocking_reasons.append(f"Validation failure unaddressed: {uf.check_name}")
+            # A different open exception must not mask an unaddressed failed check.
+            # Match exceptions by finding ID or check ID and accept only an explicit
+            # manual disposition; a vendor correction needs a fresh passing run.
+            application_exceptions = self.db.query(OnboardingException).filter(
+                OnboardingException.application_id == app.id
+            ).all()
+            manually_disposed = {
+                ExceptionStatusEnum.RESOLVED.value,
+                ExceptionStatusEnum.CLOSED.value,
+            }
+            accepted_dispositions = {
+                "VERIFIED_MANUALLY",
+                "WAIVED_WITH_JUSTIFICATION",
+                "OVERRIDDEN_BY_ADMIN",
+                "DISMISSED_AS_FALSE_POSITIVE",
+            }
+            for finding in [
+                item for item in current_run.findings
+                if item.status == ValidationStatusEnum.FAILED.value and not item.is_stale
+            ][:3]:
+                linked_exceptions = []
+                for exception in application_exceptions:
+                    try:
+                        source_check_ids = json.loads(exception.source_check_ids_json or "[]")
+                    except (TypeError, json.JSONDecodeError):
+                        source_check_ids = []
+                    if exception.source_finding_id == finding.id or finding.check_id in source_check_ids:
+                        linked_exceptions.append(exception)
+
+                has_active_exception = any(exc.status not in manually_disposed for exc in linked_exceptions)
+                has_manual_disposition = any(
+                    exc.status in manually_disposed
+                    and exc.resolution_type in accepted_dispositions
+                    and bool((exc.resolution_notes or "").strip())
+                    for exc in linked_exceptions
+                )
+                if not has_active_exception and not has_manual_disposition:
+                    blocking_reasons.append(
+                        f"Validation failure needs review: {finding.check_name}. "
+                        "Open its linked issue, document a manual finding, or rerun the check after correction."
+                    )
 
         is_eligible = len(blocking_reasons) == 0
         return is_eligible, blocking_reasons
@@ -257,6 +289,7 @@ class ReviewerDecisionService:
         instructions: str,
         related_exception_id: Optional[str] = None,
         related_field: Optional[str] = None,
+        related_document_id: Optional[str] = None,
     ) -> Application:
         """
         Transitions application to ACTION_REQUIRED and alerts vendor with specific instructions.
@@ -270,13 +303,22 @@ class ReviewerDecisionService:
         app = self._get_scoped_app(application_id, actor_member)
         self._require_review_role(actor_member)
 
+        if related_document_id:
+            related_document = self.db.query(Document).filter(
+                Document.id == related_document_id,
+                Document.application_id == app.id,
+            ).first()
+            if not related_document:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The selected document does not belong to this application.")
+
         prev_status = app.status
         app.status = ApplicationStatusEnum.ACTION_REQUIRED.value
         app.clarification_requested_at = datetime.now(timezone.utc)
 
-        # If linked to an existing exception, transition that exception
+        clarification_exception = None
+        # If linked to an existing exception, transition that exception.
         if related_exception_id:
-            exc = (
+            clarification_exception = (
                 self.db.query(OnboardingException)
                 .filter(
                     OnboardingException.id == related_exception_id,
@@ -284,15 +326,49 @@ class ReviewerDecisionService:
                 )
                 .first()
             )
-            if exc:
-                validate_transition(
-                    current_status=exc.status,
-                    target_status=ExceptionStatusEnum.ACTION_REQUIRED_FROM_VENDOR.value,
-                    actor_role=actor_member.role,
-                    reason=instructions.strip(),
-                )
-                exc.status = ExceptionStatusEnum.ACTION_REQUIRED_FROM_VENDOR.value
-                exc.vendor_action_instruction = instructions.strip()
+            if not clarification_exception:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="The selected issue was not found for this application.")
+            validate_transition(
+                current_status=clarification_exception.status,
+                target_status=ExceptionStatusEnum.ACTION_REQUIRED_FROM_VENDOR.value,
+                actor_role=actor_member.role,
+                reason=instructions.strip(),
+            )
+            clarification_exception.status = ExceptionStatusEnum.ACTION_REQUIRED_FROM_VENDOR.value
+            clarification_exception.vendor_action_instruction = instructions.strip()
+
+        # General clarification requests also need a durable, answerable vendor
+        # task. An audit entry alone leaves the vendor with nothing to respond to.
+        if not clarification_exception:
+            clarification_exception = OnboardingException(
+                reference_number=f"EXC-{datetime.now(timezone.utc).year}-{secrets.token_hex(3).upper()}",
+                organisation_id=app.organisation_id,
+                application_id=app.id,
+                vendor_id=app.vendor_id,
+                category="MISSING_INFORMATION",
+                title="Additional information requested",
+                description=instructions.strip(),
+                severity=ExceptionSeverityEnum.MEDIUM.value,
+                source_check_ids_json="[]",
+                related_document_id=related_document_id,
+                related_field_name=related_field,
+                assigned_role=RoleEnum.VENDOR.value,
+                status=ExceptionStatusEnum.ACTION_REQUIRED_FROM_VENDOR.value,
+                vendor_action_instruction=instructions.strip(),
+                created_by_user_id=actor_member.user_id,
+                created_by_role=actor_member.role,
+            )
+            self.db.add(clarification_exception)
+            self.db.flush()
+            self.db.add(ExceptionTransition(
+                exception_id=clarification_exception.id,
+                from_status="OPEN",
+                to_status=ExceptionStatusEnum.ACTION_REQUIRED_FROM_VENDOR.value,
+                actor_user_id=actor_member.user_id,
+                actor_role=actor_member.role,
+                reason=instructions.strip()[:255],
+                notes="Clarification request created for the vendor.",
+            ))
 
         # Audit event
         audit = AuditEvent(
@@ -309,6 +385,7 @@ class ReviewerDecisionService:
                 "instructions": instructions.strip(),
                 "related_exception_id": related_exception_id,
                 "related_field": related_field,
+                "related_document_id": related_document_id,
             }),
         )
         self.db.add(audit)
@@ -391,12 +468,19 @@ class ReviewerDecisionService:
         application_id: str,
         reviewer_user_id: Optional[str],
         actor_member: OrganisationMember,
+        reason: Optional[str] = None,
     ) -> Application:
         """
         Assigns or reassigns an application to an internal reviewer within the same organisation.
         """
         app = self._get_scoped_app(application_id, actor_member)
         self._require_review_role(actor_member)
+
+        if actor_member.role == RoleEnum.ADMIN.value and not (reason or "").strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Administrators must record a reason when changing case ownership.",
+            )
 
         prev_reviewer_id = app.assigned_reviewer_id
 
@@ -441,6 +525,7 @@ class ReviewerDecisionService:
                 "previous_reviewer_id": prev_reviewer_id,
                 "new_reviewer_id": reviewer_user_id,
                 "assigned_by_user_id": actor_member.user_id,
+                "reason": reason.strip() if reason else None,
             }),
         )
         self.db.add(audit)

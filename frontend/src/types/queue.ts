@@ -48,6 +48,8 @@ export interface QueueItem {
   open_exceptions_count: number;
   critical_exceptions_count: number;
   ready_for_approval: boolean;
+  blocking_reasons?: string[];
+  vendor_replied?: boolean;
   next_action: string;
 }
 

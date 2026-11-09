@@ -137,14 +137,10 @@ All pre-seeded accounts share the uniform default password: **`Password123!`**
 - **Statutory Policy Gate:** **BLOCKED (Requires manual review of duplicate flag and registry retry)**.
 - **Demonstration Value:** Proves that external registry outages do not corrupt data or auto-fail vendors, and duplicate flags require explicit human dismissal rather than risky auto-merges.
 
-### One-click vendor form examples
-On a new vendor draft, open **Step 1 — Business** and choose one of the three examples under **Need to see the flow first?**. The example fills the vendor fields and uploads matching synthetic sample documents through the normal upload and processing flow:
+### Same-account vendor form example
+Sign in as `vendor@apexcomponents.com`, open **Step 1 — Business**, and choose **Use this example** under **Need to see the flow first?**. It fills the Apex Components & Fasteners account with its matching synthetic PAN, bank and Udyam evidence through the normal upload and processing flow.
 
-- **Established goods company:** complete private limited company profile.
-- **Proprietor with a bank mismatch:** form account intentionally differs from the sample cheque so the exception is visible.
-- **LLP service provider:** LLP profile with synthetic incorporation and partner-authority examples.
-
-The sample profiles are fictional and editable. The autofill does not confirm any declaration or submit the application; the vendor must review the information, make their own confirmations, and submit. If a sample upload fails, the form remains editable and shows an error so the vendor can retry or continue manually.
+The example is shown only for that matching demo vendor identity. The Tata, Sharma and Apex Logistics cases above remain separate vendor accounts and are not autofill choices from this account. The sample remains editable; autofill does not confirm declarations or submit the application. The vendor must review it, make their own declarations, and submit. If an upload fails, the form remains editable and reports the error for retry.
 
 ---
 

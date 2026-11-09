@@ -448,7 +448,6 @@ def assign_application_reviewer(
     db: Session = Depends(get_db),
     member: OrganisationMember = Depends(require_roles([
         RoleEnum.PROCUREMENT_OFFICER,
-        RoleEnum.REVIEWER,
         RoleEnum.ADMIN,
     ])),
 ):
@@ -457,6 +456,7 @@ def assign_application_reviewer(
         application_id=application_id,
         reviewer_user_id=payload.reviewer_user_id,
         actor_member=member,
+        reason=payload.reason,
     )
     return {"success": True, "application_id": app.id, "assigned_reviewer_id": app.assigned_reviewer_id, "status": app.status}
 
@@ -542,6 +542,7 @@ def request_application_clarification(
         instructions=payload.instructions,
         related_exception_id=payload.related_exception_id,
         related_field=payload.related_field,
+        related_document_id=payload.related_document_id,
     )
     return {
         "success": True,

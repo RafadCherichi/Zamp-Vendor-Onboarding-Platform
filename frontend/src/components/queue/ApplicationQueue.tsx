@@ -123,7 +123,11 @@ export const ApplicationQueue: React.FC<Props> = ({
 
   const handleQuickAssign = async (appId: string, revId: string) => {
     try {
-      await apiAssignReviewer(appId, revId || null);
+      const reason = user?.role === 'admin'
+        ? window.prompt('Why are you changing this case owner?')?.trim()
+        : undefined;
+      if (user?.role === 'admin' && !reason) return;
+      await apiAssignReviewer(appId, revId || null, reason);
       fetchQueue();
     } catch (err: any) {
       alert(err?.message || 'Failed to reassign application.');
@@ -147,6 +151,16 @@ export const ApplicationQueue: React.FC<Props> = ({
       default:
         return 'bg-slate-100 text-slate-700 border-slate-200';
     }
+  };
+
+  const getStatusLabel = (st: string) => {
+    if (st === 'ACTION_REQUIRED') return 'Awaiting vendor';
+    if (st === 'UNDER_REVIEW') return 'In review';
+    if (st === 'SUBMITTED') return 'Submitted';
+    if (st === 'APPROVED') return 'Approved';
+    if (st === 'REJECTED') return 'Not approved';
+    if (st === 'ESCALATED') return 'Escalated';
+    return st.replace(/_/g, ' ');
   };
 
   const hasActiveFilters =
@@ -200,6 +214,7 @@ export const ApplicationQueue: React.FC<Props> = ({
           className="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 text-xs font-medium focus:outline-none"
         >
           <option value="ALL">All Statuses</option>
+          <option value="AWAITING_REVIEW">Awaiting Review</option>
           <option value="SUBMITTED">Submitted</option>
           <option value="UNDER_REVIEW">Under Review</option>
           <option value="ACTION_REQUIRED">Action Required</option>
@@ -360,11 +375,22 @@ export const ApplicationQueue: React.FC<Props> = ({
                     {item.submitted_at ? new Date(item.submitted_at).toLocaleDateString() : 'Draft'}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${getStatusBadge(item.status)}`}>
-                      {item.status.replace(/_/g, ' ')}
+                    <span className={`inline-flex whitespace-nowrap px-2.5 py-1 rounded-full text-[11px] leading-none font-semibold border ${getStatusBadge(item.status)}`}>
+                      {getStatusLabel(item.status)}
                     </span>
                   </td>
                   <td className="px-4 py-3">
+                    {item.blocking_reasons?.length && !item.ready_for_approval && !['APPROVED', 'REJECTED'].includes(item.status) ? (
+                      <div className="mb-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] leading-snug text-amber-950">
+                        <strong className="font-semibold">Approval blocked</strong>
+                        <span className="mt-0.5 block">{item.blocking_reasons[0]}</span>
+                      </div>
+                    ) : null}
+                    {item.vendor_replied && (
+                      <span className="mb-1.5 inline-flex rounded-full border border-[#9fc9ab] bg-[#edf5ee] px-2.5 py-1 text-[10px] font-semibold text-[#285b43]">
+                        Vendor replied · review response
+                      </span>
+                    )}
                     {item.status === 'REJECTED' ? (
                       <span className="text-xs text-slate-600">Decision recorded</span>
                     ) : item.open_exceptions_count > 0 ? (
@@ -400,7 +426,7 @@ export const ApplicationQueue: React.FC<Props> = ({
                       <span className="text-xs text-slate-600">
                         Decision by <strong className="text-slate-800">{item.decision_maker_name || 'Reviewer'}</strong>
                       </span>
-                    ) : (
+                    ) : user?.role === 'procurement_officer' || user?.role === 'admin' ? (
                       <select
                         aria-label={`Assign reviewer for ${item.reference_number}`}
                         value={item.assigned_reviewer_id || ''}
@@ -414,6 +440,8 @@ export const ApplicationQueue: React.FC<Props> = ({
                           </option>
                         ))}
                       </select>
+                    ) : (
+                      <span className="text-xs text-slate-600">{item.assigned_reviewer_name || 'Unassigned'}</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right">

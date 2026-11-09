@@ -254,6 +254,21 @@ def transition_exception(
     if not exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exception not found")
 
+    if (
+        payload.target_status in [ExceptionStatusEnum.RESOLVED.value, ExceptionStatusEnum.CLOSED.value]
+        and payload.resolution_type in {
+            "VERIFIED_MANUALLY",
+            "WAIVED_WITH_JUSTIFICATION",
+            "OVERRIDDEN_BY_ADMIN",
+            "DISMISSED_AS_FALSE_POSITIVE",
+        }
+        and not (payload.resolution_notes or payload.notes or "").strip()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Add the evidence or reason that supports this manual resolution.",
+        )
+
     validate_transition(
         current_status=exc.status,
         target_status=payload.target_status,

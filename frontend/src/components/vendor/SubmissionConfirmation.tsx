@@ -59,6 +59,7 @@ export const SubmissionConfirmation: React.FC<Props> = ({ application, token, on
         <VendorExceptionsBanner
           token={token}
           applicationId={application.id}
+          documentSlots={application.documents}
           onCorrectionSubmitted={onRefresh || (() => {})}
         />
       )}
@@ -110,7 +111,7 @@ export const SubmissionConfirmation: React.FC<Props> = ({ application, token, on
 
           <p className="text-sm text-slate-600 max-w-lg mt-2 leading-relaxed">
             {isApproved
-              ? `The review team has approved the application for ${application.legal_name}. Keep this reference for your records.`
+              ? `Your onboarding review for ${application.legal_name} is approved. This page is your record of the decision.`
               : isRejected
               ? `Your application for ${application.legal_name} could not be approved at this time. Please review the reason below.`
               : isActionRequired
@@ -148,7 +149,7 @@ export const SubmissionConfirmation: React.FC<Props> = ({ application, token, on
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
             Official Application Reference
           </span>
-          <div className="flex items-center justify-center gap-2">
+          <div className="flex items-center gap-2">
             <span className="text-lg font-mono font-semibold text-indigo-700">
               {application.reference_number}
             </span>
@@ -173,7 +174,7 @@ export const SubmissionConfirmation: React.FC<Props> = ({ application, token, on
 
         {/* Locked Notice */}
         {!isApproved && !isRejected && (
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 max-w-lg mx-auto flex items-center justify-center gap-2">
+        <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 max-w-lg flex items-center gap-2">
             <Lock className="w-4 h-4 text-slate-400 shrink-0" />
             <span>
               {isActionRequired
@@ -310,7 +311,7 @@ export const SubmissionConfirmation: React.FC<Props> = ({ application, token, on
             </div>
             <p className="text-[11px] text-slate-500 pl-8">
               {isApproved
-                ? 'Approved & active on vendor panel'
+              ? 'Application decision recorded'
                 : isRejected
                 ? 'Application not approved'
                 : 'A reviewer will record the final decision'}
@@ -324,7 +325,7 @@ export const SubmissionConfirmation: React.FC<Props> = ({ application, token, on
             {isRejected
               ? 'This decision is final in this application. Contact your procurement representative if you need the reason explained or want the decision reviewed.'
               : isApproved
-              ? 'Keep your application reference. Your procurement representative will contact you about the next business step.'
+              ? 'We have posted the decision in your portal. Email updates are not available, so return here to check this application. If a separate supplier setup is required, your buyer or procurement contact will share that process. This approval alone does not confirm payment setup or purchasing access.'
               : isActionRequired
               ? 'Send the corrected detail or document above. The review team will check your response and update this page.'
               : 'The review team is checking your details. If we need anything else, a request will appear here.'}

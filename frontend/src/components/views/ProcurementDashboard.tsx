@@ -15,12 +15,14 @@ import {
   Inbox,
   Layers,
   Activity,
+  AlertTriangle,
 } from 'lucide-react';
 
 export const ProcurementDashboard: React.FC = () => {
   const { token, user } = useAuth();
   const [activeView, setActiveView] = useState<'QUEUE' | 'RUNS' | 'INVITATIONS'>('QUEUE');
   const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
+  const [selectedApplicationTab, setSelectedApplicationTab] = useState<'OVERVIEW' | 'EXCEPTIONS'>('OVERVIEW');
 
   // Queue initial filters triggered by dashboard metric clicks
   const [queueStatusFilter, setQueueStatusFilter] = useState<string>('ALL');
@@ -65,6 +67,19 @@ export const ProcurementDashboard: React.FC = () => {
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
+
+  useEffect(() => {
+    const openApplication = (event: Event) => {
+      const { applicationId, initialTab } = (event as CustomEvent<{ applicationId?: string; initialTab?: 'OVERVIEW' | 'EXCEPTIONS' }>).detail || {};
+      if (applicationId) {
+        setSelectedApplicationTab(initialTab || 'OVERVIEW');
+        setActiveView('QUEUE');
+        setSelectedApplicationId(applicationId);
+      }
+    };
+    window.addEventListener('vop:open-application', openApplication);
+    return () => window.removeEventListener('vop:open-application', openApplication);
+  }, []);
 
   const handleCreateInvitation = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,7 +136,8 @@ export const ProcurementDashboard: React.FC = () => {
     return (
       <ApplicationDetailsWorkspace
         applicationId={selectedApplicationId}
-        onBack={() => setSelectedApplicationId(null)}
+        initialTab={selectedApplicationTab}
+        onBack={() => { setSelectedApplicationId(null); setSelectedApplicationTab('OVERVIEW'); }}
         onActionComplete={fetchDashboardData}
         isReviewer={true}
       />
@@ -142,7 +158,7 @@ export const ProcurementDashboard: React.FC = () => {
             </span>
           </div>
           <p className="text-sm text-[#d3ded3] mt-2 max-w-2xl">
-            Review each submission, see what the checks found, and help good vendors get moving. <span className="font-semibold text-white">{user?.organisation.name}</span>
+            Invite suppliers, assign the next reviewer, and keep each handoff moving for <span className="font-semibold text-white">{user?.organisation.name}</span>.
           </p>
         </div>
 
@@ -164,7 +180,7 @@ export const ProcurementDashboard: React.FC = () => {
             className="inline-flex h-10 items-center gap-1.5 px-4 rounded-lg text-xs font-semibold text-[#1d382b] bg-[#d8b76b] hover:bg-[#e5c984] shadow-xs transition"
           >
             <Plus className="w-4 h-4" />
-            <span>Dispatch Invitation</span>
+            <span>Invite a supplier</span>
           </button>
         </div>
       </div>
@@ -177,91 +193,43 @@ export const ProcurementDashboard: React.FC = () => {
 
       {/* Interactive Metric Cards (Click to Filter Queue) */}
       {metrics && activeView === 'QUEUE' && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          {/* Total Applications */}
-          <div
-            onClick={() => navigateToQueueFilter('ALL')}
-            className="bg-white p-4 rounded-xl border border-slate-200 hover:border-indigo-400 cursor-pointer transition shadow-2xs group"
-          >
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
-              Total Applications
-            </span>
-            <div className="text-2xl font-bold text-slate-900 mt-1 group-hover:text-indigo-600 transition">
-              {metrics.total_applications}
+        <section className="relative overflow-hidden rounded-3xl border border-[#315240] bg-[#19382b] p-5 text-[#f7f5ec] shadow-lg sm:p-7">
+          <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-24 h-64 w-64 rounded-full border border-white/10" />
+          <div className="relative flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#d9bd72]">Supplier journey</p>
+              <h3 className="mt-1 font-serif text-2xl font-medium sm:text-3xl">Keep each handoff moving</h3>
+              <p className="mt-1 text-sm text-[#d5e0d7]">Select a stage to open the applications waiting there.</p>
             </div>
-            <span className="text-[10px] text-slate-400 mt-0.5 block">View complete queue &rarr;</span>
+            <button onClick={() => navigateToQueueFilter('ALL')} className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs text-[#edf1e9] transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f0cf78]">
+              {metrics.total_applications} total applications
+            </button>
           </div>
-
-          {/* Awaiting Review */}
-          <div
-            onClick={() => navigateToQueueFilter('UNDER_REVIEW')}
-            className="bg-white p-4 rounded-xl border border-purple-200 bg-purple-50/20 hover:border-purple-400 cursor-pointer transition shadow-2xs group"
-          >
-            <span className="text-[11px] font-semibold text-purple-700 uppercase tracking-wider block">
-              Awaiting Review
-            </span>
-            <div className="text-2xl font-bold text-purple-900 mt-1 group-hover:text-purple-600 transition">
-              {metrics.awaiting_review_count}
-            </div>
-            <span className="text-[10px] text-purple-600 mt-0.5 block">Queued for evaluation &rarr;</span>
+          <div className="relative mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div aria-hidden="true" className="absolute left-[8%] right-[8%] top-6 hidden border-t border-dashed border-[#e9ca7b]/50 xl:block" />
+            {[
+              { label: 'Being completed', note: 'Vendor is filling in details', count: metrics.in_progress_count, onClick: () => navigateToQueueFilter('IN_PROGRESS'), tone: 'border-white/15 bg-white/[0.06]' },
+              { label: 'In review', note: 'Reviewer is assessing evidence', count: metrics.awaiting_review_count, onClick: () => navigateToQueueFilter('AWAITING_REVIEW'), tone: 'border-[#c4b5fd]/35 bg-[#c4b5fd]/[0.09]' },
+              { label: 'Vendor response', note: 'A clarification is outstanding', count: metrics.awaiting_vendor_count, onClick: () => navigateToQueueFilter('ACTION_REQUIRED'), tone: 'border-[#e9ca7b]/35 bg-[#e9ca7b]/[0.09]' },
+              { label: 'Onboarding approved', note: 'Review decision is complete', count: metrics.approved_count, onClick: () => navigateToQueueFilter('APPROVED'), tone: 'border-[#a8d3b4]/35 bg-[#a8d3b4]/[0.09]' },
+            ].map((stage, index) => (
+              <button key={stage.label} onClick={stage.onClick} style={{ animationDelay: `${index * 70}ms` }} className={`group relative min-h-28 animate-[stage-arrive_420ms_cubic-bezier(0.2,0.7,0.2,1)_both] rounded-2xl border p-4 text-left transition duration-200 hover:-translate-y-1 hover:bg-white/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f0cf78] motion-reduce:animate-none motion-reduce:transform-none motion-reduce:transition-none ${stage.tone}`}>
+                <span className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[#edf1e9]">{stage.label}</span>
+                  <span className="grid h-7 w-7 place-items-center rounded-full border border-[#f0cf78]/50 bg-[#19382b] text-[11px] font-bold text-[#f0cf78] transition-transform duration-300 group-hover:rotate-12 motion-reduce:transform-none motion-reduce:transition-none">{index + 1}</span>
+                </span>
+                <span className="mt-3 flex items-end justify-between gap-2">
+                  <span className="font-serif text-4xl leading-none tabular-nums">{stage.count}</span>
+                  <span className="text-right text-[10px] text-[#c5d5ca]">{stage.note}</span>
+                </span>
+              </button>
+            ))}
           </div>
-
-          {/* Pending Vendor Action */}
-          <div
-            onClick={() => navigateToQueueFilter('ACTION_REQUIRED')}
-            className="bg-white p-4 rounded-xl border border-amber-200 bg-amber-50/20 hover:border-amber-400 cursor-pointer transition shadow-2xs group"
-          >
-            <span className="text-[11px] font-semibold text-amber-700 uppercase tracking-wider block">
-              Awaiting Vendor
-            </span>
-            <div className="text-2xl font-bold text-amber-900 mt-1 group-hover:text-amber-600 transition">
-              {metrics.awaiting_vendor_count}
-            </div>
-            <span className="text-[10px] text-amber-600 mt-0.5 block">Clarifications requested &rarr;</span>
-          </div>
-
-          {/* Ready for Approval */}
-          <div
-            onClick={() => navigateToQueueFilter('SUBMITTED', 'ALL', true)}
-            className="bg-white p-4 rounded-xl border border-emerald-200 bg-emerald-50/20 hover:border-emerald-400 cursor-pointer transition shadow-2xs group"
-          >
-            <span className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider block">
-              Ready for Approval
-            </span>
-            <div className="text-2xl font-bold text-emerald-900 mt-1 group-hover:text-emerald-600 transition">
-              {metrics.ready_for_approval_count}
-            </div>
-            <span className="text-[10px] text-emerald-600 mt-0.5 block">0 open exceptions &rarr;</span>
-          </div>
-
-          {/* Critical / High Exceptions */}
-          <div
-            onClick={() => navigateToQueueFilter('ALL', 'HIGH')}
-            className="bg-white p-4 rounded-xl border border-rose-200 bg-rose-50/20 hover:border-rose-400 cursor-pointer transition shadow-2xs group"
-          >
-            <span className="text-[11px] font-semibold text-rose-700 uppercase tracking-wider block">
-              High Severity Issues
-            </span>
-            <div className="text-2xl font-bold text-rose-900 mt-1 group-hover:text-rose-600 transition">
-              {metrics.high_severity_exceptions_count}
-            </div>
-            <span className="text-[10px] text-rose-600 mt-0.5 block">Statutory blocks &rarr;</span>
-          </div>
-
-          {/* Approved */}
-          <div
-            onClick={() => navigateToQueueFilter('APPROVED')}
-            className="bg-white p-4 rounded-xl border border-slate-200 hover:border-slate-300 cursor-pointer transition shadow-2xs group"
-          >
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
-              Approved Vendors
-            </span>
-            <div className="text-2xl font-bold text-slate-700 mt-1 group-hover:text-slate-900 transition">
-              {metrics.approved_count}
-            </div>
-            <span className="text-[10px] text-slate-400 mt-0.5 block">Master records &rarr;</span>
-          </div>
-        </div>
+          <button onClick={() => navigateToQueueFilter('ALL', 'HIGH')} className="relative mt-3 inline-flex items-center gap-2 rounded-full border border-[#ef9d8a]/35 bg-[#ef9d8a]/10 px-3 py-2 text-xs text-[#ffd0c4] transition hover:bg-[#ef9d8a]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f0cf78]">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            Review {metrics.high_severity_exceptions_count} high priority issues
+          </button>
+        </section>
       )}
 
       {/* Operational Widgets Row */}
@@ -280,12 +248,12 @@ export const ProcurementDashboard: React.FC = () => {
                 metrics.recent_activity.map((act) => (
                   <div key={act.id} className="pt-2 pb-1">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-900">{act.event_type.replace(/_/g, ' ')}</span>
+                      <span className="font-semibold text-slate-900">{act.event_type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())}</span>
                       <span className="text-[10px] text-slate-400">
                         {act.created_at ? new Date(act.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                       </span>
                     </div>
-                    <span className="text-[11px] text-slate-500 block">by {act.actor_role}</span>
+                    <span className="text-[11px] text-slate-500 block">by {act.actor_role.replace(/_/g, ' ')}</span>
                   </div>
                 ))
               )}
@@ -305,7 +273,7 @@ export const ProcurementDashboard: React.FC = () => {
                 metrics.recently_submitted.map((sub) => (
                   <div
                     key={sub.id}
-                    onClick={() => setSelectedApplicationId(sub.id)}
+                    onClick={() => { setSelectedApplicationTab('OVERVIEW'); setSelectedApplicationId(sub.id); }}
                     className="pt-2 pb-1 cursor-pointer hover:bg-slate-50 transition rounded p-1"
                   >
                     <div className="flex items-center justify-between">
@@ -314,11 +282,9 @@ export const ProcurementDashboard: React.FC = () => {
                     </div>
                     <div className="flex items-center justify-between text-[11px] text-slate-500 mt-0.5">
                       <span>{sub.constitution.replace(/_/g, ' ')}</span>
-                      {sub.open_exceptions_count > 0 ? (
-                        <span className="text-amber-600 font-semibold">{sub.open_exceptions_count} open issue(s)</span>
-                      ) : (
-                        <span className="text-emerald-600 font-semibold">Ready</span>
-                      )}
+                      {sub.open_exceptions_count > 0
+                        ? <span className="text-amber-700 font-semibold">{sub.open_exceptions_count} open issue(s)</span>
+                        : <span className="text-slate-500 font-medium">{sub.status.replace(/_/g, ' ').toLowerCase()}</span>}
                     </div>
                   </div>
                 ))
@@ -338,7 +304,7 @@ export const ProcurementDashboard: React.FC = () => {
               ) : (
                 Object.entries(metrics.exception_breakdown_by_category).map(([cat, count]) => (
                   <div key={cat} className="flex items-center justify-between p-1.5 bg-slate-50 rounded">
-                    <span className="font-medium text-slate-700 truncate">{cat.replace(/_/g, ' ')}</span>
+                    <span className="font-medium text-slate-700 truncate">{cat.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())}</span>
                     <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded font-bold text-[11px]">
                       {count}
                     </span>
@@ -361,13 +327,13 @@ export const ProcurementDashboard: React.FC = () => {
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            Vendor Application Queue
+            Supplier applications
           </button>
           <button
             onClick={() => setActiveView('RUNS')}
             className={`pb-2.5 border-b-2 transition ${activeView === 'RUNS' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
           >
-            Processing Runs
+            Verification history
           </button>
           <button
             onClick={() => setActiveView('INVITATIONS')}
@@ -377,7 +343,7 @@ export const ProcurementDashboard: React.FC = () => {
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            Invitation Register ({invitations.length})
+            Invitations ({invitations.length})
           </button>
         </div>
       </div>
@@ -388,7 +354,10 @@ export const ProcurementDashboard: React.FC = () => {
           initialStatus={queueStatusFilter}
           initialSeverity={queueSeverityFilter}
           initialReadyForApproval={queueReadyFilter}
-          onSelectApplication={(appId) => setSelectedApplicationId(appId)}
+          onSelectApplication={(appId) => {
+            setSelectedApplicationTab('OVERVIEW');
+            setSelectedApplicationId(appId);
+          }}
         />
       )}
 
@@ -400,7 +369,7 @@ export const ProcurementDashboard: React.FC = () => {
       {activeView === 'INVITATIONS' && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-900">Vendor Invitation Register</h3>
+            <h3 className="text-sm font-bold text-slate-900">Supplier invitations</h3>
             <span className="text-xs text-slate-500">{invitations.length} invitation(s) recorded</span>
           </div>
 
@@ -557,7 +526,7 @@ export const ProcurementDashboard: React.FC = () => {
                     disabled={isCreating}
                     className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg font-semibold disabled:opacity-50"
                   >
-                    {isCreating ? 'Dispatching...' : 'Dispatch Invitation'}
+                    {isCreating ? 'Sending invitation...' : 'Send invitation'}
                   </button>
                 </div>
               </form>

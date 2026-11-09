@@ -30,9 +30,10 @@ export type ExceptionStatus =
 export type ResolutionType =
   | 'CORRECTED_BY_VENDOR'
   | 'VERIFIED_MANUALLY'
-  | 'DOCUMENT_ACCEPTED_WITH_NOTE'
-  | 'EXCEPTION_OVERRIDDEN'
-  | 'CANCELLED_OBSOLETE';
+  | 'WAIVED_WITH_JUSTIFICATION'
+  | 'OVERRIDDEN_BY_ADMIN'
+  | 'DISMISSED_AS_FALSE_POSITIVE'
+  | 'REJECTED';
 
 export interface ExceptionTransition {
   id: string;

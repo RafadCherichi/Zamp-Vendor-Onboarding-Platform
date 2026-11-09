@@ -26,7 +26,7 @@ import {
   LoaderCircle,
   FlaskConical,
 } from 'lucide-react';
-import { DEMO_AUTOFILL_PROFILES } from './demoAutofill';
+import { getDemoAutofillProfilesForVendor } from './demoAutofill';
 
 interface WizardProps {
   token: string;
@@ -333,7 +333,7 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
   };
 
   const handleDemoAutofill = async (profileId: string) => {
-    const profile = DEMO_AUTOFILL_PROFILES.find((item) => item.id === profileId);
+    const profile = getDemoAutofillProfilesForVendor(application.legal_name).find((item) => item.id === profileId);
     if (!profile || autofillProfile) return;
 
     setAutofillProfile(profile.id);
@@ -385,6 +385,7 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
       <VendorExceptionsBanner
         token={token}
         applicationId={application.id}
+        documentSlots={application.documents}
         onCorrectionSubmitted={() => onRefresh(true)}
       />
 
@@ -484,7 +485,7 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
                 <h3 id="demo-autofill-heading" className="text-sm font-semibold text-slate-900">Need to see the flow first?</h3>
                 <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-600">Load a fictional vendor example with its sample documents. Check every detail, edit it if you like, and make your own declarations before submitting.</p>
                 <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-3">
-                  {DEMO_AUTOFILL_PROFILES.map((profile) => (
+                  {getDemoAutofillProfilesForVendor(application.legal_name).map((profile) => (
                     <div key={profile.id} className="rounded-xl border border-amber-100 bg-white/80 p-3">
                       <p className="text-xs font-semibold text-slate-800">{profile.name}</p>
                       <p className="mt-1 min-h-8 text-[11px] leading-snug text-slate-500">{profile.description}</p>

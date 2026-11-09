@@ -30,6 +30,28 @@ export const VendorDashboard: React.FC = () => {
     loadApplication(false);
   }, [loadApplication]);
 
+  useEffect(() => {
+    if (!application || !['SUBMITTED', 'UNDER_REVIEW', 'ACTION_REQUIRED'].includes(application.status)) return;
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') loadApplication(true);
+    };
+    const interval = window.setInterval(refreshWhenVisible, 30000);
+    window.addEventListener('focus', refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshWhenVisible);
+    };
+  }, [application?.status, loadApplication]);
+
+  useEffect(() => {
+    const handleOpenApplication = (event: Event) => {
+      const detail = (event as CustomEvent<{ applicationId?: string }>).detail;
+      if (!detail?.applicationId || application?.id === detail.applicationId) loadApplication(true);
+    };
+    window.addEventListener('vop:open-application', handleOpenApplication);
+    return () => window.removeEventListener('vop:open-application', handleOpenApplication);
+  }, [application?.id, loadApplication]);
+
   if (loading) {
     return (
       <div className="py-16 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-3">

@@ -29,9 +29,11 @@ import type {
   ReviewerUser,
 } from '../../types/queue';
 import { ExceptionManagerCard } from '../reviewer/ExceptionManagerCard';
+import { useAuth } from '../../context/AuthContext';
 
 interface Props {
   applicationId: string;
+  initialTab?: 'OVERVIEW' | 'EXCEPTIONS';
   onBack?: () => void;
   onActionComplete?: () => void;
   isReviewer?: boolean;
@@ -49,10 +51,12 @@ const humanValue = (value: unknown): string => {
 
 export const ApplicationDetailsWorkspace: React.FC<Props> = ({
   applicationId,
+  initialTab = 'OVERVIEW',
   onBack,
   onActionComplete,
   isReviewer = true,
 }) => {
+  const { user } = useAuth();
   const token = localStorage.getItem('vop_auth_token') || localStorage.getItem('token') || '';
   const [details, setDetails] = useState<ApplicationComprehensiveDetails | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -62,7 +66,11 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
   // Navigation tab
   const [activeTab, setActiveTab] = useState<
     'OVERVIEW' | 'BUSINESS' | 'DOCUMENTS' | 'VALIDATION' | 'EXCEPTIONS' | 'REGISTRIES' | 'AUDIT'
-  >('OVERVIEW');
+  >(initialTab);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab, applicationId]);
 
   // Preview modal
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -76,6 +84,7 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
   const [rejectReason, setRejectReason] = useState<string>('');
   const [rejectNotes, setRejectNotes] = useState<string>('');
   const [clarifyInstructions, setClarifyInstructions] = useState<string>('');
+  const [clarifyRelatedDocumentId, setClarifyRelatedDocumentId] = useState<string>('');
   const [escalateReason, setEscalateReason] = useState<string>('');
   const [escalateTargetRole, setEscalateTargetRole] = useState<string>('ADMIN');
   const [selectedReviewerId, setSelectedReviewerId] = useState<string>('');
@@ -156,7 +165,13 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
     try {
       setActionSubmitting(true);
       setActionError(null);
-      await apiClarifyApplication(applicationId, clarifyInstructions.trim());
+      await apiClarifyApplication(
+        applicationId,
+        clarifyInstructions.trim(),
+        undefined,
+        undefined,
+        clarifyRelatedDocumentId || undefined,
+      );
       setActiveModal(null);
       fetchDetails();
       if (onActionComplete) onActionComplete();
@@ -189,7 +204,11 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
   const handleAssign = async (revId: string) => {
     try {
       setActionSubmitting(true);
-      await apiAssignReviewer(applicationId, revId || null);
+      const reason = user?.role === 'admin'
+        ? window.prompt('Why are you changing this case owner?')?.trim()
+        : undefined;
+      if (user?.role === 'admin' && !reason) return;
+      await apiAssignReviewer(applicationId, revId || null, reason);
       setSelectedReviewerId(revId);
       setActiveModal(null);
       fetchDetails();
@@ -305,7 +324,8 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
           {isReviewer && overview.status !== 'APPROVED' && overview.status !== 'REJECTED' && (
             <div className="flex w-full flex-col gap-2 lg:w-auto lg:items-end">
               <div className="flex flex-wrap items-center justify-end gap-2">
-              {/* Quick Assign Dropdown */}
+              {/* Routing belongs to procurement and organisation administrators. */}
+              {(user?.role === 'procurement_officer' || user?.role === 'admin') && (
               <div className="flex h-10 min-w-0 items-center gap-2 bg-[#f5f4ee] border border-[#deded5] rounded-lg px-3 text-xs">
                 <User className="w-3.5 h-3.5 text-slate-500 ml-1" />
                 <select
@@ -322,6 +342,7 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
                   ))}
                 </select>
               </div>
+              )}
 
               {/* Approve is adjacent to ownership: the primary decision stays easy to find. */}
               <button
@@ -342,8 +363,10 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
 
               {/* Request Clarification */}
               <button
-                onClick={() => {
+                  onClick={() => {
                   setActionError(null);
+                    setClarifyInstructions('');
+                    setClarifyRelatedDocumentId('');
                   setActiveModal('CLARIFY');
                 }}
                 className="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-[#e3cc91] bg-[#fbf5e5] px-3 text-xs font-semibold text-[#765817] transition hover:bg-[#f5ebd1]"
@@ -836,50 +859,62 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
         <ExceptionManagerCard applicationId={applicationId} isReviewer={isReviewer} />
       )}
 
-      {/* Tab F: External Registries (Simulated) */}
+      {/* Tab F: Verification results from sample registries */}
       {activeTab === 'REGISTRIES' && (
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-4 text-xs">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div>
-              <h4 className="text-sm font-bold text-slate-900">External Registry Simulations</h4>
+              <h4 className="text-sm font-bold text-slate-900">Identity and bank checks</h4>
               <p className="text-slate-500 mt-0.5">
-                Simulated responses for statutory PAN, GSTIN, MCA, and bank checks. No official registry is contacted in this prototype.
+                These results come from sample data for this prototype. No official registry or bank was contacted.
               </p>
             </div>
-            <span className="px-2.5 py-1 bg-amber-100 text-amber-800 rounded font-bold text-[10px] border border-amber-300">
-              SIMULATED SANDBOX
+            <span className="px-2.5 py-1 bg-[#f5f0dc] text-[#735d20] rounded-full font-semibold text-[10px] border border-[#e9ddb3]">
+              Sample checks
             </span>
           </div>
 
           <div className="space-y-3">
             {external_verifications.length === 0 ? (
-              <div className="text-center py-6 text-slate-400">No registry checks executed yet.</div>
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 py-8 text-center text-slate-500">No identity or bank checks have run for this application yet.</div>
             ) : (
               external_verifications.map((v) => (
-                <div key={v.id} className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/60 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900">{v.verification_type} VERIFICATION</span>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${v.status === 'VERIFIED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
-                        {v.status}
-                      </span>
-                      <span className="font-mono text-slate-400 text-[10px]">{v.request_id}</span>
+                <article key={v.id} className="rounded-2xl border border-[#e3e0d6] bg-[#fffefa] p-4 sm:p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h5 className="font-semibold text-slate-900">{humanLabel(v.verification_type)} check</h5>
+                      <p className="mt-1 text-[11px] text-slate-500">Sample source: {humanLabel(v.provider_name)}</p>
                     </div>
-                    <span className="text-slate-500 font-mono text-[11px]">{v.duration_ms} ms</span>
+                    <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${v.status === 'VERIFIED' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : v.status === 'FAILED' ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+                      {v.status === 'VERIFIED' ? 'Details matched' : v.status === 'FAILED' ? 'Details did not match' : v.status === 'UNAVAILABLE' ? 'Check unavailable' : 'Not confirmed'}
+                    </span>
                   </div>
-                  <div className="text-slate-600">
-                    <strong>Provider Adapter:</strong> {v.provider_name}
-                  </div>
-                  <div className="text-slate-600">
-                    <strong>Target:</strong> <span className="font-mono">{v.submitted_identifier}</span>
-                  </div>
-                  {v.reason && <div className="text-slate-500 italic"><strong>Outcome:</strong> {v.reason}</div>}
+                  <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl bg-[#f6f5f0] p-3">
+                      <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Identifier checked</dt>
+                      <dd className="mt-1 font-mono text-xs text-slate-800">{v.submitted_identifier.length > 4 ? `•••• ${v.submitted_identifier.slice(-4)}` : v.submitted_identifier}</dd>
+                    </div>
+                    <div className="rounded-xl bg-[#f6f5f0] p-3">
+                      <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Result</dt>
+                      <dd className="mt-1 text-xs leading-relaxed text-slate-800">{v.reason ? humanValue(v.reason) : v.status === 'VERIFIED' ? 'The submitted details matched the sample record.' : 'No confirming result was returned from the sample check.'}</dd>
+                    </div>
+                  </dl>
                   {v.returned_attributes && Object.keys(v.returned_attributes).length > 0 && (
-                    <pre className="p-2 bg-slate-900 text-slate-100 rounded text-[11px] font-mono overflow-x-auto mt-1">
-                      {JSON.stringify(v.returned_attributes, null, 2)}
-                    </pre>
+                    <dl className="mt-3 grid gap-x-5 gap-y-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-2">
+                      {Object.entries(v.returned_attributes).map(([key, value]) => (
+                        <div key={key} className="min-w-0">
+                          <dt className="text-[10px] uppercase tracking-wide text-slate-500">{humanLabel(key)}</dt>
+                          <dd className="mt-0.5 break-words text-xs text-slate-800">{humanValue(value)}</dd>
+                        </div>
+                      ))}
+                    </dl>
                   )}
-                </div>
+                  <details className="mt-3 text-[10px] text-slate-500">
+                    <summary className="cursor-pointer underline underline-offset-2">View check reference</summary>
+                    <p className="mt-1">Checked {v.created_at ? new Date(v.created_at).toLocaleString() : 'Time not recorded'}</p>
+                    <p className="mt-1 font-mono">Reference: {v.request_id}</p>
+                  </details>
+                </article>
               ))
             )}
           </div>
@@ -1017,8 +1052,7 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
             {activeModal === 'CLARIFY' && (
               <div className="space-y-3 text-xs">
                 <p className="text-slate-600">
-                  This will transition the application to <strong>ACTION REQUIRED</strong>, dispatch an in-app alert,
-                  and allow the vendor to correct specific fields or upload replacement documents.
+                  The vendor will see a tracked request in their portal and can reply here. Select a document only when you need a replacement upload.
                 </p>
                 <div>
                   <label className="block font-semibold text-slate-700 uppercase tracking-wider mb-1">
@@ -1031,6 +1065,22 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
                     placeholder="Specify the exact document or field correction needed..."
                     className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none"
                   />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Replacement document (optional)
+                  </label>
+                  <select
+                    value={clarifyRelatedDocumentId}
+                    onChange={(e) => setClarifyRelatedDocumentId(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  >
+                    <option value="">No replacement upload needed</option>
+                    {documents.map((document) => (
+                      <option key={document.id} value={document.id}>{document.title}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[11px] text-slate-500">The vendor will upload against this exact document slot. Existing versions remain in the record.</p>
                 </div>
               </div>
             )}

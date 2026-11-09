@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { notificationsApi } from '../../api/notifications';
 import type { Notification } from '../../types/exception';
+import { exceptionsApi } from '../../api/exceptions';
+import { useAuth } from '../../context/AuthContext';
 
 export const NotificationBell: React.FC = () => {
+  const { token } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
@@ -43,8 +46,8 @@ export const NotificationBell: React.FC = () => {
     setIsOpen(!isOpen);
   };
 
-  const handleMarkAsRead = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleMarkAsRead = async (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     try {
       await notificationsApi.markAsRead(id);
       setNotifications((prev) =>
@@ -63,6 +66,31 @@ export const NotificationBell: React.FC = () => {
       setUnreadCount(0);
     } catch (err) {
       console.error('Failed to mark all read:', err);
+    }
+  };
+
+  const handleOpenNotification = async (notification: Notification) => {
+    try {
+      let applicationId: string | undefined;
+      if (notification.entity_type === 'APPLICATION') {
+        applicationId = notification.entity_id;
+      } else if (notification.entity_type === 'EXCEPTION' || notification.entity_type === 'ONBOARDING_EXCEPTION') {
+        if (!notification.entity_id) return;
+        const exception = await exceptionsApi.getExceptionById(notification.entity_id, token || undefined);
+        applicationId = exception.application_id;
+      }
+
+      if (!applicationId) return;
+      window.dispatchEvent(new CustomEvent('vop:open-application', {
+        detail: {
+          applicationId,
+          initialTab: notification.entity_type === 'EXCEPTION' || notification.entity_type === 'ONBOARDING_EXCEPTION' ? 'EXCEPTIONS' : 'OVERVIEW',
+        },
+      }));
+      setIsOpen(false);
+      if (!notification.is_read) await handleMarkAsRead(notification.id);
+    } catch (err) {
+      console.error('Could not open notification destination:', err);
     }
   };
 
@@ -153,12 +181,14 @@ export const NotificationBell: React.FC = () => {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-slate-900 truncate">
-                      {n.title}
-                    </p>
-                    <p className="text-xs text-slate-600 mt-0.5 break-words">
-                      {n.message}
-                    </p>
+                    <button
+                      onClick={() => handleOpenNotification(n)}
+                      className="block w-full text-left rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+                      aria-label={`Open: ${n.title}`}
+                    >
+                      <span className="text-xs font-semibold text-slate-900 block truncate">{n.title}</span>
+                      <span className="text-xs text-slate-600 mt-0.5 break-words block">{n.message}</span>
+                    </button>
                     <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400">
                       <span>{new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       {!n.is_read && (

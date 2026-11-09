@@ -5,16 +5,14 @@ import type { DashboardMetrics } from '../../types/queue';
 import { ApplicationQueue } from '../queue/ApplicationQueue';
 import { ApplicationDetailsWorkspace } from '../review/ApplicationDetailsWorkspace';
 import {
-  CheckCircle2,
   AlertTriangle,
-  Clock,
-  ShieldAlert,
   RefreshCw,
 } from 'lucide-react';
 
 export const ReviewerDashboard: React.FC = () => {
   const { user, token } = useAuth();
   const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
+  const [selectedApplicationTab, setSelectedApplicationTab] = useState<'OVERVIEW' | 'EXCEPTIONS'>('OVERVIEW');
 
   // Quick filters for queue
   const [queueStatusFilter, setQueueStatusFilter] = useState<string>('ALL');
@@ -42,6 +40,18 @@ export const ReviewerDashboard: React.FC = () => {
     loadMetrics();
   }, [token]);
 
+  useEffect(() => {
+    const openApplication = (event: Event) => {
+      const { applicationId, initialTab } = (event as CustomEvent<{ applicationId?: string; initialTab?: 'OVERVIEW' | 'EXCEPTIONS' }>).detail || {};
+      if (applicationId) {
+        setSelectedApplicationTab(initialTab || 'OVERVIEW');
+        setSelectedApplicationId(applicationId);
+      }
+    };
+    window.addEventListener('vop:open-application', openApplication);
+    return () => window.removeEventListener('vop:open-application', openApplication);
+  }, []);
+
   const handleFilterClick = (status: string, severity: string = 'ALL', ready: boolean = false, me: boolean = false) => {
     setQueueStatusFilter(status);
     setQueueSeverityFilter(severity);
@@ -55,8 +65,10 @@ export const ReviewerDashboard: React.FC = () => {
     return (
       <ApplicationDetailsWorkspace
         applicationId={selectedApplicationId}
+        initialTab={selectedApplicationTab}
         onBack={() => {
           setSelectedApplicationId(null);
+          setSelectedApplicationTab('OVERVIEW');
           loadMetrics();
         }}
         onActionComplete={() => {
@@ -94,94 +106,54 @@ export const ReviewerDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Reviewer Priority Metric Cards */}
+      {/* Visual, state-backed review flow */}
       {metrics && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-px bg-slate-200 border border-slate-200 rounded-lg overflow-hidden">
-          {/* Card 1: Ready for Approval */}
-          <div
-            onClick={() => handleFilterClick('ALL', 'ALL', true, false)}
-            className="bg-white p-4 hover:bg-slate-50 cursor-pointer transition group"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-600 flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                Ready to Approve
-              </span>
+        <section className="relative overflow-hidden rounded-3xl border border-[#315240] bg-[#19382b] p-5 text-[#f7f5ec] shadow-lg sm:p-7">
+          <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-28 h-72 w-72 rounded-full border border-white/10" />
+          <div aria-hidden="true" className="pointer-events-none absolute -right-2 -top-20 h-56 w-56 rounded-full border border-white/10" />
+          <div className="relative flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#d9bd72]">Your review flow</p>
+              <h3 className="mt-1 font-serif text-2xl font-medium sm:text-3xl">Move the work forward</h3>
+              <p className="mt-1 max-w-xl text-sm text-[#d5e0d7]">Choose a stage to see the cases that need your attention.</p>
             </div>
-            <div className="text-2xl font-semibold text-slate-900 mt-1.5">
-              {metrics.ready_for_approval_count}
+            <div className="rounded-full border border-[#e9ca7b]/40 bg-[#e9ca7b]/10 px-3 py-1.5 text-xs text-[#f1dfae]">
+              <span className="font-semibold">{metrics.high_severity_exceptions_count}</span> high priority items
             </div>
-            <span className="text-xs text-slate-500 mt-0.5 block">Open ready cases &rarr;</span>
           </div>
-
-          {/* Card 2: Awaiting Review / Under Evaluation */}
-          <div
-            onClick={() => handleFilterClick('UNDER_REVIEW', 'ALL', false, false)}
-            className="bg-white p-4 hover:bg-slate-50 cursor-pointer transition group"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-600 flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5 text-indigo-600" />
-                Under Review
-              </span>
-            </div>
-            <div className="text-2xl font-semibold text-slate-900 mt-1.5">
-              {metrics.awaiting_review_count}
-            </div>
-            <span className="text-xs text-slate-500 mt-0.5 block">Waiting for review &rarr;</span>
+          <div className="relative mt-7 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div aria-hidden="true" className="absolute left-[9%] right-[9%] top-6 hidden border-t border-dashed border-[#e9ca7b]/50 xl:block" />
+            {[
+              { label: 'Awaiting review', note: 'Assess submitted evidence', count: metrics.awaiting_review_count, onClick: () => handleFilterClick('AWAITING_REVIEW'), tone: 'border-white/15 bg-white/[0.06]' },
+              { label: 'Vendor response', note: 'Clarification requested', count: metrics.awaiting_vendor_count, onClick: () => handleFilterClick('ACTION_REQUIRED'), tone: 'border-[#e9ca7b]/35 bg-[#e9ca7b]/[0.09]' },
+              { label: 'Ready to decide', note: 'No open blocking issues', count: metrics.ready_for_approval_count, onClick: () => handleFilterClick('ALL', 'ALL', true), tone: 'border-[#a8d3b4]/35 bg-[#a8d3b4]/[0.09]' },
+              { label: 'Escalated', note: 'Needs policy oversight', count: metrics.escalated_count, onClick: () => handleFilterClick('ESCALATED'), tone: 'border-[#c4b5fd]/35 bg-[#c4b5fd]/[0.09]' },
+            ].map((stage, index) => (
+              <button
+                key={stage.label}
+                onClick={stage.onClick}
+                style={{ animationDelay: `${index * 70}ms` }}
+                className={`group relative min-h-28 animate-[stage-arrive_420ms_cubic-bezier(0.2,0.7,0.2,1)_both] rounded-2xl border p-4 text-left transition duration-200 hover:-translate-y-1 hover:bg-white/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f0cf78] motion-reduce:animate-none motion-reduce:transform-none motion-reduce:transition-none ${stage.tone}`}
+              >
+                <span className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[#edf1e9]">{stage.label}</span>
+                  <span className="grid h-7 w-7 place-items-center rounded-full border border-[#f0cf78]/50 bg-[#19382b] text-[11px] font-bold text-[#f0cf78] transition-transform duration-300 group-hover:rotate-12 motion-reduce:transform-none motion-reduce:transition-none">{index + 1}</span>
+                </span>
+                <span className="mt-3 flex items-end justify-between gap-2">
+                  <span className="font-serif text-4xl leading-none tabular-nums">{stage.count}</span>
+                  <span className="text-right text-[10px] text-[#c5d5ca]">{stage.note}</span>
+                </span>
+              </button>
+            ))}
           </div>
-
-          {/* Card 3: Critical / High Severity Issues */}
-          <div
-            onClick={() => handleFilterClick('ALL', 'HIGH', false, false)}
-            className="bg-white p-4 hover:bg-slate-50 cursor-pointer transition group"
+          <button
+            onClick={() => handleFilterClick('ALL', 'HIGH')}
+            className="relative mt-3 inline-flex items-center gap-2 rounded-full border border-[#ef9d8a]/35 bg-[#ef9d8a]/10 px-3 py-2 text-xs text-[#ffd0c4] transition hover:bg-[#ef9d8a]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f0cf78]"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-600 flex items-center gap-1">
-                <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                High Severity Issues
-              </span>
-            </div>
-            <div className="text-2xl font-semibold text-slate-900 mt-1.5">
-              {metrics.high_severity_exceptions_count}
-            </div>
-            <span className="text-xs text-slate-500 mt-0.5 block">Needs investigation &rarr;</span>
-          </div>
-
-          {/* Card 4: Action Required (Awaiting Vendor) */}
-          <div
-            onClick={() => handleFilterClick('ACTION_REQUIRED', 'ALL', false, false)}
-            className="bg-white p-4 hover:bg-slate-50 cursor-pointer transition group"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-600 flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5 text-amber-600" />
-                Clarification Pending
-              </span>
-            </div>
-            <div className="text-2xl font-semibold text-slate-900 mt-1.5">
-              {metrics.awaiting_vendor_count}
-            </div>
-            <span className="text-xs text-slate-500 mt-0.5 block">Waiting on vendors &rarr;</span>
-          </div>
-
-          {/* Card 5: Escalated to Admin */}
-          <div
-            onClick={() => handleFilterClick('ESCALATED', 'ALL', false, false)}
-            className="bg-white p-4 hover:bg-slate-50 cursor-pointer transition group"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-600 flex items-center gap-1">
-                <ShieldAlert className="w-3.5 h-3.5 text-purple-600" />
-                Escalated to Admin
-              </span>
-            </div>
-            <div className="text-2xl font-semibold text-slate-900 mt-1.5">
-              {metrics.escalated_count}
-            </div>
-            <span className="text-xs text-slate-500 mt-0.5 block">Policy review &rarr;</span>
-          </div>
-        </div>
+            <AlertTriangle className="h-3.5 w-3.5" />
+            View {metrics.high_severity_exceptions_count} high severity findings
+          </button>
+        </section>
       )}
 
       {/* Primary Application Queue */}
@@ -200,7 +172,10 @@ export const ReviewerDashboard: React.FC = () => {
           initialSeverity={queueSeverityFilter}
           initialReadyForApproval={queueReadyFilter}
           initialAssignedToMe={assignedToMeOnly}
-          onSelectApplication={(appId) => setSelectedApplicationId(appId)}
+          onSelectApplication={(appId) => {
+            setSelectedApplicationTab('OVERVIEW');
+            setSelectedApplicationId(appId);
+          }}
         />
       </div>
     </div>

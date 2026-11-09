@@ -9,10 +9,12 @@ import {
 import { exceptionsApi } from '../../api/exceptions';
 import { apiUploadDocument } from '../../api/applications';
 import type { OnboardingException } from '../../types/exception';
+import type { DocumentSlot } from '../../types/application';
 
 interface VendorExceptionsBannerProps {
   applicationId: string;
   token?: string;
+  documentSlots: DocumentSlot[];
   onCorrectionSubmitted?: () => void;
 }
 
@@ -22,6 +24,7 @@ const readableField = (field: string) =>
 export const VendorExceptionsBanner: React.FC<VendorExceptionsBannerProps> = ({
   applicationId,
   token,
+  documentSlots,
   onCorrectionSubmitted,
 }) => {
   const [exceptions, setExceptions] = useState<OnboardingException[]>([]);
@@ -151,11 +154,11 @@ export const VendorExceptionsBanner: React.FC<VendorExceptionsBannerProps> = ({
       // If document replacement was provided
       const authToken = token || localStorage.getItem('token') || localStorage.getItem('vop_auth_token') || '';
       if (file) {
-        let docType = 'PAN_PROOF';
-        if (exc.category.includes('GST')) docType = 'GST_CERTIFICATE';
-        else if (exc.category.includes('BANK')) docType = 'BANK_PROOF';
-        else if (exc.category.includes('CIN') || exc.category.includes('LLPIN')) docType = 'COI';
-        await apiUploadDocument(authToken, applicationId, docType, file);
+        const requestedSlot = documentSlots.find((slot) => slot.id === exc.related_document_id);
+        if (!requestedSlot) {
+          throw new Error('The requested document slot is no longer available. Contact your procurement representative before uploading.');
+        }
+        await apiUploadDocument(authToken, applicationId, requestedSlot.document_type, file);
       }
 
       // Submit field correction and clarification
@@ -295,7 +298,7 @@ export const VendorExceptionsBanner: React.FC<VendorExceptionsBannerProps> = ({
                     {exc.related_document_id && (
                       <div>
                         <label htmlFor={`replacement-${exc.id}`} className="block text-sm font-semibold text-slate-700 mb-1.5">
-                          Or upload a matching document
+                          Upload a replacement {documentSlots.find((slot) => slot.id === exc.related_document_id)?.title || 'document'}
                         </label>
                         <div className="flex flex-wrap items-center gap-3">
                           <input

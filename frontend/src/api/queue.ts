@@ -94,12 +94,13 @@ export async function apiGetApplicationComprehensiveDetails(
 export async function apiAssignReviewer(
   applicationId: string,
   reviewerUserId: string | null,
+  reason?: string,
   token?: string
 ): Promise<void> {
   const res = await fetch(`${API_BASE}/applications/${applicationId}/assign`, {
     method: 'POST',
     headers: getAuthHeaders(token),
-    body: JSON.stringify({ reviewer_user_id: reviewerUserId }),
+    body: JSON.stringify({ reviewer_user_id: reviewerUserId, reason }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -147,6 +148,7 @@ export async function apiClarifyApplication(
   instructions: string,
   relatedExceptionId?: string,
   relatedField?: string,
+  relatedDocumentId?: string,
   token?: string
 ): Promise<void> {
   const res = await fetch(`${API_BASE}/applications/${applicationId}/request-clarification`, {
@@ -156,6 +158,7 @@ export async function apiClarifyApplication(
       instructions,
       related_exception_id: relatedExceptionId,
       related_field: relatedField,
+      related_document_id: relatedDocumentId,
     }),
   });
   if (!res.ok) {

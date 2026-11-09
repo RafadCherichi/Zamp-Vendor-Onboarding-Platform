@@ -58,6 +58,7 @@ class ReviewerUserResponse(BaseModel):
 
 class ReviewerAssignRequest(BaseModel):
     reviewer_user_id: Optional[str] = None
+    reason: Optional[str] = None
 
 
 class DecisionApproveRequest(BaseModel):
@@ -73,6 +74,7 @@ class DecisionClarificationRequest(BaseModel):
     instructions: str
     related_exception_id: Optional[str] = None
     related_field: Optional[str] = None
+    related_document_id: Optional[str] = None
 
 
 class DecisionEscalateRequest(BaseModel):

@@ -126,6 +126,13 @@ export const ExceptionManagerCard: React.FC<ExceptionManagerCardProps> = ({
           notes: 'Clarification requested by compliance reviewer.',
         });
       } else if (actionType === 'RESOLVE') {
+        if (
+          ['VERIFIED_MANUALLY', 'WAIVED_WITH_JUSTIFICATION', 'OVERRIDDEN_BY_ADMIN', 'DISMISSED_AS_FALSE_POSITIVE'].includes(resolutionType)
+          && !resolutionNotes.trim()
+        ) {
+          setError('Add the evidence or reason that supports this manual resolution.');
+          return;
+        }
         await exceptionsApi.resolveException(activeExcId, {
           resolution_type: resolutionType,
           resolution_notes: resolutionNotes.trim() || undefined,
@@ -481,20 +488,20 @@ export const ExceptionManagerCard: React.FC<ExceptionManagerCardProps> = ({
                   >
                     <option value="CORRECTED_BY_VENDOR">Corrected by Vendor</option>
                     <option value="VERIFIED_MANUALLY">Verified Manually</option>
-                    <option value="DOCUMENT_ACCEPTED_WITH_NOTE">Document Accepted with Note</option>
-                    <option value="EXCEPTION_OVERRIDDEN">Exception Overridden</option>
-                    <option value="CANCELLED_OBSOLETE">Cancelled / Obsolete</option>
+                    <option value="WAIVED_WITH_JUSTIFICATION">Waived with Justification</option>
+                    <option value="OVERRIDDEN_BY_ADMIN">Overridden by Administrator</option>
+                    <option value="DISMISSED_AS_FALSE_POSITIVE">Dismissed as a False Positive</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                    Reviewer Notes / Evidence Rationale
+                    Reviewer Notes / Evidence Rationale {resolutionType !== 'CORRECTED_BY_VENDOR' && '*'}
                   </label>
                   <textarea
                     rows={2}
                     value={resolutionNotes}
                     onChange={(e) => setResolutionNotes(e.target.value)}
-                    placeholder="Document why this resolution was approved..."
+                    placeholder={resolutionType === 'CORRECTED_BY_VENDOR' ? 'Describe what the new evidence corrected (optional if checks now pass)' : 'Record the evidence and reason for this manual decision'}
                     className="w-full p-2.5 text-xs border border-slate-300 rounded-lg focus:outline-none"
                   />
                 </div>

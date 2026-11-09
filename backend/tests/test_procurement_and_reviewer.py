@@ -116,7 +116,9 @@ def test_dashboard_metrics_against_persisted_data(db_session: Session, client: T
     assert data["awaiting_vendor_count"] >= 1
     assert data["open_exceptions_count"] >= 1
     assert data["high_severity_exceptions_count"] >= 1
-    assert data["ready_for_approval_count"] >= 1  # app1 has no exceptions
+    # No exception is not enough: app1 has no completed validation run, so it
+    # must stay out of the ready queue until the same approval gate can pass.
+    assert data["ready_for_approval_count"] == 0
 
 
 def test_queue_search_filter_and_pagination(db_session: Session, client: TestClient):
@@ -206,12 +208,14 @@ def test_reviewer_assignment_and_cross_org_rejection(db_session: Session, client
     db_session.flush()
 
     po_user = User(email=f"po-{tok}@a.com", full_name="PO A", hashed_password="pw")
+    admin_user = User(email=f"admin-{tok}@a.com", full_name="Admin A", hashed_password="pw")
     rev_a = User(email=f"rev-a-{tok}@a.com", full_name="Reviewer A", hashed_password="pw")
     rev_b = User(email=f"rev-b-{tok}@b.com", full_name="Reviewer B", hashed_password="pw")
-    db_session.add_all([po_user, rev_a, rev_b])
+    db_session.add_all([po_user, admin_user, rev_a, rev_b])
     db_session.flush()
 
     db_session.add(OrganisationMember(organisation_id=org1.id, user_id=po_user.id, role=RoleEnum.PROCUREMENT_OFFICER.value))
+    db_session.add(OrganisationMember(organisation_id=org1.id, user_id=admin_user.id, role=RoleEnum.ADMIN.value))
     db_session.add(OrganisationMember(organisation_id=org1.id, user_id=rev_a.id, role=RoleEnum.REVIEWER.value))
     db_session.add(OrganisationMember(organisation_id=org2.id, user_id=rev_b.id, role=RoleEnum.REVIEWER.value))
 
@@ -251,6 +255,29 @@ def test_reviewer_assignment_and_cross_org_rejection(db_session: Session, client
     db_session.refresh(app)
     assert app.assigned_reviewer_id == rev_a.id
     assert app.status == ApplicationStatusEnum.UNDER_REVIEW.value
+
+    # Reviewers cannot reassign work; administrators must record why they do.
+    reviewer_token = create_access_token(data={"sub": rev_a.id})
+    res_reviewer_assign = client.post(
+        f"/api/applications/{app.id}/assign",
+        headers={"Authorization": f"Bearer {reviewer_token}"},
+        json={"reviewer_user_id": None},
+    )
+    assert res_reviewer_assign.status_code == 403
+
+    admin_token = create_access_token(data={"sub": admin_user.id})
+    res_admin_without_reason = client.post(
+        f"/api/applications/{app.id}/assign",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"reviewer_user_id": rev_a.id},
+    )
+    assert res_admin_without_reason.status_code == 400
+    res_admin_with_reason = client.post(
+        f"/api/applications/{app.id}/assign",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"reviewer_user_id": rev_a.id, "reason": "Primary reviewer is covering the case this week."},
+    )
+    assert res_admin_with_reason.status_code == 200
 
     # Verify audit event logged
     audit = (
@@ -460,6 +487,17 @@ def test_scenario_3_clarification_and_rejection_workflows(db_session: Session, c
     db_session.add(app)
     db_session.commit()
 
+    requested_document = Document(
+        application_id=app.id,
+        organisation_id=org.id,
+        document_type=DocumentTypeEnum.GST_CERTIFICATE.value,
+        title="GST Registration Certificate",
+        is_required=True,
+        status="UPLOADED",
+    )
+    db_session.add(requested_document)
+    db_session.commit()
+
     rev_token = create_access_token(data={"sub": rev_user.id})
 
     # 1. Request Clarification without instructions -> Fails
@@ -474,11 +512,20 @@ def test_scenario_3_clarification_and_rejection_workflows(db_session: Session, c
     res_clar = client.post(
         f"/api/applications/{app.id}/request-clarification",
         headers={"Authorization": f"Bearer {rev_token}"},
-        json={"instructions": "Please provide your active GST registration certificate."},
+        json={
+            "instructions": "Please provide your active GST registration certificate.",
+            "related_document_id": requested_document.id,
+        },
     )
     assert res_clar.status_code == 200
     db_session.refresh(app)
     assert app.status == ApplicationStatusEnum.ACTION_REQUIRED.value
+    clarification_task = db_session.query(OnboardingException).filter(
+        OnboardingException.application_id == app.id,
+        OnboardingException.status == ExceptionStatusEnum.ACTION_REQUIRED_FROM_VENDOR.value,
+    ).one()
+    assert clarification_task.related_document_id == requested_document.id
+    assert clarification_task.vendor_action_instruction == "Please provide your active GST registration certificate."
 
     # 3. Reject without reason -> Fails
     res_rej_empty = client.post(
@@ -498,6 +545,83 @@ def test_scenario_3_clarification_and_rejection_workflows(db_session: Session, c
     db_session.refresh(app)
     assert app.status == ApplicationStatusEnum.REJECTED.value
     assert "blacklisted" in app.rejection_reason
+
+
+def test_approval_gate_requires_linked_failure_disposition(db_session: Session):
+    """An unrelated exception cannot mask a failed check; a documented linked dismissal can."""
+    tok = secrets.token_hex(4)
+    org = Organization(name=f"Disposition Org {tok}", slug=f"disposition-org-{tok}")
+    db_session.add(org)
+    db_session.flush()
+    vendor = Vendor(organisation_id=org.id, legal_name="Duplicate Candidate", constitution=ConstitutionEnum.PVT_LTD.value)
+    db_session.add(vendor)
+    db_session.flush()
+    app = Application(
+        reference_number=f"APP-DISPOSITION-{tok}",
+        organisation_id=org.id,
+        vendor_id=vendor.id,
+        legal_name="Duplicate Candidate Ltd",
+        constitution=ConstitutionEnum.PVT_LTD.value,
+        status=ApplicationStatusEnum.UNDER_REVIEW.value,
+    )
+    db_session.add(app)
+    db_session.flush()
+    run = ValidationRun(
+        application_id=app.id,
+        organisation_id=org.id,
+        status="COMPLETED",
+        is_current=True,
+    )
+    db_session.add(run)
+    db_session.flush()
+    finding = ValidationFinding(
+        validation_run_id=run.id,
+        application_id=app.id,
+        check_id="DUPLICATE_VENDOR_MATCH",
+        layer=ValidationLayerEnum.LAYER_D_DUPLICATE.value,
+        check_name="Possible duplicate supplier",
+        status=ValidationStatusEnum.FAILED.value,
+        severity=ValidationSeverityEnum.HIGH.value,
+        explanation="A close match needs a person to compare the records.",
+    )
+    db_session.add(finding)
+    unrelated_exception = OnboardingException(
+        reference_number=f"EXC-UNRELATED-{tok}",
+        organisation_id=org.id,
+        application_id=app.id,
+        vendor_id=vendor.id,
+        category=ExceptionCategoryEnum.PAN_MISMATCH.value,
+        title="Unrelated low priority issue",
+        description="A different check is being reviewed.",
+        severity=ExceptionSeverityEnum.LOW.value,
+        status=ExceptionStatusEnum.OPEN.value,
+        source_check_ids_json='["PAN_FORMAT"]',
+        created_by_role="SYSTEM",
+    )
+    db_session.add(unrelated_exception)
+    db_session.commit()
+
+    service = ReviewerDecisionService(db_session)
+    eligible, reasons = service.check_approval_eligibility(app)
+    assert not eligible
+    assert any("Possible duplicate supplier" in reason for reason in reasons)
+
+    unrelated_exception.status = ExceptionStatusEnum.RESOLVED.value
+    unrelated_exception.source_finding_id = finding.id
+    unrelated_exception.source_check_ids_json = json.dumps([finding.check_id])
+    unrelated_exception.resolution_type = "CORRECTED_BY_VENDOR"
+    unrelated_exception.resolution_notes = "Vendor supplied a correction; rerun is still needed."
+    db_session.commit()
+    eligible, reasons = service.check_approval_eligibility(app)
+    assert not eligible
+    assert any("Possible duplicate supplier" in reason for reason in reasons)
+
+    unrelated_exception.resolution_type = "DISMISSED_AS_FALSE_POSITIVE"
+    unrelated_exception.resolution_notes = "Compared the legal name, tax identifier and registered address; this is a distinct entity."
+    db_session.commit()
+    eligible, reasons = service.check_approval_eligibility(app)
+    assert eligible
+    assert reasons == []
 
 
 def test_application_comprehensive_details_endpoint(db_session: Session, client: TestClient):
