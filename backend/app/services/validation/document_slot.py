@@ -4,14 +4,14 @@ from app.models.application import Application
 from app.models.extraction import DocumentExtractionResult
 
 
-def mismatched_required_document_slots(db: Session, application: Application):
+def mismatched_required_document_slots(db: Session, application: Application, *, extractions=None):
     """Return required slots whose latest file is confidently another known type."""
     mismatches = []
     for document in application.documents:
         if not document.is_required or document.status != "UPLOADED" or not document.versions:
             continue
         latest_version = document.versions[0]
-        extraction = (
+        extraction = extractions.get(latest_version.id) if extractions is not None else (
             db.query(DocumentExtractionResult)
             .filter(DocumentExtractionResult.document_version_id == latest_version.id)
             .first()

@@ -1,3 +1,4 @@
+from testdata.browser_support import launch_browser
 import os
 import sys
 import time
@@ -5,12 +6,13 @@ import json
 import shutil
 import urllib.request
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent / "backend"))
 from playwright.sync_api import sync_playwright
 
-CHROME_PATH = r"C:\Users\91994\AppData\Local\ms-playwright\chromium-1234\chrome-win64\chrome.exe"
-BASE_URL = "http://127.0.0.1:5173"
+CHROME_PATH = os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE", "Playwright default / installed Chrome")
+BASE_URL = os.environ.get("ZAMP_PREVIEW_URL", "http://127.0.0.1:8017")
 SCREENSHOTS_DIR = Path("acceptance_screenshots")
-ARTIFACT_SCREENSHOTS_DIR = Path(r"C:\Users\91994\.gemini\antigravity\brain\07ec3ffd-b73a-4ef6-8a19-7f5fc03157b6\acceptance_screenshots")
+ARTIFACT_SCREENSHOTS_DIR = Path(os.environ.get("ZAMP_EVIDENCE_DIR", str(Path(__file__).resolve().parent / "grade_evidence" / "acceptance_screenshots")))
 
 SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
 ARTIFACT_SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -44,8 +46,7 @@ def run_increment2_acceptance():
     results = []
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(
-            executable_path=CHROME_PATH,
+        browser = launch_browser(p,
             headless=True,
             args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu", "--proxy-server=direct://"]
         )
@@ -67,7 +68,7 @@ def run_increment2_acceptance():
         page.wait_for_selector("text=Step 1: About Your Business", timeout=12000)
         time.sleep(1)
         save_screenshot(page, "inc2_01_step1_about_business.png", "Step 1: About Your Business with plain English labels")
-        
+
         # Verify plain-English UI copy
         assert page.is_visible("text=Step 1: About Your Business"), "Step 1 title missing"
         assert page.is_visible("text=Legal Business Name"), "Legal Business Name label missing"
@@ -89,11 +90,11 @@ def run_increment2_acceptance():
         page.wait_for_selector("text=Step 2: Tax Details", timeout=8000)
         time.sleep(1)
         save_screenshot(page, "inc2_03_step2_tax_details.png", "Step 2: Tax Details with clear GST toggle and plain statutory copy")
-        
+
         # Verify Step 2 copy
         assert page.is_visible("text=Step 2: Tax Details"), "Step 2 title missing"
         assert page.is_visible("text=Our business is registered under Goods & Services Tax (GST)"), "GST statement missing"
-        
+
         # Ensure GST toggle is checked
         gst_cb = page.locator("#gst_toggle")
         if not gst_cb.is_checked():
@@ -111,11 +112,11 @@ def run_increment2_acceptance():
         page.wait_for_selector("text=Step 3: Contact Details", timeout=8000)
         time.sleep(1)
         save_screenshot(page, "inc2_04_step3_contact_details.png", "Step 3: Contact Details with mobile and signatory labels")
-        
+
         # Verify Step 3 copy
         assert page.is_visible("text=Step 3: Contact Details"), "Step 3 title missing"
         assert page.is_visible("text=Contact Person Name"), "Contact name label missing"
-        
+
         page.fill("input[placeholder*='e.g. Vikram Malhotra']", "Vikram Malhotra")
         page.fill("input[placeholder*='e.g. Proprietor, Director, Partner, Manager']", "Managing Partner")
         page.fill("input[placeholder*='e.g. contact@company.in']", "vendor@apexcomponents.com")
@@ -132,9 +133,9 @@ def run_increment2_acceptance():
         # Verify Step 4 copy & IFSC
         assert page.is_visible("text=Step 4: Bank Account Details"), "Step 4 title missing"
         assert page.is_visible("text=IFSC Code (11 characters)"), "IFSC label missing"
-        
+
         page.fill("input[placeholder*='Name exactly as printed on cheque or bank statement']", "Apex Components & Fasteners")
-        
+
         # If Change Account Number button is present or account fields are visible
         change_acc_btn = page.locator("button:has-text('Change Account Number')")
         if change_acc_btn.count() > 0:
@@ -174,7 +175,7 @@ def run_increment2_acceptance():
         page.click("label:has-text('Other Business Activities')")
         time.sleep(0.5)
         save_screenshot(page, "inc2_07_step5_other_input_visible.png", "Step 5 dynamic input 'Please specify other business activity' visible")
-        
+
         # Verify dynamic description input is visible
         assert page.is_visible("#other_business_desc"), "Dynamic other activity input not visible!"
 
@@ -233,10 +234,10 @@ def run_increment2_acceptance():
             page.wait_for_selector("text=Open in New Tab", timeout=8000)
             time.sleep(1)
             save_screenshot(page, "inc2_11_step6_preview_modal.png", "Document preview modal with Open in New Tab and Download controls")
-            
+
             assert page.is_visible("a:has-text('Open in New Tab')"), "Open in New Tab link missing in preview"
             assert not page.is_visible("text=Preview rendering not available"), "Preview should NOT show premature error!"
-            
+
             # Close preview modal
             page.click("button:has-text('Close Preview')")
             time.sleep(0.5)
@@ -249,7 +250,7 @@ def run_increment2_acceptance():
             page.wait_for_selector("text=Original Document Preview", timeout=8000)
             time.sleep(1)
             save_screenshot(page, "inc2_11b_inspect_ocr_modal.png", "Inspect OCR extraction modal showing confidence and masked statutory fields")
-            
+
             # Verify Eye toggle button is present on masked fields
             eye_btn = page.locator("button[title*='unmasked value']").first
             if eye_btn.count() > 0:
@@ -272,7 +273,7 @@ def run_increment2_acceptance():
         assert page.is_visible("text=Step 7: Review and Submit"), "Step 7 title missing"
         assert page.is_visible("text=5. What Does Your Business Do?"), "Card 5 heading missing"
         assert page.is_visible("text=Custom precision fabrication and cryogenic valves"), "Custom business activity description missing from review card!"
-        
+
         # Verify Validation findings friendly presentation in Step 7
         assert page.is_visible("text=Application Verification Summary"), "Friendly validation heading missing"
         assert page.is_visible("text=All Checks"), "All Checks tab missing"
@@ -299,7 +300,7 @@ def run_increment2_acceptance():
             page.wait_for_selector("text=Application received", timeout=15000)
             time.sleep(2)
             save_screenshot(page, "inc2_14_post_submission_tracker.png", "Post-submission screen with 4-step progress tracker and verification summary")
-            
+
             # Verify 4-step progress tracker
             assert page.is_visible("text=Application received"), "Progress step 1 missing"
             assert page.is_visible("text=Document review"), "Progress step 2 missing"
@@ -324,7 +325,7 @@ def run_increment2_acceptance():
         page.wait_for_selector("text=Action Needed on Your Application", timeout=10000)
         time.sleep(1)
         save_screenshot(page, "inc2_15_case2_action_needed_banner.png", "Case 2 Action Needed on Your Application banner with clear instructions")
-        
+
         # Verify State A banner copy
         assert page.is_visible("text=Action Needed on Your Application"), "State A banner missing"
         assert not page.is_visible("text=Action Required from Vendor (0)"), "Confusing zero counter must not appear!"
@@ -345,7 +346,7 @@ def run_increment2_acceptance():
 
         page.wait_for_selector("text=Application Evaluation Queue", timeout=10000)
         time.sleep(1)
-        
+
         # Open first application in queue
         view_app_btn = page.locator("button:has-text('Inspect')").first
         if view_app_btn.count() > 0:
@@ -355,7 +356,7 @@ def run_increment2_acceptance():
             page.wait_for_selector("text=Business Activities & Capabilities", timeout=10000)
             time.sleep(1)
             save_screenshot(page, "inc2_16_reviewer_workspace_classification.png", "Reviewer workspace Section 5 showing Business Activities and Capabilities")
-            
+
             assert page.is_visible("text=Business Activities & Capabilities"), "Section 5 heading missing in Reviewer Workspace"
             results.append(("Reviewer Workspace Classification", "PASS", "Reviewer workspace displays Section 5 Business Activities & Capabilities"))
 
@@ -379,7 +380,7 @@ def run_increment2_acceptance():
         mobile_page.wait_for_selector("text=Application received", timeout=12000)
         time.sleep(1)
         save_screenshot(mobile_page, "inc2_17_mobile_progress_tracker.png", "Mobile 390px viewport showing 4-step progress tracker and responsive layout")
-        
+
         assert mobile_page.is_visible("text=Application received"), "Mobile progress tracker missing"
         results.append(("Mobile Viewport Responsiveness (390x844)", "PASS", "Application renders cleanly without horizontal overflow on mobile viewports"))
 

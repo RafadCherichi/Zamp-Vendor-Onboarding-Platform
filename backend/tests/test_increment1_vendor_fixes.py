@@ -185,8 +185,8 @@ def test_missing_mandatory_fields_block_submission_with_actionable_errors(db_ses
 # 5, 6 & 7. Safe Document Preview with Token Authentication
 # ==============================================================================
 
-def test_preview_pdf_with_token_query_param(db_session: Session, client: TestClient):
-    """Requirement 5: Document preview with token query param streams PDF inline."""
+def test_preview_pdf_with_auth_header(db_session: Session, client: TestClient):
+    """Requirement 5: Document preview with an authentication header streams PDF inline."""
     ctx = setup_test_vendor(db_session)
     app_id = ctx["app"].id
     token = ctx["token"]
@@ -194,22 +194,22 @@ def test_preview_pdf_with_token_query_param(db_session: Session, client: TestCli
     # Upload dummy PDF
     pdf_bytes = b"%PDF-1.4\n1 0 obj\n<< /Title (Test Document) >>\nendobj\n%%EOF"
     upload_res = client.post(
-        f"/api/applications/{app_id}/documents/PAN_CARD/upload",
+        f"/api/applications/{app_id}/documents/PAN_PROOF/upload",
         headers={"Authorization": f"Bearer {token}"},
         files={"file": ("pancard.pdf", pdf_bytes, "application/pdf")},
     )
     assert upload_res.status_code == 200
     doc_id = upload_res.json()["id"]
 
-    # Preview using query param `?token=` (no auth header, simulates iframe/img)
-    preview_res = client.get(f"/api/applications/{app_id}/documents/{doc_id}/preview?token={token}")
+    # Fetch private evidence with the account credential in a header.
+    preview_res = client.get(f"/api/applications/{app_id}/documents/{doc_id}/preview", headers={"Authorization": f"Bearer {token}"})
     assert preview_res.status_code == 200
     assert preview_res.headers["content-type"].startswith("application/pdf")
     assert "inline" in preview_res.headers.get("content-disposition", "")
     assert preview_res.content == pdf_bytes
 
 
-def test_preview_image_with_token_query_param(db_session: Session, client: TestClient):
+def test_preview_image_with_auth_header(db_session: Session, client: TestClient):
     """Requirement 6: Document preview with image returns 200 with image/png MIME type."""
     ctx = setup_test_vendor(db_session)
     app_id = ctx["app"].id
@@ -223,14 +223,14 @@ def test_preview_image_with_token_query_param(db_session: Session, client: TestC
         b"IEND\xaeB`\x82"
     )
     upload_res = client.post(
-        f"/api/applications/{app_id}/documents/BANK_ACCOUNT_PROOF/upload",
+        f"/api/applications/{app_id}/documents/BANK_PROOF/upload",
         headers={"Authorization": f"Bearer {token}"},
         files={"file": ("cheque.png", png_bytes, "image/png")},
     )
     assert upload_res.status_code == 200
     doc_id = upload_res.json()["id"]
 
-    preview_res = client.get(f"/api/applications/{app_id}/documents/{doc_id}/preview?token={token}")
+    preview_res = client.get(f"/api/applications/{app_id}/documents/{doc_id}/preview", headers={"Authorization": f"Bearer {token}"})
     assert preview_res.status_code == 200
     assert preview_res.headers["content-type"].startswith("image/png")
     assert "inline" in preview_res.headers.get("content-disposition", "")
@@ -243,12 +243,12 @@ def test_preview_error_handling_clean_response(db_session: Session, client: Test
     token = ctx["token"]
 
     # Nonexistent document ID
-    res1 = client.get(f"/api/applications/{app_id}/documents/nonexistent-id/preview?token={token}")
+    res1 = client.get(f"/api/applications/{app_id}/documents/nonexistent-id/preview", headers={"Authorization": f"Bearer {token}"})
     assert res1.status_code == 404
     assert "not found" in res1.json()["detail"].lower()
 
     # Invalid token
-    res2 = client.get(f"/api/applications/{app_id}/documents/any-id/preview?token=invalid.jwt.token")
+    res2 = client.get(f"/api/applications/{app_id}/documents/any-id/preview", headers={"Authorization": "Bearer invalid.jwt.token"})
     assert res2.status_code == 401
 
 
@@ -492,7 +492,7 @@ def test_mismatched_documents_status_semantics(db_session: Session, client: Test
     # Upload document
     pdf_bytes = b"%PDF-1.4\nTest Document\n%%EOF"
     upload_res = client.post(
-        f"/api/applications/{app.id}/documents/PAN_CARD/upload",
+        f"/api/applications/{app.id}/documents/PAN_PROOF/upload",
         headers={"Authorization": f"Bearer {token}"},
         files={"file": ("pan.pdf", pdf_bytes, "application/pdf")},
     )

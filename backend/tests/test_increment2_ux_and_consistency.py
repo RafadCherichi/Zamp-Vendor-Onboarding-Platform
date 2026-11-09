@@ -187,6 +187,7 @@ class TestIncrement2UXAndConsistency:
         db_session.flush()
         rev_member = OrganisationMember(organisation_id=org.id, user_id=rev_user.id, role=RoleEnum.REVIEWER.value)
         db_session.add(rev_member)
+        app_record.assigned_reviewer_id = rev_user.id
         db_session.commit()
 
         service = QueueAndDashboardService(db_session)

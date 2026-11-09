@@ -9,7 +9,7 @@ from PIL import Image, ImageDraw, ImageFilter
 
 def generate_synthetic_pan_pdf(
     dest_path: str,
-    pan: str = "AAPFU0938L",
+    pan: str = "ABCPV1234F",
     name: str = "VIKRAM MALHOTRA",
     father_name: str = "RAJESH MALHOTRA",
     dob: str = "12/04/1985",
@@ -66,7 +66,7 @@ def generate_synthetic_pan_pdf(
 
 def generate_synthetic_pan_image(
     dest_path: str,
-    pan: str = "AAPFU0938L",
+    pan: str = "ABCPV1234F",
     name: str = "VIKRAM MALHOTRA",
     dob: str = "12/04/1985",
 ) -> str:
@@ -197,7 +197,7 @@ def generate_synthetic_bank_cheque_pdf(
 def generate_synthetic_bank_cheque_image(
     dest_path: str,
     bank_name: str = "HDFC BANK LTD",
-    account_number: str = "9876543210123",
+    account_number: str = "8876543210123",
     ifsc: str = "HDFC0000123",
     holder_name: str = "Apex Components & Fasteners",
 ) -> str:
@@ -233,7 +233,7 @@ def generate_synthetic_bank_cheque_image(
 
 def generate_synthetic_udyam_pdf(
     dest_path: str,
-    udyam_number: str = "UDYAM-MH-02-0012345",
+    udyam_number: str = "UDYAM-MH-02-0054321",
     name: str = "Apex Components & Fasteners",
     enterprise_type: str = "MICRO",
 ) -> str:
@@ -362,6 +362,34 @@ def generate_synthetic_unreadable_image(dest_path: str) -> str:
     return dest_path
 
 
+def generate_synthetic_text_pdf(dest_path: str, lines) -> str:
+    Path(dest_path).parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(dest_path, pagesize=A4)
+    c.setFont("Helvetica", 10)
+    c.drawString(45, 800, "FICTIONAL DEMONSTRATION DOCUMENT - NOT VALID FOR OFFICIAL USE")
+    for index, line in enumerate(lines):
+        c.drawString(45, 760 - index * 28, line)
+    c.save()
+    return dest_path
+
+
+def generate_synthetic_llp_pdf(dest_path: str) -> str:
+    Path(dest_path).parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(dest_path, pagesize=A4)
+    for index, line in enumerate([
+        "FICTIONAL DEMONSTRATION DOCUMENT - NOT VALID FOR OFFICIAL USE",
+        "LIMITED LIABILITY PARTNERSHIP - CERTIFICATE OF INCORPORATION",
+        "LLP AGREEMENT AND REGISTRATION DETAILS",
+        "Apex Logistics & Cargo LLP",
+        "LLPIN: AAA-1234",
+        "Registered office: Unit 5, Transport Nagar, Sion East, Mumbai 400037",
+        "Authorised partner: Anand Mehta",
+    ]):
+        c.drawString(45, 780 - index * 28, line)
+    c.save()
+    return dest_path
+
+
 def generate_all_demo_documents(target_dir: str = "./demo_documents") -> dict:
     """Generates all synthetic demo compliance documents."""
     out_dir = Path(target_dir)
@@ -410,6 +438,12 @@ def generate_all_demo_documents(target_dir: str = "./demo_documents") -> dict:
             signatory_name="Ratan Verma",
         ),
 
+        "pan_logistics_pdf": generate_synthetic_pan_pdf(str(out_dir / "pan_logistics.pdf"), pan="AABFA1234F", name="Apex Logistics & Cargo LLP", father_name="NOT APPLICABLE"),
+        "bank_logistics_pdf": generate_synthetic_bank_cheque_pdf(str(out_dir / "bank_logistics.pdf"), account_number="123456789012", ifsc="SBIN0001234", bank_name="State Bank of India", holder_name="Apex Logistics & Cargo LLP"),
+        "llp_logistics_pdf": generate_synthetic_llp_pdf(str(out_dir / "llp_logistics.pdf")),
+        "authority_logistics_pdf": generate_synthetic_text_pdf(str(out_dir / "authority_logistics.pdf"), ["LETTER OF AUTHORITY - CERTIFIED TRUE COPY", "Apex Logistics & Cargo LLP", "Resolved that Anand Mehta is the authorised signatory", "The partner may sign and execute supplier onboarding documents."]),
+        "permit_logistics_pdf": generate_synthetic_text_pdf(str(out_dir / "permit_logistics.pdf"), ["TRANSPORT COMMISSIONER - CARRIAGE PERMIT", "Motor Vehicles Act - Transport demonstration", "Apex Logistics & Cargo LLP", "Permit number: DEMO-TRANSPORT-2026-003", "Fictional evidence for product testing only"]),
+
         # Case 2 (Sharma Engineering Works)
         "pan_sharma_pdf": generate_synthetic_pan_pdf(
             str(out_dir / "pan_sharma.pdf"),
@@ -429,16 +463,16 @@ def generate_all_demo_documents(target_dir: str = "./demo_documents") -> dict:
         "bank_sharma_png": generate_synthetic_bank_cheque_image(
             str(out_dir / "bank_sharma.png"),
             bank_name="HDFC BANK LTD",
-            # Intended mismatch: Cheque shows 50200012345678, while form declares 9876543210123
-            account_number="50200012345678",
+            # Intended mismatch: Cheque shows 60200012345678, while form declares 9876543210123
+            account_number="60200012345678",
             ifsc="HDFC0000123",
             holder_name="Sharma Engineering Works",
         ),
         "bank_sharma_pdf": generate_synthetic_bank_cheque_pdf(
             str(out_dir / "bank_sharma.pdf"),
             bank_name="HDFC BANK LTD",
-            # Intended mismatch: Cheque shows 50200012345678, while form declares 9876543210123
-            account_number="50200012345678",
+            # Intended mismatch: Cheque shows 60200012345678, while form declares 9876543210123
+            account_number="60200012345678",
             ifsc="HDFC0000123",
             holder_name="Sharma Engineering Works",
         ),
@@ -456,7 +490,7 @@ def generate_all_demo_documents(target_dir: str = "./demo_documents") -> dict:
         "bank_pdf": generate_synthetic_bank_cheque_pdf(
             str(out_dir / "synthetic_cancelled_cheque.pdf"),
             bank_name="HDFC BANK LTD",
-            account_number="9876543210123",
+            account_number="8876543210123",
             ifsc="HDFC0000123",
             holder_name="Apex Components & Fasteners",
         ),

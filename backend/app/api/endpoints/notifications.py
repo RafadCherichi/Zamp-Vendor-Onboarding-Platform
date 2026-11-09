@@ -11,6 +11,20 @@ from app.schemas.notification import NotificationResponse
 router = APIRouter()
 
 
+def visible_notifications(db, member):
+    from sqlalchemy import and_, or_
+    from app.models.application import Application
+    from app.models.exception import OnboardingException
+    from app.models.role import RoleEnum
+    query = db.query(Notification).filter(Notification.organisation_id == member.organisation_id, Notification.recipient_user_id == member.user_id)
+    if member.role == RoleEnum.REVIEWER.value:
+        apps = db.query(Application.id).filter(Application.organisation_id == member.organisation_id, Application.assigned_reviewer_id == member.user_id)
+        issues = db.query(OnboardingException.id).filter(OnboardingException.organisation_id == member.organisation_id, OnboardingException.application_id.in_(apps))
+        query = query.filter(or_(and_(Notification.entity_type == "APPLICATION", Notification.entity_id.in_(apps)), and_(Notification.entity_type.in_(["EXCEPTION", "ONBOARDING_EXCEPTION"]), Notification.entity_id.in_(issues))))
+    return query
+
+
+
 @router.get(
     "/count",
     summary="Get unread notification count",
@@ -19,11 +33,7 @@ def get_unread_notification_count(
     db: Session = Depends(get_db),
     member: OrganisationMember = Depends(get_current_member),
 ) -> dict:
-    unread_count = db.query(Notification.id).filter(
-        Notification.organisation_id == member.organisation_id,
-        Notification.recipient_user_id == member.user_id,
-        Notification.is_read.is_(False),
-    ).count()
+    unread_count = visible_notifications(db, member).filter(Notification.is_read.is_(False)).count()
     return {"unread_count": unread_count}
 
 
@@ -38,10 +48,7 @@ def get_user_notifications(
     db: Session = Depends(get_db),
     member: OrganisationMember = Depends(get_current_member),
 ) -> List[NotificationResponse]:
-    query = db.query(Notification).filter(
-        Notification.organisation_id == member.organisation_id,
-        Notification.recipient_user_id == member.user_id,
-    )
+    query = visible_notifications(db, member)
     if unread_only:
         query = query.filter(Notification.is_read.is_(False))
 
@@ -58,11 +65,7 @@ def mark_notification_read(
     db: Session = Depends(get_db),
     member: OrganisationMember = Depends(get_current_member),
 ) -> NotificationResponse:
-    notif = db.query(Notification).filter(
-        Notification.id == notification_id,
-        Notification.organisation_id == member.organisation_id,
-        Notification.recipient_user_id == member.user_id,
-    ).first()
+    notif = visible_notifications(db, member).filter(Notification.id == notification_id).first()
     if not notif:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
 

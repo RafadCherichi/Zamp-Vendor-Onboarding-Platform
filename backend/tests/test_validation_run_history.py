@@ -95,3 +95,22 @@ def test_validation_run_history_detail_does_not_leak_across_organisations(client
     )
 
     assert response.status_code == 404
+
+
+def test_saved_failed_checks_stay_distinct_from_latest_approval(client, db_session):
+    app = db_session.query(Application).filter_by(reference_number="APP-2026-MISM-002").one()
+    old_status, old_reviewed = app.status, app.reviewed_at
+    try:
+        app.status = "APPROVED"
+        app.reviewed_at = datetime.now(timezone.utc)
+        db_session.commit()
+        token = _token(client, "procurement@apex.com")
+        response = client.get("/api/applications/runs?limit=100", headers={"Authorization": f"Bearer {token}"})
+        item = next(row for row in response.json() if row["application_id"] == app.id and row["failed_count"] > 0)
+        assert item["check_outcome"] == "NEEDS_REVIEW"
+        assert item["application_status"] == "APPROVED"
+        assert item["decision_at"]
+        assert "reviewer approved" not in item["reason"].lower()
+    finally:
+        app.status, app.reviewed_at = old_status, old_reviewed
+        db_session.commit()

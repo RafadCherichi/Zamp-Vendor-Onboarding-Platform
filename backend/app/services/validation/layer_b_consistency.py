@@ -146,6 +146,8 @@ def run_layer_b_checks(app: Application) -> List[Dict[str, Any]]:
                 "extracted_value": None,
                 "external_value": None,
                 "evidence": "PAN document uploaded but OCR failed to extract a structured 10-character PAN.",
+                "source_document_id": doc_id,
+                "source_version_id": ver_id,
                 "explanation": "Document text was unreadable or field was missing in extracted results.",
                 "recommended_action": "Manual review of uploaded PAN proof required.",
             })

@@ -113,14 +113,13 @@ def test_scenario_a_clean_vendor_onboarding_and_approval(db_session: Session, cl
             "legal_name": "Apex Components & Fasteners",
             "trade_name": "Apex Fasteners",
             "constitution": "PROPRIETORSHIP",
-            "pan": "AAPFU0938L",
-            "is_gst_registered": True,
-            "gstin": "27AAPFU0938L1ZV",
+            "pan": "ABCPV1234F",
+            "is_gst_registered": False,
             "contact_name": "Vikram Malhotra",
             "contact_email": f"vendor-{uid}@acme.in",
             "contact_mobile": "+91 98450 12345",
             "bank_account_holder_name": "Apex Components & Fasteners",
-            "bank_account_number": "9876543210123",
+            "bank_account_number": "8876543210123",
             "bank_ifsc": "HDFC0000123",
             "bank_name": "HDFC Bank",
             "registered_address": "Plot 42, Wagle Industrial Estate, Road No. 16",
@@ -144,14 +143,6 @@ def test_scenario_a_clean_vendor_onboarding_and_approval(db_session: Session, cl
             files={"file": ("pan_card.pdf", f, "application/pdf")},
         )
     assert pan_upload.status_code == 200
-
-    with open(demo_docs["gst_pdf"], "rb") as f:
-        gst_upload = client.post(
-            f"/api/applications/{app_id}/documents/GST_CERTIFICATE/upload",
-            headers={"Authorization": f"Bearer {vendor_token}"},
-            files={"file": ("gst_cert.pdf", f, "application/pdf")},
-        )
-    assert gst_upload.status_code == 200
 
     bank_doc = demo_docs.get("bank_pdf", demo_docs["bank_png"])
     ext = "application/pdf" if bank_doc.endswith(".pdf") else "image/png"
@@ -180,6 +171,9 @@ def test_scenario_a_clean_vendor_onboarding_and_approval(db_session: Session, cl
     assert submit_res.status_code == 200
     assert submit_res.json()["status"] == "SUBMITTED"
 
+    assigned = client.post(f"/api/applications/{app_id}/assign", headers={"Authorization": f"Bearer {po_token}"}, json={"reviewer_user_id": rev_user.id})
+    assert assigned.status_code == 200, assigned.text
+
     # Trigger full validation
     val_res = client.post(
         f"/api/applications/{app_id}/validate",
@@ -196,7 +190,7 @@ def test_scenario_a_clean_vendor_onboarding_and_approval(db_session: Session, cl
     assert details_res.status_code == 200
     details = details_res.json()
     assert details["overview"]["reference_number"] is not None
-    assert details["business_details"]["tax_and_registrations"]["pan"].startswith("AA")
+    assert details["business_details"]["tax_and_registrations"]["pan"].startswith("AB")
     assert details["overview"]["is_approval_eligible"] is True
 
     # 7. Reviewer approves application
@@ -255,6 +249,7 @@ def test_scenario_b_mismatch_exception_vendor_correction_revalidation(db_session
     db_session.flush()
 
     app = Application(
+        assigned_reviewer_id=rev_user.id,
         reference_number=f"APP-MISM-{uid}",
         organisation_id=org.id,
         vendor_id=vendor.id,
@@ -362,6 +357,7 @@ def test_scenario_b_mismatch_exception_vendor_correction_revalidation(db_session
     # Ensure mandatory documents and validation evaluation meet policy requirements for final sign-off
     for doc in app.documents:
         doc.status = "UPLOADED"
+    db_session.query(ValidationRun).filter(ValidationRun.application_id == app.id).update({"is_current": False})
     val_run = ValidationRun(
         application_id=app.id,
         organisation_id=org.id,
@@ -375,12 +371,24 @@ def test_scenario_b_mismatch_exception_vendor_correction_revalidation(db_session
     db_session.add(val_run)
     db_session.commit()
 
+    # This synthetic fixture has no readable PAN proof; that independent concern
+    # must also be explicitly reviewed rather than disappear with a new run.
+    for pending in db_session.query(OnboardingException).filter(
+        OnboardingException.application_id == app.id,
+        OnboardingException.status.notin_(["RESOLVED", "CLOSED"]),
+    ).all():
+        reviewed = client.post(f"/api/exceptions/{pending.id}/resolve",
+            headers={"Authorization": f"Bearer {rev_token}"},
+            json={"target_status": "RESOLVED", "reason": "Synthetic manual evidence verification",
+                  "resolution_type": "VERIFIED_MANUALLY", "notes": "Fixture policy setup: proof checked manually."})
+        assert reviewed.status_code == 200, reviewed.text
+
     final_approve = client.post(
         f"/api/applications/{app.id}/approve",
         headers={"Authorization": f"Bearer {rev_token}"},
         json={"decision_notes": "All exceptions resolved. Vendor approved."},
     )
-    assert final_approve.status_code == 200
+    assert final_approve.status_code == 200, final_approve.text
     assert final_approve.json()["status"] == "APPROVED"
 
 
@@ -481,6 +489,7 @@ def test_scenario_d_external_verification_unavailable(db_session: Session, clien
     db_session.flush()
 
     app = Application(
+        assigned_reviewer_id=rev_user.id,
         reference_number=f"APP-TO-{uid}",
         organisation_id=org.id,
         vendor_id=vendor.id,
@@ -564,8 +573,8 @@ def test_scenario_e_duplicate_vendor_candidate_detection(db_session: Session, cl
     db_session.add_all([v1, v2])
     db_session.flush()
 
-    app1 = Application(reference_number=f"APP-DUP-1-{uid}", organisation_id=org.id, vendor_id=v1.id, legal_name="Apex Logistics LLP", constitution=ConstitutionEnum.LLP.value)
-    app2 = Application(reference_number=f"APP-DUP-2-{uid}", organisation_id=org.id, vendor_id=v2.id, legal_name="Apex Logistics & Express LLP", constitution=ConstitutionEnum.LLP.value)
+    app1 = Application(assigned_reviewer_id=rev_user.id, reference_number=f"APP-DUP-1-{uid}", organisation_id=org.id, vendor_id=v1.id, legal_name="Apex Logistics LLP", constitution=ConstitutionEnum.LLP.value)
+    app2 = Application(assigned_reviewer_id=rev_user.id, reference_number=f"APP-DUP-2-{uid}", organisation_id=org.id, vendor_id=v2.id, legal_name="Apex Logistics & Express LLP", constitution=ConstitutionEnum.LLP.value)
     db_session.add_all([app1, app2])
     db_session.flush()
 

@@ -48,6 +48,13 @@ class ExceptionResolutionService:
     def __init__(self, db: Session):
         self.db = db
 
+    def _has_other_vendor_requests(self, exc):
+        return self.db.query(OnboardingException).filter(
+            OnboardingException.application_id == exc.application_id,
+            OnboardingException.id != exc.id,
+            OnboardingException.status == ExceptionStatusEnum.ACTION_REQUIRED_FROM_VENDOR.value,
+        ).first() is not None
+
     def submit_vendor_correction(
         self,
         exception_id: str,
@@ -74,6 +81,9 @@ class ExceptionResolutionService:
         )
 
         app = exc.application
+
+        if exc.related_document_id and not (exc.related_field_name and new_field_value is not None):
+            raise HTTPException(status_code=400, detail="Upload the requested replacement document to answer this request.")
 
         # 1. Handle Field Correction if provided
         target_field = field_name or exc.related_field_name
@@ -105,7 +115,7 @@ class ExceptionResolutionService:
         exc.status = ExceptionStatusEnum.RESPONSE_SUBMITTED.value
 
         # If application was in ACTION_REQUIRED, return it to UNDER_REVIEW for reviewer reassessment
-        if app.status == "ACTION_REQUIRED":
+        if app.status == "ACTION_REQUIRED" and not self._has_other_vendor_requests(exc):
             app.status = "UNDER_REVIEW"
 
         transition = ExceptionTransition(
@@ -196,6 +206,7 @@ class ExceptionResolutionService:
         document_version_id: str,
         user: User,
         explanation: Optional[str] = None,
+        new_field_value: Optional[str] = None,
     ) -> OnboardingException:
         """
         Links a newly uploaded replacement DocumentVersion to the exception,
@@ -205,11 +216,33 @@ class ExceptionResolutionService:
         if not exc:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exception not found")
 
+        if exc.status == ExceptionStatusEnum.RESPONSE_SUBMITTED.value and exc.related_version_id == document_version_id:
+            return exc
+        validate_transition(
+            current_status=exc.status,
+            target_status=ExceptionStatusEnum.RESPONSE_SUBMITTED.value,
+            actor_role=RoleEnum.VENDOR.value,
+            reason=explanation,
+        )
         prev_status = exc.status
+        if new_field_value is not None:
+            target_field = exc.related_field_name
+            if target_field not in PERMITTED_VENDOR_FIELDS:
+                raise HTTPException(status_code=400, detail="This request does not permit a field correction.")
+            previous_value = getattr(exc.application, target_field, None)
+            setattr(exc.application, target_field, new_field_value)
+            sensitive = "pan" in target_field or "bank" in target_field
+            self.db.add(FieldCorrectionRecord(
+                exception_id=exc.id, application_id=exc.application_id, field_name=target_field,
+                previous_value=mask_id(str(previous_value)) if sensitive else str(previous_value) if previous_value else None,
+                new_value=mask_id(new_field_value) if sensitive else new_field_value,
+                changed_by_user_id=user.id, changed_by_role=RoleEnum.VENDOR.value,
+                vendor_explanation=explanation,
+            ))
         exc.related_version_id = document_version_id
         exc.status = ExceptionStatusEnum.RESPONSE_SUBMITTED.value
 
-        if exc.application and exc.application.status == "ACTION_REQUIRED":
+        if exc.application and exc.application.status == "ACTION_REQUIRED" and not self._has_other_vendor_requests(exc):
             exc.application.status = "UNDER_REVIEW"
 
         trans = ExceptionTransition(

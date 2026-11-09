@@ -8,10 +8,8 @@ interface Props {
   onOpenApplication: (id: string) => void;
 }
 
-const outcomeText = (outcome: ValidationRunHistoryItem['outcome']) => ({
-  APPROVED: 'Ready to approve',
-  REJECTED: 'Rejected',
-  PENDING: 'Pending review',
+const outcomeText = (outcome: ValidationRunHistoryItem['check_outcome']) => ({
+  CLEAR: 'Checks clear', NEEDS_REVIEW: 'Needs review', INCOMPLETE: 'Checks incomplete',
 }[outcome]);
 
 const plainReason = (reason: string) => {
@@ -129,7 +127,7 @@ export const ProcessRunHistory: React.FC<Props> = ({ token, onOpenApplication })
                     <div className="font-semibold text-[#26382d]">{run.vendor_name}</div>
                     <div className="mt-1 font-mono text-xs text-[#7b857b]">{run.application_reference}{run.is_current && <span className="ml-2 rounded bg-[#e7f1e8] px-1.5 py-0.5 font-sans text-[10px] font-semibold text-[#245b3b]">Latest</span>}</div>
                   </td>
-                  <td className="px-4 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${outcomeStyle(run.outcome)}`}>{run.outcome === 'APPROVED' ? <Check className="mr-1 h-3.5 w-3.5" /> : run.outcome === 'PENDING' ? <Clock3 className="mr-1 h-3.5 w-3.5" /> : null}{outcomeText(run.outcome)}</span></td>
+                  <td className="px-4 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${outcomeStyle(run.outcome)}`}>{run.check_outcome === 'CLEAR' ? <Check className="mr-1 h-3.5 w-3.5" /> : run.outcome === 'PENDING' ? <Clock3 className="mr-1 h-3.5 w-3.5" /> : null}{outcomeText(run.check_outcome)}</span></td>
                   <td className="px-4 py-4 text-xs text-[#526358]">{findings} checks <span className="text-[#a0a59b]">·</span> {run.passed_count} clear</td>
                   <td className="max-w-sm px-4 py-4 text-xs leading-5 text-[#53645a]">{plainReason(run.reason || run.summary || 'Checks completed.')}</td>
                   <td className="whitespace-nowrap px-6 py-4 text-xs text-[#748076]"><span className="inline-flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5" />{new Date(run.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span></td>
@@ -158,9 +156,9 @@ export const ProcessRunHistory: React.FC<Props> = ({ token, onOpenApplication })
               : detailError ? <div role="alert" className="rounded-lg border border-[#e7c1b7] bg-[#fbefeb] px-4 py-3 text-sm text-[#873e2c]">{detailError}</div>
               : runDetail && <>
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-xl border border-[#d9d8ce] bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-[#7b857b]">Process outcome</p><p className="mt-1 text-sm font-semibold text-[#26382d]">{outcomeText(selectedRun.outcome)}</p></div>
+                  <div className="rounded-xl border border-[#d9d8ce] bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-[#7b857b]">Outcome of this check</p><p className="mt-1 text-sm font-semibold text-[#26382d]">{outcomeText(selectedRun.check_outcome)}</p></div>
                   <div className="rounded-xl border border-[#d9d8ce] bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-[#7b857b]">Findings recorded</p><p className="mt-1 text-sm font-semibold text-[#26382d]">{runDetail.findings.length} total</p></div>
-                  <div className="rounded-xl border border-[#d9d8ce] bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-[#7b857b]">Current case status</p><p className="mt-1 text-sm font-semibold text-[#26382d]">{selectedRun.application_status.replace(/_/g, ' ')}</p></div>
+                  <div className="rounded-xl border border-[#d9d8ce] bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-[#7b857b]">Latest human decision / stage</p><p className="mt-1 text-sm font-semibold text-[#26382d]">{selectedRun.application_status.replace(/_/g, ' ')}</p>{selectedRun.decision_at && <p className="mt-1 text-xs text-slate-500">Recorded {new Date(selectedRun.decision_at).toLocaleString()}</p>}</div>
                 </div>
                 <div className="mt-4 rounded-xl border border-[#d9d8ce] bg-white p-4 sm:p-5">
                   <h3 className="text-sm font-semibold text-[#26382d]">What the checks found</h3>

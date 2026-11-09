@@ -56,3 +56,13 @@ def test_preview_and_details_identify_exact_document_version(client, db_session)
     version_links = [v["preview_url"] for d in details["documents"] if d["id"] == document.id for v in d["versions"]]
     assert len(version_links) >= 2
     assert all("version_id=" in link for link in version_links)
+
+
+def test_preview_rejects_bearer_token_in_query_string(client, db_session):
+    app = db_session.query(Application).filter_by(reference_number="APP-2026-CLEAN-001").one()
+    document = db_session.query(Document).filter_by(application_id=app.id, document_type="PAN_PROOF").one()
+    login = client.post("/api/auth/login", json={"email": "admin@apex.com", "password": "Password123!"})
+    token = login.json()["access_token"]
+    url = f"/api/applications/{app.id}/documents/{document.id}/preview"
+    assert client.get(url, params={"token": token}).status_code == 401
+    assert client.get(url, headers={"Authorization": f"Bearer {token}"}).status_code == 200

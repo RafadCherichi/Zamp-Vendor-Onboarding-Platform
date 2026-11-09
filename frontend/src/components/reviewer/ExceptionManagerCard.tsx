@@ -27,6 +27,19 @@ export const ExceptionManagerCard: React.FC<ExceptionManagerCardProps> = ({
   isReviewer = true,
 }) => {
   const [exceptions, setExceptions] = useState<OnboardingException[]>([]);
+  useEffect(() => {
+    const focusRequest = () => {
+      const id = new URLSearchParams(window.location.search).get('request');
+      if (!id) return;
+      const element = document.getElementById(`request-${id}`);
+      element?.scrollIntoView({ block: 'center', behavior: 'instant' });
+      element?.focus({ preventScroll: true });
+    };
+    focusRequest();
+    window.addEventListener('vop:open-application', focusRequest);
+    return () => window.removeEventListener('vop:open-application', focusRequest);
+  }, [exceptions]);
+
   const [loading, setLoading] = useState<boolean>(true);
   const [syncing, setSyncing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -278,6 +291,8 @@ export const ExceptionManagerCard: React.FC<ExceptionManagerCardProps> = ({
           {filteredExceptions.map((exc) => (
             <div
               key={exc.id}
+              id={`request-${exc.id}`}
+              tabIndex={-1}
               className="p-4 rounded-xl border border-slate-200 bg-slate-50/40 text-xs space-y-3 transition hover:border-slate-300"
             >
               {/* Card Header */}

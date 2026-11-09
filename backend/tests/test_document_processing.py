@@ -50,7 +50,7 @@ def test_pdf_selectable_text_extraction(tmp_path):
     assert result.primary_method == "PDF_TEXT"
     assert result.page_count == 1
     assert "INCOME TAX DEPARTMENT" in result.full_text
-    assert "AAPFU0938L" in result.full_text
+    assert "ABCPV1234F" in result.full_text
     assert "VIKRAM MALHOTRA" in result.full_text
     assert result.average_confidence >= 0.95
 
@@ -68,7 +68,7 @@ def test_image_ocr_neural_vision(tmp_path):
     assert result.page_count == 1
     assert "HDFC" in result.full_text.upper()
     assert "HDFC0000123" in result.full_text
-    assert "9876543210123" in result.full_text
+    assert "8876543210123" in result.full_text
     assert result.average_confidence >= 0.80
 
 

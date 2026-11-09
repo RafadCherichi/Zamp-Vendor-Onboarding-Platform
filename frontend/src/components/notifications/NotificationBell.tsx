@@ -9,6 +9,7 @@ export const NotificationBell: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -71,6 +72,7 @@ export const NotificationBell: React.FC = () => {
 
   const handleOpenNotification = async (notification: Notification) => {
     try {
+      setError(null);
       let applicationId: string | undefined;
       if (notification.entity_type === 'APPLICATION') {
         applicationId = notification.entity_id;
@@ -81,16 +83,23 @@ export const NotificationBell: React.FC = () => {
       }
 
       if (!applicationId) return;
+      const destination = new URL(window.location.href);
+      destination.searchParams.set('application', applicationId);
+      const isRequest = ['EXCEPTION', 'ONBOARDING_EXCEPTION'].includes(notification.entity_type || '');
+      if (isRequest && notification.entity_id) destination.searchParams.set('request', notification.entity_id);
+      else destination.searchParams.delete('request');
+      window.history.pushState({}, '', destination);
       window.dispatchEvent(new CustomEvent('vop:open-application', {
         detail: {
           applicationId,
+          exceptionId: isRequest ? notification.entity_id : undefined,
           initialTab: notification.entity_type === 'EXCEPTION' || notification.entity_type === 'ONBOARDING_EXCEPTION' ? 'EXCEPTIONS' : 'OVERVIEW',
         },
       }));
       setIsOpen(false);
       if (!notification.is_read) await handleMarkAsRead(notification.id);
     } catch (err) {
-      console.error('Could not open notification destination:', err);
+      setError('This notification could not be opened. Try again or refresh your workspace.');
     }
   };
 
@@ -156,6 +165,7 @@ export const NotificationBell: React.FC = () => {
             )}
           </div>
 
+          {error && <p role="alert" className="px-4 py-3 text-sm text-rose-800">{error}</p>}
           <div className="max-h-96 overflow-y-auto divide-y divide-slate-100">
             {loading ? (
               <div className="p-4 text-center text-sm text-slate-500">Loading...</div>

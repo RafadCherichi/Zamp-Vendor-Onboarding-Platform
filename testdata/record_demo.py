@@ -1,6 +1,8 @@
-"""Record one short, silent browser rehearsal of a decision and an edge case."""
+from browser_support import launch_browser
+"""Record a narrated browser rehearsal using a disposable seeded database."""
 
 import json
+import re
 import os
 import socket
 import sys
@@ -37,50 +39,112 @@ with tempfile.TemporaryDirectory(prefix="zamp-recording-", ignore_cleanup_errors
     thread.start()
     while not server.started:
         time.sleep(0.05)
-    started = time.monotonic()
+    import wave, subprocess
+    import imageio_ffmpeg
+    scenes = json.loads((ROOT / "testdata/demo_script.json").read_text(encoding="utf-8"))
+    for index, scene in enumerate(scenes):
+        scene["audio"] = str(OUTPUT / "narration" / f"scene-{index}.wav")
+        with wave.open(scene["audio"]) as sound:
+            scene["duration"] = sound.getnframes() / sound.getframerate()
+    timeline = []
     try:
         with sync_playwright() as pw:
-            browser = pw.chromium.launch(executable_path=str(Path(os.environ["LOCALAPPDATA"]) / "ms-playwright/chromium-1234/chrome-win64/chrome.exe"), headless=True, args=["--disable-gpu", "--no-sandbox"])
-            context = browser.new_context(viewport={"width": 1280, "height": 720}, record_video_dir=str(OUTPUT), record_video_size={"width": 1280, "height": 720})
+            from playwright.sync_api import expect
+            browser = launch_browser(pw, headless=True)
+            context = browser.new_context(viewport={"width":1280,"height":800}, record_video_dir=str(OUTPUT), record_video_size={"width":1280,"height":800}, reduced_motion="reduce")
             page = context.new_page()
-            page.set_default_timeout(15000)
-            page.goto(f"http://127.0.0.1:{port}/web/")
-            page.locator("input[type=email]").fill("reviewer@apex.com")
-            page.locator("input[type=password]").fill("Password123!")
-            page.locator("button[type=submit]").click()
-            page.get_by_text("APP-2026-CLEAN-001").wait_for()
-            page.wait_for_timeout(1800)
-            page.locator("tr").filter(has_text="APP-2026-CLEAN-001").get_by_role("button", name="Inspect").click()
-            page.get_by_text("Approve Vendor", exact=True).wait_for()
-            page.wait_for_timeout(2200)
-            page.get_by_text("Approve Vendor", exact=True).click()
-            page.get_by_text("Approve Vendor Application").wait_for()
-            page.wait_for_timeout(1000)
-            page.get_by_role("button", name="Confirm Approval").click()
-            page.get_by_text("Formal Approval Recorded").wait_for()
-            page.wait_for_timeout(2200)
-            page.get_by_title("Sign out of your session").click()
-            page.locator("input[type=email]").fill("vendor.mismatch@sharmaworks.in")
-            page.locator("input[type=password]").fill("Password123!")
-            page.locator("button[type=submit]").click()
-            page.get_by_text("1 item needs your attention").wait_for()
-            page.wait_for_timeout(2200)
-            page.get_by_label("Correct Bank Account Number").fill("50200012345678")
-            page.get_by_role("button", name="Send response").click()
-            page.wait_for_timeout(2200)
-            edge_text = page.locator("body").inner_text()
+            clock_start = time.monotonic()
+            page.set_default_timeout(20000)
+            base = f"http://127.0.0.1:{port}/"
+            def login(email):
+                page.goto(base)
+                if page.get_by_title("Sign out of your session").count():
+                    page.get_by_title("Sign out of your session").click()
+                page.locator('input[type=email]').fill(email)
+                page.locator('input[type=password]').fill('Password123!')
+                page.locator('button[type=submit]').click()
+                page.get_by_title('Sign out of your session').wait_for()
+            def scene(index, action):
+                print(f"Scene {index + 1}: {scenes[index]['title']}", flush=True)
+                start = time.monotonic()
+                timeline.append({"title":scenes[index]["title"],"start":start-clock_start,"duration":scenes[index]["duration"]})
+                action()
+                remaining = scenes[index]['duration'] + 1 - (time.monotonic()-start)
+                if remaining > 0:
+                    page.wait_for_timeout(remaining*1000)
+            login('vendor@apexcomponents.com')
+            def fill_vendor():
+                page.get_by_role('button',name=re.compile('Fill with demo data: Apex Components')).click()
+                page.get_by_role('status').filter(has_text='ready to review').wait_for(timeout=60000)
+                page.get_by_role('button',name=re.compile('Step 7')).click()
+            scene(0, fill_vendor)
+            def submit_vendor():
+                for checkbox in page.locator('input[type=checkbox]').all():
+                    checkbox.check()
+                page.get_by_role('button',name='Submit Application for Review').click()
+                page.get_by_text('Thank You! Application Submitted Successfully').wait_for()
+            scene(1, submit_vendor)
+            def assign_case():
+                login('procurement@apex.com')
+                card = page.locator('.case-card').filter(has_text='APP-2026-PROP-001')
+                card.get_by_role('combobox').select_option(label='Rajesh Iyer')
+                expect(card.get_by_role('combobox')).to_have_value(re.compile('.+'))
+                card.scroll_into_view_if_needed()
+            scene(2, assign_case)
+            def approve_case():
+                login('reviewer@apex.com')
+                page.locator('.case-card').filter(has_text='APP-2026-PROP-001').get_by_role('button',name='Open case').click()
+                page.get_by_role('button',name='Approve Vendor',exact=True).click()
+                page.get_by_placeholder('Optional approval notes or internal reference...').fill('Evidence reviewed. Onboarding approved for the demonstrated supplier.')
+                page.get_by_role('button',name='Confirm Approval').click()
+                page.get_by_text('Formal Approval Recorded').wait_for()
+            scene(3, approve_case)
+            def vendor_receipt():
+                login('vendor@apexcomponents.com')
+                page.get_by_role('heading',name='Onboarding Application Approved!').wait_for()
+                page.get_by_role('button',name='Notifications',exact=True).click()
+                page.get_by_role('button',name=re.compile('Open: Application Approved')).click()
+                page.get_by_text('Your onboarding application is complete. You have no further tasks in this application.').wait_for()
+            scene(4, vendor_receipt)
+            def correct_bank():
+                login('vendor.mismatch@sharmaworks.in')
+                page.get_by_label('Correct Bank Account Number').fill('60200012345678')
+                page.get_by_placeholder('Tell the reviewer what you changed').fill('Corrected the number to match my uploaded cheque.')
+                page.get_by_role('button',name='Send response').click()
+                page.get_by_role('heading',name=re.compile('Responses Submitted')).wait_for()
+            scene(5, correct_bank)
+            def inspect_reply():
+                login('reviewer@apex.com')
+                card = page.locator('.case-card').filter(has_text='APP-2026-MISM-002')
+                expect(card).to_contain_text('Vendor replied')
+                card.get_by_role('button',name='Open case').click()
+                page.get_by_role('heading',name='Vendor responses to review').wait_for()
+                page.get_by_role('heading',name='Vendor responses to review').scroll_into_view_if_needed()
+            scene(6, inspect_reply)
+            scene(7, lambda: None)
             video = page.video
             page.close()
             context.close()
-            browser.close()
-            duration = time.monotonic() - started
-            assert video is not None
             source = Path(video.path())
-            destination = OUTPUT / "iteration2-demo-rehearsal.webm"
-            source.replace(destination)
-            result = {"duration_seconds": round(duration, 1), "within_five_minutes": duration <= 300, "happy_decision_recorded": True, "edge_response_clicked": True, "edge_screen_excerpt": edge_text[:240], "recording": str(destination)}
-            (ROOT / "testdata/demo_rehearsal_results.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
-            print(json.dumps(result), flush=True)
+            browser.close()
+        trim = timeline[0]['start']
+        ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+        destination = OUTPUT / 'zamp-submission-demo.mp4'
+        command = [ffmpeg,'-y','-ss',str(trim),'-i',str(source)]
+        for item in scenes:
+            command += ['-i',item['audio']]
+        filters = []
+        for index, item in enumerate(timeline):
+            delay = round((item['start']-trim)*1000)
+            filters.append(f'[{index+1}:a]adelay={delay}:all=1[a{index}]')
+        filters.append(''.join(f'[a{i}]' for i in range(len(scenes)))+f'amix=inputs={len(scenes)}:duration=longest:normalize=0[audio]')
+        command += ['-filter_complex',';'.join(filters),'-map','0:v','-map','[audio]','-c:v','libx264','-preset','fast','-crf','22','-c:a','aac','-b:a','128k','-movflags','+faststart','-shortest',str(destination)]
+        subprocess.run(command,check=True,capture_output=True)
+        duration = timeline[-1]['start']-trim+scenes[-1]['duration']
+        assert duration <= 300, duration
+        result = {'duration_seconds':round(duration,1),'within_five_minutes':True,'fresh_ui_submission':True,'procurement_assignment':True,'happy_decision_recorded':True,'vendor_notice_opened':True,'edge_response_saved':True,'reviewer_reply_visible':True,'narration':'Windows system speech; script in demo_script.json','recording':str(destination),'scenes':timeline}
+        (ROOT/'testdata/demo_rehearsal_results.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
+        print(json.dumps(result),flush=True)
     finally:
         server.should_exit = True
         thread.join(2)

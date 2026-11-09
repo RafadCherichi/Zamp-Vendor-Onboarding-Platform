@@ -1,0 +1,3 @@
+# Optional isolated browser evidence and narrated recording tools.
+playwright>=1.49
+imageio-ffmpeg>=0.6

@@ -20,6 +20,18 @@ from app.schemas.invitation import (
 router = APIRouter()
 
 
+def claim_invitation(db, invitation):
+    now = datetime.now(timezone.utc)
+    changed = db.query(Invitation).filter(
+        Invitation.id == invitation.id,
+        Invitation.status == InvitationStatusEnum.PENDING.value,
+        Invitation.expires_at > now,
+    ).update({"status": InvitationStatusEnum.ACCEPTED.value, "accepted_at": now}, synchronize_session=False)
+    if changed != 1:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="This invitation changed or has already been used. Ask the buyer for a current invitation.")
+
+
 def mask_email(email: str) -> str:
     """Mask email for safe public presentation (e.g., v***r@domain.com)."""
     try:
@@ -247,7 +259,7 @@ def accept_invitation(
     db: Session = Depends(get_db),
 ):
     import secrets
-    from app.core.security import hash_password, create_access_token
+    from app.core.security import hash_password, create_access_token, verify_password
     from app.models.user import User
     from app.models.vendor import Vendor
     from app.models.application import Application, ApplicationStatusEnum, ConstitutionEnum
@@ -289,22 +301,15 @@ def accept_invitation(
 
     now = datetime.now(timezone.utc)
 
-    # 1. Create or retrieve User
+    # Prove ownership before claiming a link for an existing account.
     user = db.query(User).filter(User.email == invitation.vendor_email.lower()).first()
+    if user and (not user.is_active or not verify_password(data.password, user.hashed_password)):
+        raise HTTPException(status_code=401, detail="This email already has an account. Enter its existing password to accept the invitation.")
+    claim_invitation(db, invitation)
     if not user:
-        user = User(
-            email=invitation.vendor_email.lower(),
-            hashed_password=hash_password(data.password),
-            full_name=data.full_name or invitation.vendor_name,
-            is_active=True,
-        )
+        user = User(email=invitation.vendor_email.lower(), hashed_password=hash_password(data.password), full_name=data.full_name or invitation.vendor_name, is_active=True)
         db.add(user)
         db.flush()
-    else:
-        # Update password if accepting fresh invite
-        user.hashed_password = hash_password(data.password)
-        if data.full_name:
-            user.full_name = data.full_name
 
     # 2. Establish Organisation Membership as Vendor
     member = (
@@ -324,6 +329,9 @@ def accept_invitation(
         )
         db.add(member)
         db.flush()
+
+    if member.role != RoleEnum.VENDOR.value or not member.is_active:
+        raise HTTPException(status_code=403, detail="This account cannot accept a vendor invitation for this organisation.")
 
     # 3. Mark Invitation Accepted
     invitation.status = InvitationStatusEnum.ACCEPTED.value

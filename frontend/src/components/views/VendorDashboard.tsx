@@ -31,7 +31,7 @@ export const VendorDashboard: React.FC = () => {
   }, [loadApplication]);
 
   useEffect(() => {
-    if (!application || !['SUBMITTED', 'UNDER_REVIEW', 'ACTION_REQUIRED'].includes(application.status)) return;
+    if (!application || !['SUBMITTED', 'UNDER_REVIEW', 'ACTION_REQUIRED', 'ESCALATED'].includes(application.status)) return;
     const refreshWhenVisible = () => {
       if (document.visibilityState === 'visible') loadApplication(true);
     };

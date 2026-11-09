@@ -1,17 +1,16 @@
 {
-  "build": "current frontend/dist",
-  "screens": [
-    "login",
-    "vendor-rejected",
-    "vendor-action",
-    "procurement-runs",
-    "reviewer"
+  "build": "local candidate 2026-11-09",
+  "checks": [
+    "Reviewer cases visible and keyboard filters work at 320px",
+    "Reviewer cases visible and keyboard filters work at 767px",
+    "Reviewer cases visible and keyboard filters work at 768px",
+    "Reviewer cases visible and keyboard filters work at 1440px",
+    "Admin case count and awaiting-review filter match",
+    "Procurement unfinished case filter and draft copy work",
+    "Authenticated exact-version document opens through a blob URL",
+    "Notification opens exact request, restores focus on reload, and fits 320px",
+    "Company-matched autofill uploads required proof; reset restores original draft"
   ],
-  "rejection_reason_visible": true,
-  "rejected_correction_banner_hidden": true,
-  "mobile_no_horizontal_overflow": true,
-  "reviewer_queue_visible": true,
-  "run_history_detail_visible": true,
-  "not_applicable_findings_explicit": true,
-  "high_severity_open_count_excludes_rejected": true
+  "page_errors": [],
+  "pass": true
 }

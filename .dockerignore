@@ -16,3 +16,4 @@ grade_evidence
 acceptance_screenshots
 audit_screenshots
 testdata
+backend/.verify_portal_*

@@ -1,10 +1,11 @@
+from app.schemas.common import UTCResponseModel
 import json
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, ConfigDict, field_validator
 
 
-class ValidationFindingResponse(BaseModel):
+class ValidationFindingResponse(UTCResponseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -26,7 +27,7 @@ class ValidationFindingResponse(BaseModel):
     created_at: datetime
 
 
-class ExternalVerificationResponse(BaseModel):
+class ExternalVerificationResponse(UTCResponseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -56,7 +57,7 @@ class ExternalVerificationResponse(BaseModel):
         return {}
 
 
-class DuplicateSignalResponse(BaseModel):
+class DuplicateSignalResponse(UTCResponseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -85,7 +86,7 @@ class DuplicateSignalResponse(BaseModel):
         return []
 
 
-class AuditEventResponse(BaseModel):
+class AuditEventResponse(UTCResponseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -196,7 +197,7 @@ def get_check_order_weight(check_id: Optional[str], check_name: Optional[str] = 
     return 999
 
 
-class ValidationRunResponse(BaseModel):
+class ValidationRunResponse(UTCResponseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -227,7 +228,7 @@ class ValidationRunResponse(BaseModel):
         return sorted(v, key=get_key)
 
 
-class ValidationRunHistoryItemResponse(BaseModel):
+class ValidationRunHistoryItemResponse(UTCResponseModel):
     """A compact, human-readable record of one real validation execution."""
 
     id: str
@@ -238,6 +239,8 @@ class ValidationRunHistoryItemResponse(BaseModel):
     run_status: str
     outcome: str
     application_status: str
+    check_outcome: str
+    decision_at: Optional[datetime] = None
     summary: Optional[str] = None
     reason: str
     passed_count: int

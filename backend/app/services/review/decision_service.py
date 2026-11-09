@@ -1,15 +1,17 @@
+from app.core.deps import require_case_access
 import json
 import secrets
 from datetime import datetime, timezone
 from typing import List, Tuple, Optional, Dict, Any
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.application import Application, ApplicationStatusEnum
 from app.models.member import OrganisationMember
 from app.models.role import RoleEnum
 from app.models.user import User
 from app.models.document import Document
+from app.models.extraction import DocumentExtractionResult
 from app.models.exception import OnboardingException, ExceptionStatusEnum, ExceptionSeverityEnum, ExceptionTransition
 from app.models.validation import ValidationRun, ValidationFinding, ValidationStatusEnum
 from app.models.audit import AuditEvent
@@ -27,7 +29,29 @@ class ReviewerDecisionService:
     def __init__(self, db: Session):
         self.db = db
 
-    def check_approval_eligibility(self, app: Application) -> Tuple[bool, List[str]]:
+    def prepare_eligibility(self, applications):
+        """Request-local evidence snapshot for read-only queues; never used to approve."""
+        ids = [app.id for app in applications]
+        exceptions = {}
+        runs = {}
+        if not ids:
+            return {"exceptions": exceptions, "runs": runs, "extractions": {}}
+        for exc in self.db.query(OnboardingException).filter(OnboardingException.application_id.in_(ids)).all():
+            exceptions.setdefault(exc.application_id, []).append(exc)
+        for run in self.db.query(ValidationRun).options(selectinload(ValidationRun.findings)).filter(
+            ValidationRun.application_id.in_(ids), ValidationRun.is_current.is_(True)
+        ).all():
+            runs.setdefault(run.application_id, run)
+        version_ids = [doc.versions[0].id for app in applications for doc in app.documents if doc.versions]
+        extractions = {
+            item.document_version_id: item
+            for item in self.db.query(DocumentExtractionResult).filter(
+                DocumentExtractionResult.document_version_id.in_(version_ids)
+            ).all()
+        } if version_ids else {}
+        return {"exceptions": exceptions, "runs": runs, "extractions": extractions}
+
+    def check_approval_eligibility(self, app: Application, *, evidence=None) -> Tuple[bool, List[str]]:
         """
         Evaluates whether an application satisfies all statutory and organizational
         policy prerequisites for formal approval.
@@ -46,14 +70,19 @@ class ReviewerDecisionService:
         for doc in app.documents:
             if doc.is_required and doc.status != "UPLOADED":
                 blocking_reasons.append(f"Mandatory document missing: {doc.title}")
-        for doc, extraction in mismatched_required_document_slots(self.db, app):
+        for doc, extraction in mismatched_required_document_slots(
+            self.db, app, extractions=evidence["extractions"] if evidence is not None else None
+        ):
             blocking_reasons.append(
                 f"Required document has the wrong file type: {doc.title}. "
                 f"The latest upload appears to be {extraction.detected_document_type.replace('_', ' ')}."
             )
 
         # 3. Unresolved Exceptions check (Critical and High strictly block approval)
-        unresolved_exceptions = (
+        unresolved_exceptions = [
+            exc for exc in evidence["exceptions"].get(app.id, [])
+            if exc.status not in [ExceptionStatusEnum.RESOLVED.value, ExceptionStatusEnum.CLOSED.value]
+        ] if evidence is not None else (
             self.db.query(OnboardingException)
             .filter(
                 OnboardingException.application_id == app.id,
@@ -76,7 +105,7 @@ class ReviewerDecisionService:
                 )
 
         # 4. Current Validation Run check
-        current_run = (
+        current_run = evidence["runs"].get(app.id) if evidence is not None else (
             self.db.query(ValidationRun)
             .filter(
                 ValidationRun.application_id == app.id,
@@ -87,22 +116,26 @@ class ReviewerDecisionService:
         if not current_run:
             blocking_reasons.append("No completed validation evaluation on file for this application.")
         else:
+            if current_run.status != "COMPLETED":
+                blocking_reasons.append("Automated checks are incomplete. Retry checks before deciding.")
+            if any(finding.is_stale for finding in current_run.findings):
+                blocking_reasons.append("Evidence changed after checks. Run checks again before deciding.")
             # A provider timeout is unknown evidence, not a clean verification.
             # Staff can retry or document a policy path before approval.
             unavailable_checks = [
                 finding for finding in current_run.findings
-                if finding.status == ValidationStatusEnum.UNAVAILABLE.value
+                if finding.status in [ValidationStatusEnum.UNAVAILABLE.value, ValidationStatusEnum.UNVERIFIED.value]
                 and finding.check_id.startswith("C_")
                 and not finding.is_stale
             ]
             for finding in unavailable_checks:
                 blocking_reasons.append(
-                    f"Verification unavailable: {finding.check_name}. Procurement must retry or escalate before approval."
+                    f"Verification incomplete: {finding.check_name}. Procurement must verify the evidence or escalate before approval."
                 )
             # A different open exception must not mask an unaddressed failed check.
             # Match exceptions by finding ID or check ID and accept only an explicit
             # manual disposition; a vendor correction needs a fresh passing run.
-            application_exceptions = self.db.query(OnboardingException).filter(
+            application_exceptions = evidence["exceptions"].get(app.id, []) if evidence is not None else self.db.query(OnboardingException).filter(
                 OnboardingException.application_id == app.id
             ).all()
             manually_disposed = {
@@ -117,15 +150,20 @@ class ReviewerDecisionService:
             }
             for finding in [
                 item for item in current_run.findings
-                if item.status == ValidationStatusEnum.FAILED.value and not item.is_stale
-            ][:3]:
+                if not item.is_stale and (
+                    item.status == ValidationStatusEnum.FAILED.value
+                    or (item.status == ValidationStatusEnum.UNVERIFIED.value and item.check_id in {
+                        "B_PAN_DOC_CROSS_MATCH", "B_BANK_ACCOUNT_NUM_MATCH"
+                    })
+                )
+            ]:
                 linked_exceptions = []
                 for exception in application_exceptions:
                     try:
                         source_check_ids = json.loads(exception.source_check_ids_json or "[]")
                     except (TypeError, json.JSONDecodeError):
                         source_check_ids = []
-                    if exception.source_finding_id == finding.id or finding.check_id in source_check_ids:
+                    if exception.source_finding_id == finding.id:
                         linked_exceptions.append(exception)
 
                 has_active_exception = any(exc.status not in manually_disposed for exc in linked_exceptions)
@@ -135,7 +173,7 @@ class ReviewerDecisionService:
                     and bool((exc.resolution_notes or "").strip())
                     for exc in linked_exceptions
                 )
-                if not has_active_exception and not has_manual_disposition:
+                if not has_manual_disposition:
                     blocking_reasons.append(
                         f"Validation failure needs review: {finding.check_name}. "
                         "Open its linked issue, document a manual finding, or rerun the check after correction."
@@ -154,7 +192,7 @@ class ReviewerDecisionService:
         Approves an application if all policy requirements are met.
         """
         app = self._get_scoped_app(application_id, actor_member)
-        self._require_review_role(actor_member)
+        self._require_decision_authority(app, actor_member)
 
         is_eligible, blocking_reasons = self.check_approval_eligibility(app)
         if not is_eligible:
@@ -168,7 +206,7 @@ class ReviewerDecisionService:
 
         now = datetime.now(timezone.utc)
         prev_status = app.status
-        app.status = ApplicationStatusEnum.APPROVED.value
+        self._claim_transition(app, ApplicationStatusEnum.APPROVED.value)
         app.reviewed_by_user_id = actor_member.user_id
         app.reviewed_at = now
         app.decision_notes = notes
@@ -225,22 +263,22 @@ class ReviewerDecisionService:
             )
 
         app = self._get_scoped_app(application_id, actor_member)
-        self._require_review_role(actor_member)
+        self._require_decision_authority(app, actor_member)
 
         if app.status in [ApplicationStatusEnum.DRAFT.value, ApplicationStatusEnum.IN_PROGRESS.value]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot reject an application that has not been submitted.",
             )
-        if app.status == ApplicationStatusEnum.REJECTED.value:
+        if app.status in [ApplicationStatusEnum.REJECTED.value, ApplicationStatusEnum.APPROVED.value]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Application is already in rejected state.",
+                detail="A final decision has already been recorded.",
             )
 
         now = datetime.now(timezone.utc)
         prev_status = app.status
-        app.status = ApplicationStatusEnum.REJECTED.value
+        self._claim_transition(app, ApplicationStatusEnum.REJECTED.value)
         app.reviewed_by_user_id = actor_member.user_id
         app.reviewed_at = now
         app.rejection_reason = reason.strip()
@@ -301,7 +339,7 @@ class ReviewerDecisionService:
             )
 
         app = self._get_scoped_app(application_id, actor_member)
-        self._require_review_role(actor_member)
+        self._require_decision_authority(app, actor_member)
 
         if related_document_id:
             related_document = self.db.query(Document).filter(
@@ -312,7 +350,7 @@ class ReviewerDecisionService:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The selected document does not belong to this application.")
 
         prev_status = app.status
-        app.status = ApplicationStatusEnum.ACTION_REQUIRED.value
+        self._claim_transition(app, ApplicationStatusEnum.ACTION_REQUIRED.value)
         app.clarification_requested_at = datetime.now(timezone.utc)
 
         clarification_exception = None
@@ -424,10 +462,10 @@ class ReviewerDecisionService:
             )
 
         app = self._get_scoped_app(application_id, actor_member)
-        self._require_review_role(actor_member)
+        self._require_decision_authority(app, actor_member)
 
         prev_status = app.status
-        app.status = ApplicationStatusEnum.ESCALATED.value
+        self._claim_transition(app, ApplicationStatusEnum.ESCALATED.value)
 
         # Audit event
         audit = AuditEvent(
@@ -451,7 +489,7 @@ class ReviewerDecisionService:
         NotificationService.notify_organisation_role(
             db=self.db,
             organisation_id=app.organisation_id,
-            target_role=target_role,
+            role=target_role.lower(),
             title=f"Escalation Alert: Application {app.reference_number}",
             message=f"Application for {app.legal_name} has been escalated: {reason.strip()}",
             notification_type="ESCALATION",
@@ -474,7 +512,8 @@ class ReviewerDecisionService:
         Assigns or reassigns an application to an internal reviewer within the same organisation.
         """
         app = self._get_scoped_app(application_id, actor_member)
-        self._require_review_role(actor_member)
+        if actor_member.role not in [RoleEnum.ADMIN.value, RoleEnum.PROCUREMENT_OFFICER.value]:
+            raise HTTPException(status_code=403, detail="Procurement or an administrator must assign the decision maker.")
 
         if actor_member.role == RoleEnum.ADMIN.value and not (reason or "").strip():
             raise HTTPException(
@@ -494,9 +533,8 @@ class ReviewerDecisionService:
                 )
                 .first()
             )
-            if not target_member or target_member.role not in [
+            if not target_member or not target_member.is_active or target_member.role not in [
                 RoleEnum.REVIEWER.value,
-                RoleEnum.PROCUREMENT_OFFICER.value,
                 RoleEnum.ADMIN.value,
             ]:
                 raise HTTPException(
@@ -558,7 +596,31 @@ class ReviewerDecisionService:
         )
         if not app:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found.")
+        require_case_access(app, member)
         return app
+
+    def _claim_transition(self, app, target_status):
+        # Compare and write in one statement so concurrent decisions cannot both win.
+        query = self.db.query(Application).filter(
+            Application.id == app.id,
+            Application.organisation_id == app.organisation_id,
+            Application.status == app.status,
+            Application.assigned_reviewer_id == app.assigned_reviewer_id,
+            Application.updated_at == app.updated_at,
+        )
+        changed = query.update({"status": target_status, "updated_at": datetime.now(timezone.utc)}, synchronize_session=False)
+        if changed != 1:
+            self.db.rollback()
+            raise HTTPException(status_code=409, detail="This case changed while you were reviewing it. Refresh the case before deciding.")
+        app.status = target_status
+
+    def _require_decision_authority(self, app, member):
+        if member.role not in [RoleEnum.REVIEWER.value, RoleEnum.ADMIN.value]:
+            raise HTTPException(status_code=403, detail="A reviewer must record this decision.")
+        if app.status not in ["SUBMITTED", "UNDER_REVIEW", "ACTION_REQUIRED", "ESCALATED"]:
+            raise HTTPException(status_code=409, detail="This application is not awaiting a decision.")
+        if app.assigned_reviewer_id != member.user_id:
+            raise HTTPException(status_code=403, detail="Assign this case to the decision maker before recording a decision.")
 
     def _require_review_role(self, member: OrganisationMember):
         if member.role not in [

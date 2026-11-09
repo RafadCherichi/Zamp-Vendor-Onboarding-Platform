@@ -23,6 +23,24 @@ const MainAppContent: React.FC = () => {
     }
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+    const restoreDestination = () => {
+      const params = new URLSearchParams(window.location.search);
+      window.dispatchEvent(new CustomEvent('vop:open-application', {
+        detail: {
+          applicationId: params.get('application') || undefined,
+          exceptionId: params.get('request') || undefined,
+          initialTab: params.get('request') ? 'EXCEPTIONS' : 'OVERVIEW',
+          restore: true,
+        },
+      }));
+    };
+    restoreDestination();
+    window.addEventListener('popstate', restoreDestination);
+    return () => window.removeEventListener('popstate', restoreDestination);
+  }, [user?.id]);
+
   if (inviteToken) {
     return (
       <InviteLandingView

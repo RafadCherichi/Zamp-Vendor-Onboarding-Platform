@@ -116,7 +116,8 @@ def test_exception_generation_and_deduplication(db_session: Session):
         .all()
     )
     pan_exc_count = len([e for e in exceptions_run1 if e.category == ExceptionCategoryEnum.PAN_MISMATCH.value])
-    assert pan_exc_count == 1
+    # Invalid declared PAN and missing readable PAN proof are distinct concerns.
+    assert pan_exc_count == 2
 
     # Run validation again without resolving the issue
     val_run2 = orchestrator.run_full_validation(app.id, user_id=user.id)
@@ -131,7 +132,8 @@ def test_exception_generation_and_deduplication(db_session: Session):
         )
         .all()
     )
-    assert len(exceptions_run2) == 1, "Duplicate open exception created for the same check"
+    assert len(exceptions_run2) == 2, "Duplicate open exception created for the same check"
+    assert len({e.source_check_ids_json for e in exceptions_run2}) == 2
 
 
 def test_scenario_a_missing_document_and_vendor_upload(db_session: Session):

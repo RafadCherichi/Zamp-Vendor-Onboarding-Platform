@@ -1,3 +1,4 @@
+import { focusCaseQueue } from '../../utils/focusCaseQueue';
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { apiResetDemo } from '../../api/client';
@@ -7,12 +8,9 @@ import { ApplicationQueue } from '../queue/ApplicationQueue';
 import { ApplicationDetailsWorkspace } from '../review/ApplicationDetailsWorkspace';
 import {
   ShieldCheck,
-  Building2,
-  Users,
   RotateCcw,
   CheckCircle2,
   AlertTriangle,
-  ArrowUpRight,
 } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
@@ -24,6 +22,7 @@ export const AdminDashboard: React.FC = () => {
   const [resetError, setResetError] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [queueStatusFilter, setQueueStatusFilter] = useState<string>('ALL');
+  const [queueRevision, setQueueRevision] = useState(0);
   const [queueSeverityFilter, setQueueSeverityFilter] = useState<string>('ALL');
 
   useEffect(() => {
@@ -33,7 +32,8 @@ export const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     const openApplication = (event: Event) => {
-      const { applicationId, initialTab } = (event as CustomEvent<{ applicationId?: string; initialTab?: 'OVERVIEW' | 'EXCEPTIONS' }>).detail || {};
+      const { applicationId, initialTab } = (event as CustomEvent<{ applicationId?: string; initialTab?: 'OVERVIEW' | 'EXCEPTIONS'; restore?: boolean }>).detail || {};
+      if (!applicationId && (event as CustomEvent).detail?.restore) setSelectedApplicationId(null);
       if (applicationId) {
         setSelectedApplicationTab(initialTab || 'OVERVIEW');
         setSelectedApplicationId(applicationId);
@@ -65,8 +65,8 @@ export const AdminDashboard: React.FC = () => {
       <ApplicationDetailsWorkspace
         applicationId={selectedApplicationId}
         initialTab={selectedApplicationTab}
-        onBack={() => { setSelectedApplicationId(null); setSelectedApplicationTab('OVERVIEW'); }}
-        onActionComplete={() => setSelectedApplicationId(null)}
+        onBack={() => { window.history.replaceState({}, '', window.location.pathname); setSelectedApplicationId(null); setSelectedApplicationTab('OVERVIEW'); }}
+        onActionComplete={() => { setSelectedApplicationId(null); setQueueRevision(value => value + 1); if (token) apiGetDashboardMetrics(token).then(setMetrics); }}
         isReviewer={true}
       />
     );
@@ -160,24 +160,6 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      <section className="grid grid-cols-1 gap-3 md:grid-cols-3" aria-label="Administrator responsibilities">
-        {[
-          { icon: Building2, title: 'Organisation cases', copy: 'See every supplier application and its current decision stage.', detail: 'Open the full case queue' },
-          { icon: Users, title: 'Clear ownership', copy: 'Make sure each active case has a reviewer who can take the next step.', detail: 'Assignments are recorded' },
-          { icon: ShieldCheck, title: 'Escalations & history', copy: 'Review policy questions and the record of decisions and changes.', detail: 'Keep decisions explainable' },
-        ].map(({ icon: Icon, title, copy, detail }) => (
-          <article key={title} className="group rounded-2xl border border-[#dedbd1] bg-[#fffefa] p-5 transition duration-200 hover:-translate-y-0.5 hover:shadow-md motion-reduce:transform-none motion-reduce:transition-none">
-            <div className="flex items-start justify-between">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#e8eee7] text-[#285b43]"><Icon className="h-5 w-5" /></span>
-              <ArrowUpRight className="h-4 w-4 text-[#a6a294] transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none" />
-            </div>
-            <h3 className="mt-4 font-serif text-xl text-[#243b2f]">{title}</h3>
-            <p className="mt-1 min-h-10 text-sm leading-relaxed text-slate-600">{copy}</p>
-            <p className="mt-3 border-t border-[#ece9df] pt-3 text-[11px] font-semibold uppercase tracking-wide text-[#65766a]">{detail}</p>
-          </article>
-        ))}
-      </section>
-
       {metrics && (
         <section className="relative overflow-hidden rounded-3xl border border-[#dcd8ca] bg-[#f3f0e6] p-5 sm:p-7" aria-label="Organisation workload">
           <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-24 h-64 w-64 rounded-full border border-[#315240]/10" />
@@ -194,13 +176,12 @@ export const AdminDashboard: React.FC = () => {
             {[
               { label: 'Awaiting review', note: 'Cases still need assessment', count: metrics.awaiting_review_count, action: () => { setQueueStatusFilter('AWAITING_REVIEW'); setQueueSeverityFilter('ALL'); }, tone: 'border-[#788c78]/35 bg-white/75' },
               { label: 'Escalated', note: 'Policy or authority question', count: metrics.escalated_count, action: () => { setQueueStatusFilter('ESCALATED'); setQueueSeverityFilter('ALL'); }, tone: 'border-[#c7ae73]/45 bg-[#fbf5e5]' },
-              { label: 'Waiting over 3 days', note: 'Check the next owner', count: metrics.stale_review_count, action: () => { setQueueStatusFilter('AWAITING_REVIEW'); setQueueSeverityFilter('ALL'); }, tone: 'border-[#d79d89]/40 bg-[#fbefeb]' },
+              { label: 'Waiting over 3 days', note: 'Check the next owner', count: metrics.stale_review_count, action: () => { setQueueStatusFilter('OVERDUE_REVIEW'); setQueueSeverityFilter('ALL'); }, tone: 'border-[#d79d89]/40 bg-[#fbefeb]' },
               { label: 'High priority issues', note: 'Review potential blockers', count: metrics.high_severity_exceptions_count, action: () => { setQueueStatusFilter('ALL'); setQueueSeverityFilter('HIGH'); }, tone: 'border-[#d79d89]/50 bg-white/80' },
             ].map((stage, index) => (
-              <button key={stage.label} onClick={stage.action} style={{ animationDelay: `${index * 70}ms` }} className={`group relative min-h-28 animate-[stage-arrive_420ms_cubic-bezier(0.2,0.7,0.2,1)_both] rounded-2xl border p-4 text-left transition duration-200 hover:-translate-y-1 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#315240] motion-reduce:animate-none motion-reduce:transform-none motion-reduce:transition-none ${stage.tone}`}>
+              <button key={stage.label} onClick={() => { stage.action(); focusCaseQueue(); }} style={{ animationDelay: `${index * 70}ms` }} className={`group relative min-h-28 animate-[stage-arrive_420ms_cubic-bezier(0.2,0.7,0.2,1)_both] rounded-2xl border p-4 text-left transition duration-200 hover:-translate-y-1 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#315240] motion-reduce:animate-none motion-reduce:transform-none motion-reduce:transition-none ${stage.tone}`}>
                 <span className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-[#34483a]">{stage.label}</span>
-                  <span className="grid h-7 w-7 place-items-center rounded-full border border-[#72816e]/50 bg-white text-[11px] font-bold text-[#52674f] transition-transform duration-300 group-hover:rotate-12 motion-reduce:transform-none motion-reduce:transition-none">{index + 1}</span>
                 </span>
                 <span className="mt-3 flex items-end justify-between gap-2">
                   <span className="font-serif text-4xl leading-none tabular-nums text-[#243b2f]">{stage.count}</span>
@@ -224,6 +205,7 @@ export const AdminDashboard: React.FC = () => {
         </div>
 
         <ApplicationQueue
+          key={`${queueRevision}-${queueStatusFilter}-${queueSeverityFilter}`}
           initialStatus={queueStatusFilter}
           initialSeverity={queueSeverityFilter}
           onSelectApplication={(appId) => {

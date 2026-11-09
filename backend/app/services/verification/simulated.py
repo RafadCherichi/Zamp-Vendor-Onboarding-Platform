@@ -8,6 +8,26 @@ from app.services.verification.base import (
 )
 
 
+# Independent fictional records shared by the sample forms and proof generators.
+EXTRA_FIXTURES = {
+    "PAN": {"ABCPV1234F": {"registered_name": "VIKRAM MALHOTRA", "status": "VALID_AND_ACTIVE"}, "AABFA1234F": {"registered_name": "Apex Logistics & Cargo LLP", "status": "VALID_AND_ACTIVE"}},
+    "BANK_ACCOUNT": {
+        "123456785678": {"registered_name": "Tata Industrial Supplies Private Limited", "bank_name": "ICICI Bank", "account_status": "ACTIVE"},
+        "8876543210123": {"registered_name": "Apex Components & Fasteners", "bank_name": "HDFC Bank", "account_status": "ACTIVE"},
+        "60200012345678": {"registered_name": "Sharma Engineering Works", "bank_name": "HDFC Bank", "account_status": "ACTIVE"},
+        "123456789012": {"registered_name": "Apex Logistics & Cargo LLP", "bank_name": "State Bank of India", "account_status": "ACTIVE"},
+    },
+    "UDYAM": {"UDYAM-MH-02-0054321": {"enterprise_name": "Apex Components & Fasteners", "enterprise_type": "MICRO", "major_activity": "MANUFACTURING", "status": "ACTIVE"}},
+}
+
+
+def extra_fixture(adapter, identifier, request_id):
+    attributes = EXTRA_FIXTURES.get(adapter.verification_type, {}).get(identifier)
+    if attributes is None:
+        return None
+    return VerificationResult(verification_type=adapter.verification_type, provider_name=adapter.provider_name, request_id=request_id, submitted_identifier=mask_id(identifier), status=VerificationStatus.VERIFIED, is_simulated=True, returned_attributes=dict(attributes), reason="Matched an independent fictional demonstration registry record.", duration_ms=35)
+
+
 def mask_id(val: str) -> str:
     if not val:
         return ""
@@ -34,6 +54,9 @@ class SimulatedPanAdapter(BaseVerificationAdapter):
         start = time.time()
         clean_pan = (identifier or "").strip().upper()
         req_id = f"REQ-PAN-{secrets.token_hex(4).upper()}"
+        fixture = extra_fixture(self, clean_pan, req_id)
+        if fixture:
+            return fixture
 
         # Test case: Service Unavailable
         if "TIMEOUT" in clean_pan or "UNAVAILABLE" in clean_pan:
@@ -65,9 +88,7 @@ class SimulatedPanAdapter(BaseVerificationAdapter):
 
         # Seeded PAN records
         if clean_pan == "AAPFU0938L":
-            reg_name = "VIKRAM MALHOTRA"
-            if context and "Sharma" in str(context.get("legal_name", "")):
-                reg_name = "RAMESH SHARMA"
+            reg_name = "RAMESH SHARMA"
             return VerificationResult(
                 verification_type=self.verification_type,
                 provider_name=self.provider_name,
@@ -103,26 +124,6 @@ class SimulatedPanAdapter(BaseVerificationAdapter):
                 duration_ms=int((time.time() - start) * 1000) + 35,
             )
 
-        # Generic valid PAN format fallback for synthetic testing
-        if len(clean_pan) == 10 and clean_pan[3] in "PCHFATBLJG":
-            reg_name = "REGISTERED ENTITY"
-            if context:
-                reg_name = context.get("legal_name") or context.get("declared_name") or "REGISTERED ENTITY"
-            return VerificationResult(
-                verification_type=self.verification_type,
-                provider_name=self.provider_name,
-                request_id=req_id,
-                submitted_identifier=mask_id(clean_pan),
-                status=VerificationStatus.VERIFIED,
-                is_simulated=True,
-                returned_attributes={
-                    "taxpayer_name": str(reg_name).upper(),
-                    "registered_name": str(reg_name).upper(),
-                    "status": "VALID_AND_ACTIVE",
-                },
-                reason="Synthetic PAN record verified against test registry.",
-                duration_ms=int((time.time() - start) * 1000) + 40,
-            )
 
         return VerificationResult(
             verification_type=self.verification_type,
@@ -132,7 +133,7 @@ class SimulatedPanAdapter(BaseVerificationAdapter):
             status=VerificationStatus.UNVERIFIED,
             is_simulated=True,
             returned_attributes={},
-            reason="Unable to verify: Malformed or unverified PAN identifier.",
+            reason="Identifier is not included in the demo sample registry.",
             duration_ms=int((time.time() - start) * 1000) + 20,
         )
 
@@ -178,11 +179,8 @@ class SimulatedGstAdapter(BaseVerificationAdapter):
             )
 
         if clean_gst == "27AAPFU0938L1ZV":
-            leg_name = "Apex Components & Fasteners"
-            trade_name = "Apex Fasteners"
-            if context and "Sharma" in str(context.get("legal_name", "")):
-                leg_name = "Sharma Engineering Works"
-                trade_name = "Sharma Engineering"
+            leg_name = "Sharma Engineering Works"
+            trade_name = "Sharma Engineering"
             return VerificationResult(
                 verification_type=self.verification_type,
                 provider_name=self.provider_name,
@@ -222,26 +220,6 @@ class SimulatedGstAdapter(BaseVerificationAdapter):
                 duration_ms=int((time.time() - start) * 1000) + 50,
             )
 
-        if len(clean_gst) == 15 and clean_gst[:2].isdigit():
-            gst_name = "REGISTERED TAXPAYER"
-            if context:
-                gst_name = context.get("legal_name") or context.get("declared_name") or "REGISTERED TAXPAYER"
-            return VerificationResult(
-                verification_type=self.verification_type,
-                provider_name=self.provider_name,
-                request_id=req_id,
-                submitted_identifier=mask_id(clean_gst),
-                status=VerificationStatus.VERIFIED,
-                is_simulated=True,
-                returned_attributes={
-                    "legal_name": str(gst_name),
-                    "trade_name": str(gst_name),
-                    "gst_status": "Active",
-                    "gstin_status": "Active",
-                },
-                reason="Synthetic GSTIN confirmed active on sandbox gateway.",
-                duration_ms=int((time.time() - start) * 1000) + 45,
-            )
 
         return VerificationResult(
             verification_type=self.verification_type,
@@ -251,7 +229,7 @@ class SimulatedGstAdapter(BaseVerificationAdapter):
             status=VerificationStatus.UNVERIFIED,
             is_simulated=True,
             returned_attributes={},
-            reason="Unable to verify: GSTIN not found in GSTN database.",
+            reason="Identifier is not included in the demo sample registry.",
             duration_ms=int((time.time() - start) * 1000) + 30,
         )
 
@@ -270,7 +248,7 @@ class SimulatedMcaAdapter(BaseVerificationAdapter):
         clean_id = (identifier or "").strip().upper()
         req_id = f"REQ-MCA-{secrets.token_hex(4).upper()}"
 
-        if "TIMEOUT" in clean_id or "UNAVAILABLE" in clean_id:
+        if clean_id == "AAA-1234" or "TIMEOUT" in clean_id or "UNAVAILABLE" in clean_id:
             return VerificationResult(
                 verification_type=self.verification_type,
                 provider_name=self.provider_name,
@@ -302,27 +280,6 @@ class SimulatedMcaAdapter(BaseVerificationAdapter):
                 duration_ms=int((time.time() - start) * 1000) + 60,
             )
 
-        if len(clean_id) == 21 and (clean_id.startswith("U") or clean_id.startswith("L")):
-            comp_name = "REGISTERED CORPORATE ENTITY"
-            if context:
-                comp_name = context.get("legal_name") or context.get("declared_name") or "REGISTERED CORPORATE ENTITY"
-            return VerificationResult(
-                verification_type=self.verification_type,
-                provider_name=self.provider_name,
-                request_id=req_id,
-                submitted_identifier=mask_id(clean_id),
-                status=VerificationStatus.VERIFIED,
-                is_simulated=True,
-                returned_attributes={
-                    "company_name": str(comp_name),
-                    "company_status": "Active",
-                    "roc": "RoC",
-                    "class_of_company": "Private",
-                    "date_of_incorporation": "01/01/2020",
-                },
-                reason="CIN found in RoC registry with Active status.",
-                duration_ms=int((time.time() - start) * 1000) + 50,
-            )
 
         return VerificationResult(
             verification_type=self.verification_type,
@@ -350,6 +307,9 @@ class SimulatedUdyamAdapter(BaseVerificationAdapter):
         start = time.time()
         clean_udyam = (identifier or "").strip().upper()
         req_id = f"REQ-UDYAM-{secrets.token_hex(4).upper()}"
+        fixture = extra_fixture(self, clean_udyam, req_id)
+        if fixture:
+            return fixture
 
         if "TIMEOUT" in clean_udyam or "UNAVAILABLE" in clean_udyam:
             return VerificationResult(
@@ -409,6 +369,9 @@ class SimulatedBankAccountAdapter(BaseVerificationAdapter):
         clean_acc = (identifier or "").strip()
         ifsc = (context.get("bank_ifsc") or "").strip().upper() if context else ""
         req_id = f"REQ-BANK-{secrets.token_hex(4).upper()}"
+        fixture = extra_fixture(self, clean_acc, req_id)
+        if fixture:
+            return fixture
 
         if "TIMEOUT" in clean_acc or "UNAVAILABLE" in clean_acc:
             return VerificationResult(
@@ -437,9 +400,7 @@ class SimulatedBankAccountAdapter(BaseVerificationAdapter):
             )
 
         if clean_acc == "9876543210123":
-            holder = "Apex Components & Fasteners"
-            if context and ("Sharma" in str(context.get("legal_name", "")) or "Sharma" in str(context.get("bank_account_holder_name", ""))):
-                holder = "Sharma Engineering Works"
+            holder = "Sharma Engineering Works"
             return VerificationResult(
                 verification_type=self.verification_type,
                 provider_name=self.provider_name,
@@ -475,31 +436,6 @@ class SimulatedBankAccountAdapter(BaseVerificationAdapter):
                 duration_ms=int((time.time() - start) * 1000) + 65,
             )
 
-        # Fallback for synthetic accounts
-        if len(clean_acc) >= 9 and len(clean_acc) <= 18 and clean_acc.isdigit():
-            holder = "VERIFIED VENDOR"
-            if context:
-                holder = (
-                    context.get("account_holder_name")
-                    or context.get("bank_account_holder_name")
-                    or context.get("legal_name")
-                    or "VERIFIED VENDOR"
-                )
-            return VerificationResult(
-                verification_type=self.verification_type,
-                provider_name=self.provider_name,
-                request_id=req_id,
-                submitted_identifier=mask_id(clean_acc),
-                status=VerificationStatus.VERIFIED,
-                is_simulated=True,
-                returned_attributes={
-                    "registered_name": str(holder),
-                    "account_status": "ACTIVE",
-                    "imps_response_code": "00_TRANSACTION_SUCCESSFUL",
-                },
-                reason="Penny drop completed successfully on sandbox gateway.",
-                duration_ms=int((time.time() - start) * 1000) + 70,
-            )
 
         return VerificationResult(
             verification_type=self.verification_type,
@@ -509,6 +445,6 @@ class SimulatedBankAccountAdapter(BaseVerificationAdapter):
             status=VerificationStatus.UNVERIFIED,
             is_simulated=True,
             returned_attributes={},
-            reason="Unable to verify bank account on IMPS network.",
+            reason="Identifier is not included in the demo sample registry.",
             duration_ms=int((time.time() - start) * 1000) + 40,
         )

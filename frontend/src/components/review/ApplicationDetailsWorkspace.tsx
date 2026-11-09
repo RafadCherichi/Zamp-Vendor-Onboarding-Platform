@@ -1,3 +1,4 @@
+import { useProtectedDocument } from '../../utils/useProtectedDocument';
 import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft,
@@ -74,6 +75,7 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
 
   // Preview modal
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const protectedPreview = useProtectedDocument(previewUrl, token);
   const [previewTitle, setPreviewTitle] = useState<string>('');
 
   // Modals for Decision Actions
@@ -344,9 +346,10 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
               </div>
               )}
 
+              {!overview.allowed_actions?.includes('REJECT') && <p className="w-full text-xs text-slate-600">Only the assigned decision maker can record a decision. Procurement or an administrator can route this case.</p>}
               {/* Approve is adjacent to ownership: the primary decision stays easy to find. */}
               <button
-                disabled={!overview.is_approval_eligible}
+                disabled={!overview.allowed_actions?.includes('APPROVE')}
                 onClick={() => {
                   setActionError(null);
                   setActiveModal('APPROVE');
@@ -363,6 +366,7 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
 
               {/* Request Clarification */}
               <button
+                disabled={!overview.allowed_actions?.includes('CLARIFY')}
                   onClick={() => {
                   setActionError(null);
                     setClarifyInstructions('');
@@ -377,6 +381,7 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
 
               {/* Escalate */}
               <button
+                disabled={!overview.allowed_actions?.includes('ESCALATE')}
                 onClick={() => {
                   setActionError(null);
                   setActiveModal('ESCALATE');
@@ -389,6 +394,7 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
 
               {/* Reject */}
               <button
+                disabled={!overview.allowed_actions?.includes('REJECT')}
                 onClick={() => {
                   setActionError(null);
                   setActiveModal('REJECT');
@@ -429,6 +435,25 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
           ))}
         </div>
       </div>
+
+      {activeTab === 'OVERVIEW' && exceptions.some(issue => issue.status === 'RESPONSE_SUBMITTED') && (
+        <section aria-label="Vendor responses to review" className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5 space-y-4">
+          <h3 className="text-base font-semibold text-emerald-950">Vendor responses to review</h3>
+          {exceptions.filter(issue => issue.status === 'RESPONSE_SUBMITTED').map(issue => {
+            const reply = [...issue.transitions].reverse().find(item => item.to_status === 'RESPONSE_SUBMITTED');
+            return <article key={issue.id} className="rounded-xl border border-emerald-200 bg-white p-4 text-sm">
+              <h4 className="font-semibold text-slate-900">{issue.title}</h4>
+              {issue.field_corrections.map(change => <div key={change.id} className="mt-2 text-slate-700">
+                <p>{change.field_name.replace(/_/g, ' ')}: <span className="text-slate-500">{change.previous_value || 'Not supplied'}</span> → <strong>{change.new_value}</strong></p>
+                {change.vendor_explanation && <p className="mt-1">Vendor note: {change.vendor_explanation}</p>}
+              </div>)}
+              {reply?.notes && issue.field_corrections.length === 0 && <p className="mt-2 text-slate-700">Vendor note: {reply.notes}</p>}
+              {reply?.created_at && <p className="mt-2 text-xs text-slate-500">Received {new Date(reply.created_at).toLocaleString()}</p>}
+              <button onClick={() => setActiveTab('EXCEPTIONS')} className="mt-3 font-semibold text-emerald-800 underline">Review evidence and record resolution</button>
+            </article>;
+          })}
+        </section>
+      )}
 
       {/* Tab A: Overview & Policy Checklist */}
       {activeTab === 'OVERVIEW' && (
@@ -750,10 +775,7 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
 
                         <button
                           onClick={() => {
-                            const url = ver.preview_url.includes('?')
-                              ? `${ver.preview_url}&token=${encodeURIComponent(token || '')}`
-                              : `${ver.preview_url}?token=${encodeURIComponent(token || '')}`;
-                            setPreviewUrl(url);
+                            setPreviewUrl(ver.preview_url);
                             setPreviewTitle(`${doc.title} (v${ver.version_number})`);
                           }}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium text-xs transition self-start md:self-auto"
@@ -838,7 +860,7 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
                         const sourceDoc = documents.find((doc) => doc.id === f.source_document_id);
                         const sourceVersion = sourceDoc?.versions.find((version) => version.id === f.source_version_id);
                         if (!sourceDoc || !sourceVersion) return <p className="mt-2 text-[11px] text-slate-500">Source document version is no longer available.</p>;
-                        return <button type="button" onClick={() => { const url = sourceVersion.preview_url.includes('?') ? `${sourceVersion.preview_url}&token=${encodeURIComponent(token)}` : `${sourceVersion.preview_url}?token=${encodeURIComponent(token)}`; setPreviewUrl(url); setPreviewTitle(`${sourceDoc.title} (v${sourceVersion.version_number})`); }} className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-slate-800 underline underline-offset-2"><Eye className="h-3 w-3" />Open source: {sourceDoc.title}, version {sourceVersion.version_number}</button>;
+                        return <button type="button" onClick={() => { setPreviewUrl(sourceVersion.preview_url); setPreviewTitle(`${sourceDoc.title} (v${sourceVersion.version_number})`); }} className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-slate-800 underline underline-offset-2"><Eye className="h-3 w-3" />Open source: {sourceDoc.title}, version {sourceVersion.version_number}</button>;
                       })() : f.extracted_value ? <p className="mt-2 text-[11px] text-slate-500">No source document version was recorded for this comparison.</p> : null}
                     </div>
                     {f.recommended_action && (
@@ -1177,7 +1199,7 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
               </button>
             </div>
             <div className="flex-1 bg-slate-100 p-2">
-              <iframe src={previewUrl} className="w-full h-full rounded border border-slate-200 bg-white" title={previewTitle} />
+              {protectedPreview.url ? <iframe src={protectedPreview.url} className="w-full h-full rounded border border-slate-200 bg-white" title={previewTitle} /> : <p role="status" className="p-6 text-sm">{protectedPreview.error || 'Opening document…'}</p>}
             </div>
           </div>
         </div>

@@ -1,17 +1,19 @@
+from testdata.browser_support import launch_browser
 import os
 import sys
 import time
 import json
 import shutil
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent / "backend"))
 from playwright.sync_api import sync_playwright
 from app.database import SessionLocal
 from app.models.invitation import Invitation, InvitationStatusEnum
 
-CHROME_PATH = r"C:\Users\91994\AppData\Local\ms-playwright\chromium-1234\chrome-win64\chrome.exe"
-BASE_URL = "http://127.0.0.1:5173"
+CHROME_PATH = os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE", "Playwright default / installed Chrome")
+BASE_URL = os.environ.get("ZAMP_PREVIEW_URL", "http://127.0.0.1:8017")
 SCREENSHOTS_DIR = Path("acceptance_screenshots")
-ARTIFACT_SCREENSHOTS_DIR = Path(r"C:\Users\91994\.gemini\antigravity\brain\07ec3ffd-b73a-4ef6-8a19-7f5fc03157b6\acceptance_screenshots")
+ARTIFACT_SCREENSHOTS_DIR = Path(os.environ.get("ZAMP_EVIDENCE_DIR", str(Path(__file__).resolve().parent / "grade_evidence" / "acceptance_screenshots")))
 
 SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
 ARTIFACT_SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -38,8 +40,7 @@ def run_acceptance():
     results = []
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(
-            executable_path=CHROME_PATH,
+        browser = launch_browser(p,
             headless=True,
             args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu", "--proxy-server=direct://"]
         )
@@ -60,7 +61,7 @@ def run_acceptance():
         page.wait_for_selector("input[type='email']")
         time.sleep(1)
         save_screenshot(page, "01_login_screen.png", "Initial clean login interface")
-        
+
         assert page.is_visible("text=Vendor Onboarding Platform"), "App title not visible"
         assert page.is_visible("text=Business Email"), "Email label not visible"
         assert page.is_visible("text=Quick-Login Demo Accounts"), "Quick demo logins not visible"
@@ -76,7 +77,7 @@ def run_acceptance():
         page.wait_for_selector("text=Procurement & Onboarding Operations", timeout=10000)
         time.sleep(1)
         save_screenshot(page, "02_procurement_dashboard.png", "Procurement Officer KPI dashboard and active queues")
-        
+
         assert page.is_visible("text=Total Applications"), "KPI Total Applications missing"
         assert page.is_visible("text=Open Exceptions"), "KPI Open Exceptions missing"
         results.append(("Procurement Dashboard KPIs", "PASS", "Dashboard rendered all operational metrics and queues"))
@@ -97,7 +98,7 @@ def run_acceptance():
         page.wait_for_selector("input[placeholder*='Acme Supplies']")
         time.sleep(0.5)
         save_screenshot(page, "03_procurement_invite_modal.png", "Dispatch Vendor Onboarding Invitation modal")
-        
+
         # Fill invitation details
         inv_vendor_name = "Kaveri Precision Industries Pvt Ltd"
         inv_vendor_email = "compliance@kaveriprecision.in"
@@ -184,11 +185,11 @@ def run_acceptance():
         page.click("button:has-text('Approve Vendor')")
         page.wait_for_selector("text=Approve Vendor Application", timeout=5000)
         time.sleep(0.5)
-        
+
         # Fill approval notes
         page.fill("textarea[placeholder*='Optional approval notes']", "All statutory documents verified against external sandbox. Approved for vendor master creation.")
         save_screenshot(page, "10_case1_approve_modal.png", "Formal approval confirmation modal")
-        
+
         page.click("button:has-text('Confirm Approval')")
         page.wait_for_selector("text=Formal Approval Recorded", timeout=8000)
         time.sleep(1)
@@ -227,7 +228,7 @@ def run_acceptance():
         time.sleep(0.5)
         page.fill("textarea[placeholder*='Specify the exact document']", "Please confirm your current registered bank account number. Your application form specifies 9876543210123, while the uploaded cancelled cheque shows 50200012345678. Please update your account number or upload a matching cancelled cheque.")
         save_screenshot(page, "14_case2_clarification_modal.png", "Reviewer clarification request modal with detailed instructions")
-        
+
         page.click("button:has-text('Send Clarification Request')")
         time.sleep(1.5)
         save_screenshot(page, "15_case2_clarification_sent.png", "Clarification requested; status confirmed as ACTION REQUIRED")
@@ -248,7 +249,7 @@ def run_acceptance():
         page.wait_for_selector("text=Action Required from Vendor", timeout=12000)
         time.sleep(1)
         save_screenshot(page, "16_vendor_clarification_banner.png", "Vendor view showing prominent clarification banner")
-        
+
         assert page.is_visible("text=Action Required from Vendor"), "Vendor banner missing"
         assert page.is_visible("text=50200012345678") or page.is_visible("text=cheque"), "Reviewer instructions not displayed"
         results.append(("Vendor Clarification Banner", "PASS", "Vendor clearly alerted of required correction and reviewer note"))
@@ -258,14 +259,14 @@ def run_acceptance():
         if corrected_val_input.count() > 0:
             corrected_val_input.first.fill("50200012345678")
             time.sleep(0.5)
-            
+
             # Optional explanation
             exp_input = page.locator("textarea[placeholder*='Provide details or reasoning']")
             if exp_input.count() > 0:
                 exp_input.first.fill("Updated bank account number to match the uploaded cancelled cheque.")
-                
+
             save_screenshot(page, "17_vendor_entering_correction.png", "Vendor entering corrected bank account number and explanation")
-            
+
             # Submit correction
             page.click("button:has-text('Submit Correction')")
             time.sleep(2)
@@ -327,7 +328,7 @@ def run_acceptance():
         page.wait_for_selector("text=Administrator Control Center", timeout=10000)
         time.sleep(1)
         save_screenshot(page, "22_admin_dashboard.png", "Administrator Dashboard with 1-click Demo Reset control")
-        
+
         assert page.is_visible("text=Administrator Control Center"), "Admin header missing"
         assert page.is_visible("text=Reset & Re-Seed Demo"), "Demo reset button missing"
         results.append(("Administrator Dashboard", "PASS", "Organisation administration and governance workspace verified"))
@@ -355,7 +356,7 @@ def run_acceptance():
         page.wait_for_selector("text=Reviewer & Approver Workspace", timeout=10000)
         time.sleep(1)
         save_screenshot(page, "24_post_reset_pristine_queue.png", "Pristine application queue post-reset verifying reproducibility")
-        
+
         # Verify all 3 cases are back to original pristine state
         assert page.is_visible("text=Tata Industrial Supplies Private Limited"), "Case 1 missing after reset"
         assert page.is_visible("text=Sharma Engineering Works"), "Case 2 missing after reset"

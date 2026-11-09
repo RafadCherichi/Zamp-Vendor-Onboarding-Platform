@@ -80,10 +80,16 @@ export async function apiUploadDocument(
   token: string,
   applicationId: string,
   documentType: string,
-  file: File
+  file: File,
+  response?: { exceptionId: string; explanation?: string; newFieldValue?: string }
 ): Promise<DocumentSlot> {
   const formData = new FormData();
   formData.append('file', file);
+  if (response) {
+    formData.append('exception_id', response.exceptionId);
+    if (response.explanation) formData.append('explanation', response.explanation);
+    if (response.newFieldValue !== undefined) formData.append('new_field_value', response.newFieldValue);
+  }
 
   const res = await fetch(`${API_BASE}/applications/${applicationId}/documents/${documentType}/upload`, {
     method: 'POST',
@@ -119,11 +125,10 @@ export async function apiFetchProcessingProgress(
 
 export function getDocumentPreviewUrl(
   applicationId: string,
-  documentId: string,
-  token?: string
+  documentId: string
 ): string {
   const base = `${API_BASE}/applications/${applicationId}/documents/${documentId}/preview`;
-  return token ? `${base}?token=${encodeURIComponent(token)}` : base;
+  return base;
 }
 
 export async function apiFetchDocumentExtraction(

@@ -99,11 +99,11 @@ def validate_pan_structure(pan: str, constitution: Optional[str] = None) -> Tupl
         "P": "Individual / Sole Proprietor",
         "C": "Company (Private or Public Limited)",
         "H": "Hindu Undivided Family (HUF)",
-        "F": "Partnership Firm",
+        "F": "Firm / Limited Liability Partnership",
         "A": "Association of Persons (AOP)",
         "T": "Trust",
         "B": "Body of Individuals (BOI)",
-        "L": "Limited Liability Partnership (LLP)",
+        "L": "Local Authority",
         "J": "Artificial Juridical Person",
         "G": "Government Agency",
     }
@@ -120,8 +120,8 @@ def validate_pan_structure(pan: str, constitution: Optional[str] = None) -> Tupl
             return False, f"For a Company, PAN 4th character must be 'C' (Company), found '{fourth_char}' ({valid_fourth_chars[fourth_char]})."
         elif const_upper == "PARTNERSHIP" and fourth_char != "F":
             return False, f"For a Partnership Firm, PAN 4th character must be 'F' (Firm), found '{fourth_char}' ({valid_fourth_chars[fourth_char]})."
-        elif const_upper == "LLP" and fourth_char != "L":
-            return False, f"For a Limited Liability Partnership, PAN 4th character must be 'L' (LLP), found '{fourth_char}' ({valid_fourth_chars[fourth_char]})."
+        elif const_upper == "LLP" and fourth_char != "F":
+            return False, f"For a Limited Liability Partnership, PAN 4th character must be 'F' (Firm / LLP), found '{fourth_char}' ({valid_fourth_chars[fourth_char]})."
 
     return True, None
 

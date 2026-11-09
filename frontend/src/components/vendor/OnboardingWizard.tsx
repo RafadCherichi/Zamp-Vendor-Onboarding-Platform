@@ -181,6 +181,12 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
 
   const [application, setApplication] = useState<Application>(initialApplication);
   const unsavedDraftRef = useRef<ApplicationDraftUpdate>({});
+  const pendingSaves = useRef<Promise<unknown>>(Promise.resolve());
+  const enqueueSave = <T,>(operation: () => Promise<T>): Promise<T> => {
+    const result = pendingSaves.current.catch(() => undefined).then(operation);
+    pendingSaves.current = result;
+    return result;
+  };
   const [isSaving, setIsSaving] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
@@ -219,7 +225,7 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
     try {
       // Responses can arrive out of order while someone fills successive fields.
       // Keep the newer local draft; the full save before advancing reconciles it.
-      await apiUpdateApplicationDraft(token, application.id, updates);
+      await enqueueSave(() => apiUpdateApplicationDraft(token, application.id, updates));
     } catch {
       // Local changes remain for explicit save
     }
@@ -229,7 +235,7 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
     setIsSaving(true);
     setSaveSuccessMsg(null);
     try {
-      const updated = await apiUpdateApplicationDraft(token, application.id, {
+      const updated = await enqueueSave(() => apiUpdateApplicationDraft(token, application.id, {
         legal_name: application.legal_name,
         trade_name: application.trade_name || undefined,
         constitution: application.constitution,
@@ -259,7 +265,7 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
         declaration_accurate_info: application.declaration_accurate_info,
         declaration_authorised_rep: application.declaration_authorised_rep,
         declaration_verification_consent: application.declaration_verification_consent,
-      });
+      }));
       const changesMadeWhileSaving = unsavedDraftRef.current;
       for (const [key, value] of Object.entries(changesMadeWhileSaving)) {
         if (value === (application as any)[key]) {
@@ -271,8 +277,10 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
       setSaveSuccessMsg(`Progress saved at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
       setTimeout(() => setSaveSuccessMsg(null), 3000);
       onRefresh(true);
+      return true;
     } catch (err: any) {
       alert(err?.message || 'Failed to save draft progress.');
+      return false;
     } finally {
       setIsSaving(false);
     }
@@ -319,7 +327,7 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
     }
 
     setStepErrors(null);
-    await handleExplicitSave();
+    if (!await handleExplicitSave()) return;
     if (currentStep < STEPS.length - 1) {
       updateStep(currentStep + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -335,7 +343,7 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
   };
 
   const handleDemoAutofill = async (profileId: string) => {
-    const profile = getDemoAutofillProfilesForVendor(application.legal_name).find((item) => item.id === profileId);
+    const profile = getDemoAutofillProfilesForVendor(application.demo_profile_id).find((item) => item.id === profileId);
     if (!profile || autofillProfile) return;
 
     setAutofillProfile(profile.id);
@@ -385,7 +393,7 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
     if (!window.confirm('Start this draft again? Your entered details and uploaded documents will be cleared. Your company account and the other demo cases will stay as they are.')) return;
     setIsResetting(true);
     try {
-      const reset = await apiResetOwnDraft(token, application.id);
+      const reset = await enqueueSave(() => apiResetOwnDraft(token, application.id));
       unsavedDraftRef.current = {};
       setApplication(reset);
       setStepErrors(null);
@@ -516,7 +524,7 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
                 <h3 id="demo-autofill-heading" className="text-sm font-semibold text-slate-900">Need to see the flow first?</h3>
                 <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-600">Load a fictional vendor example with its sample documents. Check every detail, edit it if you like, and make your own declarations before submitting.</p>
                 <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-3">
-                  {getDemoAutofillProfilesForVendor(application.legal_name).map((profile) => (
+                  {getDemoAutofillProfilesForVendor(application.demo_profile_id).map((profile) => (
                     <div key={profile.id} className="rounded-xl border border-amber-100 bg-white/80 p-3">
                       <p className="text-xs font-semibold text-slate-800">{profile.name}</p>
                       <p className="mt-1 min-h-8 text-[11px] leading-snug text-slate-500">{profile.description}</p>
@@ -571,6 +579,7 @@ export const OnboardingWizard: React.FC<WizardProps> = ({
             onGoToStep={(stepIdx) => handleStepClick(stepIdx)}
             onChange={handleFieldChange}
             onSubmitSuccess={onSubmitSuccess}
+            onBeforeSubmit={handleExplicitSave}
           />
         )}
 

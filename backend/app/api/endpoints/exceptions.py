@@ -67,6 +67,9 @@ def list_exceptions(
         .filter(OnboardingException.organisation_id == member.organisation_id)
     )
 
+    if member.role == RoleEnum.REVIEWER.value:
+        query = query.filter(OnboardingException.application_id.in_(db.query(Application.id).filter(Application.organisation_id == member.organisation_id, Application.assigned_reviewer_id == member.user_id)))
+
     # Vendor scoping: Only own applications and only non-internal comments
     if member.role == RoleEnum.VENDOR.value:
         vendor_apps = (
@@ -122,6 +125,7 @@ def get_exception(
     )
     if not exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exception not found")
+    get_scoped_application(exc.application_id, member, db)
 
     # If vendor, ensure ownership
     if member.role == RoleEnum.VENDOR.value:
@@ -253,6 +257,7 @@ def transition_exception(
     )
     if not exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exception not found")
+    get_scoped_application(exc.application_id, member, db)
 
     if (
         payload.target_status in [ExceptionStatusEnum.RESOLVED.value, ExceptionStatusEnum.CLOSED.value]
@@ -362,6 +367,7 @@ def assign_exception(
     )
     if not exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exception not found")
+    get_scoped_application(exc.application_id, member, db)
 
     exc.assigned_user_id = payload.assigned_user_id
     if payload.assigned_role:
@@ -420,6 +426,7 @@ def add_comment(
     )
     if not exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exception not found")
+    get_scoped_application(exc.application_id, member, db)
 
     is_internal = payload.is_internal
     if member.role == RoleEnum.VENDOR.value:
@@ -450,7 +457,7 @@ def submit_correction(
     exception_id: str,
     payload: VendorCorrectionSubmitRequest,
     db: Session = Depends(get_db),
-    member: OrganisationMember = Depends(get_current_member),
+    member: OrganisationMember = Depends(require_roles([RoleEnum.VENDOR])),
 ) -> OnboardingExceptionResponse:
     exc = (
         db.query(OnboardingException)
@@ -462,10 +469,14 @@ def submit_correction(
     )
     if not exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exception not found")
+    get_scoped_application(exc.application_id, member, db)
 
     # Authorisation: Vendors can only correct their own applications
-    if member.role == RoleEnum.VENDOR.value and exc.application.created_by_user_id != member.user_id:
+    if exc.application.created_by_user_id != member.user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    if payload.field_name and payload.field_name != exc.related_field_name:
+        raise HTTPException(status_code=400, detail="Only the field requested by the reviewer can be corrected.")
 
     service = ExceptionResolutionService(db)
     updated_exc = service.submit_vendor_correction(

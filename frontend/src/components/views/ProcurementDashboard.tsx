@@ -1,3 +1,4 @@
+import { focusCaseQueue } from '../../utils/focusCaseQueue';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { apiListInvitations, apiCreateInvitation, apiRevokeInvitation } from '../../api/invitations';
@@ -70,7 +71,8 @@ export const ProcurementDashboard: React.FC = () => {
 
   useEffect(() => {
     const openApplication = (event: Event) => {
-      const { applicationId, initialTab } = (event as CustomEvent<{ applicationId?: string; initialTab?: 'OVERVIEW' | 'EXCEPTIONS' }>).detail || {};
+      const { applicationId, initialTab } = (event as CustomEvent<{ applicationId?: string; initialTab?: 'OVERVIEW' | 'EXCEPTIONS'; restore?: boolean }>).detail || {};
+      if (!applicationId && (event as CustomEvent).detail?.restore) setSelectedApplicationId(null);
       if (applicationId) {
         setSelectedApplicationTab(initialTab || 'OVERVIEW');
         setActiveView('QUEUE');
@@ -130,6 +132,7 @@ export const ProcurementDashboard: React.FC = () => {
     setQueueReadyFilter(readyOnly);
     setActiveView('QUEUE');
     setSelectedApplicationId(null);
+    focusCaseQueue();
   };
 
   if (selectedApplicationId) {
@@ -137,9 +140,9 @@ export const ProcurementDashboard: React.FC = () => {
       <ApplicationDetailsWorkspace
         applicationId={selectedApplicationId}
         initialTab={selectedApplicationTab}
-        onBack={() => { setSelectedApplicationId(null); setSelectedApplicationTab('OVERVIEW'); }}
+        onBack={() => { window.history.replaceState({}, '', window.location.pathname); setSelectedApplicationId(null); setSelectedApplicationTab('OVERVIEW'); }}
         onActionComplete={fetchDashboardData}
-        isReviewer={true}
+        isReviewer={false}
       />
     );
   }
@@ -208,15 +211,14 @@ export const ProcurementDashboard: React.FC = () => {
           <div className="relative mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div aria-hidden="true" className="absolute left-[8%] right-[8%] top-6 hidden border-t border-dashed border-[#e9ca7b]/50 xl:block" />
             {[
-              { label: 'Being completed', note: 'Vendor is filling in details', count: metrics.in_progress_count, onClick: () => navigateToQueueFilter('IN_PROGRESS'), tone: 'border-white/15 bg-white/[0.06]' },
+              { label: 'Being completed', note: 'Vendor is filling in details', count: metrics.in_progress_count, onClick: () => navigateToQueueFilter('BEING_COMPLETED'), tone: 'border-white/15 bg-white/[0.06]' },
               { label: 'In review', note: 'Reviewer is assessing evidence', count: metrics.awaiting_review_count, onClick: () => navigateToQueueFilter('AWAITING_REVIEW'), tone: 'border-[#c4b5fd]/35 bg-[#c4b5fd]/[0.09]' },
-              { label: 'Vendor response', note: 'A clarification is outstanding', count: metrics.awaiting_vendor_count, onClick: () => navigateToQueueFilter('ACTION_REQUIRED'), tone: 'border-[#e9ca7b]/35 bg-[#e9ca7b]/[0.09]' },
+              { label: 'Waiting for vendor', note: 'A clarification is outstanding', count: metrics.awaiting_vendor_count, onClick: () => navigateToQueueFilter('ACTION_REQUIRED'), tone: 'border-[#e9ca7b]/35 bg-[#e9ca7b]/[0.09]' },
               { label: 'Onboarding approved', note: 'Review decision is complete', count: metrics.approved_count, onClick: () => navigateToQueueFilter('APPROVED'), tone: 'border-[#a8d3b4]/35 bg-[#a8d3b4]/[0.09]' },
             ].map((stage, index) => (
               <button key={stage.label} onClick={stage.onClick} style={{ animationDelay: `${index * 70}ms` }} className={`group relative min-h-28 animate-[stage-arrive_420ms_cubic-bezier(0.2,0.7,0.2,1)_both] rounded-2xl border p-4 text-left transition duration-200 hover:-translate-y-1 hover:bg-white/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f0cf78] motion-reduce:animate-none motion-reduce:transform-none motion-reduce:transition-none ${stage.tone}`}>
                 <span className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-[#edf1e9]">{stage.label}</span>
-                  <span className="grid h-7 w-7 place-items-center rounded-full border border-[#f0cf78]/50 bg-[#19382b] text-[11px] font-bold text-[#f0cf78] transition-transform duration-300 group-hover:rotate-12 motion-reduce:transform-none motion-reduce:transition-none">{index + 1}</span>
                 </span>
                 <span className="mt-3 flex items-end justify-between gap-2">
                   <span className="font-serif text-4xl leading-none tabular-nums">{stage.count}</span>

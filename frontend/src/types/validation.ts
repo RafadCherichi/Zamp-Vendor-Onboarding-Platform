@@ -60,6 +60,8 @@ export interface ValidationRunHistoryItem {
   run_type: string;
   run_status: string;
   outcome: 'APPROVED' | 'REJECTED' | 'PENDING';
+  check_outcome: 'CLEAR' | 'NEEDS_REVIEW' | 'INCOMPLETE';
+  decision_at?: string | null;
   application_status: string;
   summary?: string | null;
   reason: string;

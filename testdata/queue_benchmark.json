@@ -1,0 +1,53 @@
+{
+  "environment": "Local SQLite, minimal synthetic cases with empty document collections; one measurement per condition, not a production SLA",
+  "results": [
+    {
+      "cases": 10,
+      "filter": "all",
+      "page_size": 10,
+      "sql_queries": 7,
+      "milliseconds": 18.4,
+      "returned": 10
+    },
+    {
+      "cases": 10,
+      "filter": "ready",
+      "page_size": 10,
+      "sql_queries": 6,
+      "milliseconds": 5.0,
+      "returned": 10
+    },
+    {
+      "cases": 100,
+      "filter": "all",
+      "page_size": 10,
+      "sql_queries": 7,
+      "milliseconds": 4.9,
+      "returned": 10
+    },
+    {
+      "cases": 100,
+      "filter": "ready",
+      "page_size": 10,
+      "sql_queries": 6,
+      "milliseconds": 8.0,
+      "returned": 10
+    },
+    {
+      "cases": 500,
+      "filter": "all",
+      "page_size": 10,
+      "sql_queries": 7,
+      "milliseconds": 5.4,
+      "returned": 10
+    },
+    {
+      "cases": 500,
+      "filter": "ready",
+      "page_size": 10,
+      "sql_queries": 6,
+      "milliseconds": 56.2,
+      "returned": 10
+    }
+  ]
+}

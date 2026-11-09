@@ -75,6 +75,7 @@ export interface DocumentSlot {
 }
 
 export interface Application {
+  demo_profile_id?: string | null;
   id: string;
   reference_number: string;
   organisation_id: string;

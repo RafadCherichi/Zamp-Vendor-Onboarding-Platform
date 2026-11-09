@@ -87,6 +87,7 @@ export interface ApplicationComprehensiveDetails {
     decision_notes?: string;
     rejection_reason?: string;
     is_approval_eligible: boolean;
+    allowed_actions: string[];
     blocking_reasons: string[];
   };
   business_details: {

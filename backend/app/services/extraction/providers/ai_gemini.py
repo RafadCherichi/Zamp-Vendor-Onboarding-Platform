@@ -20,12 +20,14 @@ class GeminiExtractionProvider(BaseExtractionProvider):
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or getattr(settings, "GEMINI_API_KEY", None) or os.getenv("GEMINI_API_KEY")
         self._local_fallback = LocalDeterministicProvider()
+        self._actual_provider = "LOCAL_DETERMINISTIC"
 
     @property
     def provider_name(self) -> str:
-        return "GEMINI_AI" if self.api_key else "LOCAL_DETERMINISTIC"
+        return self._actual_provider
 
     def extract(self, text: str, document_type: str, page_number: int = 1) -> List[ExtractedFieldData]:
+        self._actual_provider = "LOCAL_DETERMINISTIC"
         # If API key is not present, use local deterministic extractor
         if not self.api_key:
             return self._local_fallback.extract(text, document_type, page_number)
@@ -34,6 +36,7 @@ class GeminiExtractionProvider(BaseExtractionProvider):
         try:
             fields = self._call_gemini_api(text, document_type, page_number)
             if fields:
+                self._actual_provider = "GEMINI_AI"
                 return fields
         except Exception as e:
             logger.warning(f"Gemini AI extraction encountered error ({e}); falling back to local deterministic provider.")

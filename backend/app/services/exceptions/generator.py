@@ -31,6 +31,7 @@ class ExceptionGenerator:
         actor_user_id: Optional[str] = None,
         actor_role: str = "SYSTEM",
         validation_run: Optional[ValidationRun] = None,
+        commit: bool = True,
     ) -> List[OnboardingException]:
         app = self.db.query(Application).filter(Application.id == application_id).first()
         if not app:
@@ -86,7 +87,7 @@ class ExceptionGenerator:
                 ValidationStatusEnum.WARNING.value,
                 ValidationStatusEnum.UNAVAILABLE.value,
             ] and not (
-                finding.check_id == "B_BANK_ACCOUNT_NUM_MATCH"
+                finding.check_id in {"B_BANK_ACCOUNT_NUM_MATCH", "B_PAN_DOC_CROSS_MATCH"}
                 and finding.status == ValidationStatusEnum.UNVERIFIED.value
             ):
                 continue
@@ -142,7 +143,10 @@ class ExceptionGenerator:
             created_exceptions.append(new_exc)
             active_by_check_id[check_id] = new_exc
 
-        self.db.commit()
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
         return created_exceptions
 
     def _map_finding_to_exception(self, app: Application, finding: ValidationFinding) -> Optional[dict]:

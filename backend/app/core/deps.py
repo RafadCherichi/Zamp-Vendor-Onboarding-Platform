@@ -110,3 +110,23 @@ def require_roles(allowed_roles: List[RoleEnum]):
         return member
 
     return role_checker
+
+
+def scope_applications(query, member):
+    """Apply organisation and case ownership before returning application data."""
+    from app.models.application import Application
+    from app.models.vendor import Vendor
+    from sqlalchemy import or_
+    query = query.filter(Application.organisation_id == member.organisation_id)
+    if member.role == RoleEnum.REVIEWER.value:
+        query = query.filter(Application.assigned_reviewer_id == member.user_id)
+    elif member.role == RoleEnum.VENDOR.value:
+        query = query.filter(or_(Application.created_by_user_id == member.user_id, Application.vendor.has(Vendor.created_by_user_id == member.user_id)))
+    return query
+
+
+def require_case_access(application, member):
+    if application is None or application.organisation_id != member.organisation_id or (
+        member.role == RoleEnum.REVIEWER.value and application.assigned_reviewer_id != member.user_id
+    ):
+        raise HTTPException(status_code=404, detail="Application not found or no longer assigned to you.")

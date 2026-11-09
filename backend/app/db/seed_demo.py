@@ -240,7 +240,7 @@ def reset_and_seed_demo(db: Session = None) -> dict:
             legal_name="Apex Components & Fasteners",
             trade_name="Apex Fasteners",
             constitution=ConstitutionEnum.PROPRIETORSHIP.value,
-            pan="AAPFU0938L",
+            pan="ABCPV1234F",
         )
         db.add(v_base)
         db.flush()
@@ -463,6 +463,7 @@ def reset_and_seed_demo(db: Session = None) -> dict:
         seed_document(db, app2, "GST_CERTIFICATE", demo_docs["gst_sharma_pdf"], "application/pdf", "gst_certificate_sharma.pdf", vendor2_user.id)
         bank_v2 = seed_document(db, app2, "BANK_PROOF", demo_docs["bank_sharma_pdf"], "application/pdf", "cheque_sharma.pdf", vendor2_user.id)
         seed_document(db, app2, "UDYAM_CERTIFICATE", demo_docs["udyam_sharma_pdf"], "application/pdf", "udyam_cert_sharma.pdf", vendor2_user.id)
+        seed_document(db, app2, "CONSTITUTION_PROOF", demo_docs["udyam_sharma_pdf"], "application/pdf", "establishment_sharma.pdf", vendor2_user.id)
 
         # Run validation
         run2 = orchestrator.run_full_validation(
@@ -484,7 +485,7 @@ def reset_and_seed_demo(db: Session = None) -> dict:
             raise RuntimeError("Seeded bank mismatch did not produce an exception")
         exc2.reference_number = "EXC-2026-0001"
         exc2.title = "Bank Account Number Mismatch between Form and Cancelled Cheque"
-        exc2.description = "The registered bank account number '9876543210123' does not match the account number '50200012345678' extracted from the uploaded cheque."
+        exc2.description = "The registered bank account number '9876543210123' does not match the account number '60200012345678' extracted from the uploaded cheque."
         exc2.severity = ExceptionSeverityEnum.HIGH.value
         exc2.status = ExceptionStatusEnum.ACTION_REQUIRED_FROM_VENDOR.value
         exc2.related_document_id = bank_doc.id if bank_doc else None
@@ -492,7 +493,7 @@ def reset_and_seed_demo(db: Session = None) -> dict:
         exc2.source_check_ids_json = json.dumps(["B_BANK_ACCOUNT_NUM_MATCH"])
         exc2.assigned_user_id = rev_user.id
         exc2.assigned_role = RoleEnum.REVIEWER.value
-        exc2.vendor_action_instruction = "Please check your bank account number. The form shows 9876543210123, while your cheque shows 50200012345678. Update the number or upload a matching cheque."
+        exc2.vendor_action_instruction = "Please check your bank account number. The form shows 9876543210123, while your cheque shows 60200012345678. Update the number or upload a matching cheque."
         db.flush()
 
         # Transitions & Comments
@@ -558,7 +559,7 @@ def reset_and_seed_demo(db: Session = None) -> dict:
             legal_name="Apex Logistics & Cargo LLP",
             trade_name="Apex Cargo",
             constitution=ConstitutionEnum.LLP.value,
-            pan="AABCA1234F",
+            pan="AABFA1234F",
         )
         db.add(vendor3)
         db.flush()
@@ -581,7 +582,7 @@ def reset_and_seed_demo(db: Session = None) -> dict:
             city="Mumbai",
             state="Maharashtra",
             pincode="400037",
-            pan="AABCA1234F",
+            pan="AABFA1234F",
             is_gst_registered=False,
             cin_llpin="AAA-1234",
             contact_name="Anand Mehta",
@@ -605,8 +606,13 @@ def reset_and_seed_demo(db: Session = None) -> dict:
         sync_application_documents(db, app3)
 
         # Upload docs for Case 3
-        seed_document(db, app3, "PAN_PROOF", demo_docs["pan_pdf"], "application/pdf", "pan_card_apex_logistics.pdf", vendor3_user.id)
-        seed_document(db, app3, "BANK_PROOF", demo_docs["bank_png"], "image/png", "cheque_apex_logistics.png", vendor3_user.id)
+        seed_document(db, app3, "PAN_PROOF", demo_docs["pan_logistics_pdf"], "application/pdf", "pan_card_apex_logistics.pdf", vendor3_user.id)
+        seed_document(db, app3, "BANK_PROOF", demo_docs["bank_logistics_pdf"], "application/pdf", "cheque_apex_logistics.pdf", vendor3_user.id)
+
+        seed_document(db, app3, "CONSTITUTION_PROOF", demo_docs["llp_logistics_pdf"], "application/pdf", "llp_logistics.pdf", vendor3_user.id)
+
+        seed_document(db, app3, "SIGNATORY_PROOF", demo_docs["authority_logistics_pdf"], "application/pdf", "authority_logistics.pdf", vendor3_user.id)
+        seed_document(db, app3, "INDUSTRY_LICENCE", demo_docs["permit_logistics_pdf"], "application/pdf", "permit_logistics.pdf", vendor3_user.id)
 
         # Run validation for Case 3
         orchestrator.run_full_validation(
@@ -616,22 +622,6 @@ def reset_and_seed_demo(db: Session = None) -> dict:
             trigger_reason="Initial validation run for Case 3",
         )
 
-        # Simulated External Verification Unavailable record
-        ver_unavail = ExternalVerificationRecord(
-            application_id=app3.id,
-            organisation_id=apex_org.id,
-            verification_type="LLPIN",
-            provider_name="Ministry of Corporate Affairs (MCA Simulated Sandbox)",
-            request_id=f"REQ-MCA-{secrets.token_hex(4).upper()}",
-            submitted_identifier="AAA-1234",
-            status="UNAVAILABLE",
-            is_simulated=True,
-            duration_ms=5002,
-            reason="Simulated provider connection timeout (HTTP 504 Gateway Timeout). External registry unreachable after 2 retries.",
-            returned_attributes_json=json.dumps({}),
-        )
-        db.add(ver_unavail)
-
         # Duplicate signal candidate with Case 2
         dup_signal = DuplicateSignal(
             application_id=app3.id,
@@ -639,30 +629,23 @@ def reset_and_seed_demo(db: Session = None) -> dict:
             candidate_application_id=app2.id,
             candidate_vendor_id=app2.vendor_id,
             match_strength="STRONG",
-            explanation="High similarity in legal trade name 'Apex Cargo' and registered address with existing supplier 'Apex Fasteners / Sharma Engineering'.",
+            explanation="Synthetic demonstration: procurement designated this existing supplier as a candidate for manual duplicate review. This is a seeded concern, not a measured similarity result.",
             matching_attributes_json=json.dumps(["trade_name_similarity", "geographic_zone"]),
             recommended_action="Reviewer manual inspection required: verify corporate filings to confirm distinct entity ownership.",
             is_dismissed=False,
         )
         db.add(dup_signal)
 
-        # Exception for Case 3
-        exc3 = OnboardingException(
-            id="exc-warn-002",
-            reference_number="EXC-2026-0002",
-            organisation_id=apex_org.id,
-            application_id=app3.id,
-            vendor_id=app3.vendor_id,
-            title="MCA External Registry Verification Unavailable (HTTP 504 Timeout)",
-            description="The authoritative registry query for LLPIN 'AAA-1234' could not be completed because the simulated MCA external adapter timed out.",
-            category=ExceptionCategoryEnum.EXTERNAL_VERIFICATION_UNAVAILABLE.value,
-            severity=ExceptionSeverityEnum.HIGH.value,
-            status=ExceptionStatusEnum.OPEN.value,
-            assigned_user_id=rev_user.id,
-            assigned_role=RoleEnum.REVIEWER.value,
-            resolution_notes="External provider connection timed out. Reviewer must manually inspect the Certificate of Incorporation or re-trigger verification when the provider is online.",
-        )
-        db.add(exc3)
+        # Route the real unavailable-check issue to reviewer oversight without duplicating it.
+        exc3 = db.query(OnboardingException).filter(
+            OnboardingException.application_id == app3.id,
+            OnboardingException.source_check_ids_json.contains("C_MCA_EXTERNAL_VERIFICATION"),
+        ).first()
+        if not exc3:
+            raise RuntimeError("Seeded logistics timeout did not produce an issue")
+        exc3.severity = ExceptionSeverityEnum.HIGH.value
+        exc3.assigned_user_id = rev_user.id
+        exc3.assigned_role = RoleEnum.REVIEWER.value
 
         # Audit events for Case 3
         db.add(AuditEvent(

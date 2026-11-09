@@ -23,6 +23,7 @@ interface StepProps {
   application: Application;
   onGoToStep: (stepIndex: number) => void;
   onChange: (updates: ApplicationDraftUpdate) => void;
+  onBeforeSubmit: () => Promise<boolean>;
   onSubmitSuccess: (refNumber: string) => void;
 }
 
@@ -37,6 +38,7 @@ export const StepReviewSubmit: React.FC<StepProps> = ({
   application,
   onGoToStep,
   onChange,
+  onBeforeSubmit,
   onSubmitSuccess,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -185,6 +187,11 @@ export const StepReviewSubmit: React.FC<StepProps> = ({
     setStructuredErrors([]);
 
     try {
+      if (!await onBeforeSubmit()) {
+        setIsSubmitting(false);
+        setSubmitError('Your latest changes could not be saved. Please retry before submitting.');
+        return;
+      }
       const res = await apiSubmitApplication(token, application.id);
       onSubmitSuccess(res.reference_number);
     } catch (err: any) {

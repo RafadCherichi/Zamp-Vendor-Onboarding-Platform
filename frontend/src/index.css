@@ -60,3 +60,7 @@ main button { transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* One case collection remains visible at every viewport and zoom level. */
+.case-collection { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 16px; }
+.case-card { min-width: 0; overflow-wrap: anywhere; }

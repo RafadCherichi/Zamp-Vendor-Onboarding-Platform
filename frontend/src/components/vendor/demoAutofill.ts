@@ -25,17 +25,17 @@ export const DEMO_AUTOFILL_PROFILES: DemoAutofillProfile[] = [
       city: 'Thane',
       state: 'Maharashtra',
       pincode: '400604',
-      pan: 'AAPFU0938L',
+      pan: 'ABCPV1234F',
       is_gst_registered: false,
       is_udyam_registered: true,
-      udyam_number: 'UDYAM-MH-02-0012345',
+      udyam_number: 'UDYAM-MH-02-0054321',
       contact_name: 'Vikram Malhotra',
       contact_designation: 'Proprietor',
       contact_email: 'vendor@apexcomponents.com',
       contact_mobile: '+91 98765 43210',
       authorised_signatory_name: 'Vikram Malhotra',
       bank_account_holder_name: 'Apex Components & Fasteners',
-      bank_account_number: '9876543210123',
+      bank_account_number: '8876543210123',
       bank_ifsc: 'HDFC0000123',
       bank_account_type: 'CURRENT',
       bank_name: 'HDFC Bank',
@@ -53,6 +53,6 @@ export const DEMO_AUTOFILL_PROFILES: DemoAutofillProfile[] = [
   },
 ];
 
-export function getDemoAutofillProfilesForVendor(legalName: string): DemoAutofillProfile[] {
-  return DEMO_AUTOFILL_PROFILES.filter((profile) => profile.draft.legal_name === legalName);
+export function getDemoAutofillProfilesForVendor(profileId?: string | null): DemoAutofillProfile[] {
+  return DEMO_AUTOFILL_PROFILES.filter((profile) => profile.id === profileId);
 }

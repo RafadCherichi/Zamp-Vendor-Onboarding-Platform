@@ -1,9 +1,11 @@
+from app.schemas.common import iso_utc
+from app.core.deps import require_case_access
 import json
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any, Tuple
 from fastapi import HTTPException, status
 from sqlalchemy import or_, and_, func, desc, asc
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.application import Application, ApplicationStatusEnum
 from app.models.vendor import Vendor
@@ -11,7 +13,7 @@ from app.models.user import User
 from app.models.member import OrganisationMember
 from app.models.role import RoleEnum
 from app.models.document import Document, DocumentVersion
-from app.models.extraction import DocumentExtractionResult, ExtractedField
+from app.models.extraction import DocumentExtractionResult, ExtractedField, DocumentProcessingJob
 from app.models.exception import (
     OnboardingException,
     ExceptionStatusEnum,
@@ -52,13 +54,16 @@ class QueueAndDashboardService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_dashboard_metrics(self, organisation_id: str) -> Dict[str, Any]:
+    def get_dashboard_metrics(self, organisation_id: str, reviewer_scope_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Derives operational dashboard metrics strictly from persisted database records.
         """
         # Applications query
         apps_query = self.db.query(Application).filter(Application.organisation_id == organisation_id)
-        all_apps = apps_query.all()
+        if reviewer_scope_id:
+            apps_query = apps_query.filter(Application.assigned_reviewer_id == reviewer_scope_id)
+        all_apps = apps_query.options(selectinload(Application.documents).selectinload(Document.versions)).all()
+        visible_app_ids = [a.id for a in all_apps]
         total_apps = len(all_apps)
 
         in_progress_count = sum(1 for a in all_apps if a.status in [ApplicationStatusEnum.DRAFT.value, ApplicationStatusEnum.IN_PROGRESS.value])
@@ -73,6 +78,8 @@ class QueueAndDashboardService:
 
         # Exceptions query
         exceptions_query = self.db.query(OnboardingException).filter(OnboardingException.organisation_id == organisation_id)
+        if reviewer_scope_id:
+            exceptions_query = exceptions_query.filter(OnboardingException.application_id.in_(visible_app_ids))
         all_exceptions = exceptions_query.all()
 
         active_app_ids = {
@@ -96,10 +103,11 @@ class QueueAndDashboardService:
         # Use the approval policy gate itself. A resolved exception does not make
         # a case ready when a blocking validation finding remains current.
         decision_service = ReviewerDecisionService(self.db)
+        evidence = decision_service.prepare_eligibility(all_apps)
         ready_for_approval_count = sum(
             1 for a in all_apps
             if a.status in [ApplicationStatusEnum.SUBMITTED.value, ApplicationStatusEnum.UNDER_REVIEW.value]
-            and decision_service.check_approval_eligibility(a)[0]
+            and decision_service.check_approval_eligibility(a, evidence=evidence)[0]
         )
 
         # Extended review wait: submitted > 3 days ago still awaiting review
@@ -107,14 +115,16 @@ class QueueAndDashboardService:
         stale_review_count = sum(
             1 for a in all_apps
             if a.status in [ApplicationStatusEnum.SUBMITTED.value, ApplicationStatusEnum.UNDER_REVIEW.value]
-            and a.submitted_at and (a.submitted_at.tzinfo is not None and a.submitted_at <= three_days_ago)
+            and a.submitted_at and ((a.submitted_at.replace(tzinfo=timezone.utc) if a.submitted_at.tzinfo is None else a.submitted_at) <= three_days_ago)
         )
 
-        # Processing count: applications having documents in processing
-        processing_count = sum(
-            1 for a in all_apps
-            if any(d.status == "PENDING" for d in a.documents)
-        )
+        # Count active executions, not empty optional upload slots.
+        processing_count = self.db.query(Document.application_id).join(
+            DocumentProcessingJob, Document.current_version_id == DocumentProcessingJob.document_version_id
+        ).filter(
+            Document.application_id.in_(visible_app_ids),
+            DocumentProcessingJob.status.in_(["QUEUED", "PROCESSING"]),
+        ).distinct().count()
 
         # Exception category breakdown
         cat_breakdown: Dict[str, int] = {}
@@ -129,7 +139,7 @@ class QueueAndDashboardService:
         # Recent application activity (last 8 audit events)
         recent_audits = (
             self.db.query(AuditEvent)
-            .filter(AuditEvent.organisation_id == organisation_id)
+            .filter(AuditEvent.organisation_id == organisation_id, *([AuditEvent.application_id.in_(visible_app_ids)] if reviewer_scope_id else []))
             .order_by(AuditEvent.created_at.desc())
             .limit(8)
             .all()
@@ -148,7 +158,7 @@ class QueueAndDashboardService:
                 "actor_role": audit.actor_role or "SYSTEM",
                 "application_id": audit.application_id,
                 "details": details,
-                "created_at": audit.created_at.isoformat() if audit.created_at else None,
+                "created_at": iso_utc(audit.created_at),
             })
 
         # Recently submitted applications (last 5)
@@ -156,6 +166,7 @@ class QueueAndDashboardService:
             self.db.query(Application)
             .filter(
                 Application.organisation_id == organisation_id,
+                *([Application.assigned_reviewer_id == reviewer_scope_id] if reviewer_scope_id else []),
                 Application.status.notin_([ApplicationStatusEnum.DRAFT.value, ApplicationStatusEnum.IN_PROGRESS.value]),
             )
             .order_by(Application.submitted_at.desc().nullslast(), Application.updated_at.desc())
@@ -169,7 +180,7 @@ class QueueAndDashboardService:
                 "legal_name": a.legal_name,
                 "constitution": a.constitution,
                 "status": a.status,
-                "submitted_at": a.submitted_at.isoformat() if a.submitted_at else None,
+                "submitted_at": iso_utc(a.submitted_at),
                 "open_exceptions_count": app_open_exc_map.get(a.id, 0),
             }
             for a in recent_submits
@@ -203,6 +214,7 @@ class QueueAndDashboardService:
         exception_category: Optional[str] = None,
         assigned_reviewer_id: Optional[str] = None,
         unassigned_only: bool = False,
+        reviewer_scope_id: Optional[str] = None,
         ready_for_approval_only: bool = False,
         submitted_from: Optional[datetime] = None,
         submitted_to: Optional[datetime] = None,
@@ -215,6 +227,8 @@ class QueueAndDashboardService:
         Paginated, multi-filtered query for internal reviewer and procurement queues.
         """
         query = self.db.query(Application).filter(Application.organisation_id == organisation_id)
+        if reviewer_scope_id:
+            query = query.filter(Application.assigned_reviewer_id == reviewer_scope_id)
         decision_service = ReviewerDecisionService(self.db)
 
         # 1. Search term (matches vendor legal name, trade name, reference number, contact email)
@@ -231,7 +245,13 @@ class QueueAndDashboardService:
 
         # 2. Lifecycle Status filter
         if status and status.strip() and status != "ALL":
-            if status.strip() == "AWAITING_REVIEW":
+            if status.strip() == "OVERDUE_REVIEW":
+                query = query.filter(Application.status.in_(["SUBMITTED", "UNDER_REVIEW"]), Application.submitted_at <= datetime.now(timezone.utc) - timedelta(days=3))
+            elif status.strip() == "BEING_COMPLETED":
+                query = query.filter(Application.status.in_(["DRAFT", "IN_PROGRESS"]))
+            elif status.strip() == "UNASSIGNED":
+                query = query.filter(Application.assigned_reviewer_id.is_(None), Application.status.in_(["SUBMITTED", "UNDER_REVIEW", "ACTION_REQUIRED", "ESCALATED"]))
+            elif status.strip() == "AWAITING_REVIEW":
                 query = query.filter(Application.status.in_([
                     ApplicationStatusEnum.SUBMITTED.value,
                     ApplicationStatusEnum.UNDER_REVIEW.value,
@@ -264,7 +284,7 @@ class QueueAndDashboardService:
                 ])
             ]
             if exception_severity and exception_severity != "ALL":
-                exc_filter.append(OnboardingException.severity == exception_severity)
+                exc_filter.append(OnboardingException.severity.in_(["HIGH", "CRITICAL"]) if exception_severity == "HIGH" else OnboardingException.severity == exception_severity)
             if exception_category and exception_category != "ALL":
                 exc_filter.append(OnboardingException.category == exception_category)
 
@@ -295,16 +315,20 @@ class QueueAndDashboardService:
         # Readiness includes documents and the current validation result, not just
         # exception count. Evaluate candidates through the same gate as approval.
         offset = max(0, (page - 1) * page_size)
+        query = query.options(selectinload(Application.documents).selectinload(Document.versions))
         if ready_for_approval_only:
+            candidates = query.all()
+            evidence = decision_service.prepare_eligibility(candidates)
             eligible_candidates = [
-                app for app in query.all()
-                if decision_service.check_approval_eligibility(app)[0]
+                app for app in candidates
+                if decision_service.check_approval_eligibility(app, evidence=evidence)[0]
             ]
             total = len(eligible_candidates)
             applications = eligible_candidates[offset:offset + page_size]
         else:
             total = query.count()
             applications = query.offset(offset).limit(page_size).all()
+            evidence = decision_service.prepare_eligibility(applications)
 
         # Batch load active exceptions and reviewer names for items
         app_ids = [a.id for a in applications]
@@ -342,7 +366,7 @@ class QueueAndDashboardService:
             open_count = len(app_excs)
             crit_count = sum(1 for e in app_excs if e.severity in ["CRITICAL", "HIGH"])
             vendor_replied = any(e.status == ExceptionStatusEnum.RESPONSE_SUBMITTED.value for e in app_excs)
-            is_ready, blocking_reasons = decision_service.check_approval_eligibility(app)
+            is_ready, blocking_reasons = decision_service.check_approval_eligibility(app, evidence=evidence)
             is_ready = (
                 app.status in [ApplicationStatusEnum.SUBMITTED.value, ApplicationStatusEnum.UNDER_REVIEW.value]
                 and is_ready
@@ -370,9 +394,9 @@ class QueueAndDashboardService:
                 "trade_name": app.trade_name,
                 "constitution": app.constitution,
                 "status": app.status,
-                "submitted_at": app.submitted_at.isoformat() if app.submitted_at else None,
-                "created_at": app.created_at.isoformat() if app.created_at else None,
-                "updated_at": app.updated_at.isoformat() if app.updated_at else None,
+                "submitted_at": iso_utc(app.submitted_at),
+                "created_at": iso_utc(app.created_at),
+                "updated_at": iso_utc(app.updated_at),
                 "assigned_reviewer_id": app.assigned_reviewer_id,
                 "assigned_reviewer_name": reviewer_map.get(app.assigned_reviewer_id) if app.assigned_reviewer_id else None,
                 "decision_maker_name": reviewer_map.get(app.reviewed_by_user_id) if app.reviewed_by_user_id else None,
@@ -412,9 +436,19 @@ class QueueAndDashboardService:
         if not app:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found.")
 
+        require_case_access(app, actor_member)
         is_vendor = (actor_member.role == RoleEnum.VENDOR.value)
         decision_service = ReviewerDecisionService(self.db)
         is_eligible, blocking_reasons = decision_service.check_approval_eligibility(app)
+
+        allowed_actions = []
+        if app.status in ["SUBMITTED", "UNDER_REVIEW", "ACTION_REQUIRED", "ESCALATED"]:
+            if actor_member.role in [RoleEnum.ADMIN.value, RoleEnum.PROCUREMENT_OFFICER.value]:
+                allowed_actions.append("ASSIGN")
+            if actor_member.role in [RoleEnum.ADMIN.value, RoleEnum.REVIEWER.value] and app.assigned_reviewer_id == actor_member.user_id:
+                allowed_actions.extend(["CLARIFY", "ESCALATE", "REJECT"])
+                if is_eligible:
+                    allowed_actions.append("APPROVE")
 
         # 1. Overview Section
         overview = {
@@ -424,17 +458,18 @@ class QueueAndDashboardService:
             "trade_name": app.trade_name,
             "constitution": app.constitution,
             "status": app.status,
-            "submitted_at": app.submitted_at.isoformat() if app.submitted_at else None,
-            "created_at": app.created_at.isoformat() if app.created_at else None,
-            "updated_at": app.updated_at.isoformat() if app.updated_at else None,
+            "submitted_at": iso_utc(app.submitted_at),
+            "created_at": iso_utc(app.created_at),
+            "updated_at": iso_utc(app.updated_at),
             "assigned_reviewer_id": app.assigned_reviewer_id,
             "assigned_reviewer_name": app.assigned_reviewer.full_name if app.assigned_reviewer else None,
-            "assigned_at": app.assigned_at.isoformat() if app.assigned_at else None,
+            "assigned_at": iso_utc(app.assigned_at),
             "reviewed_by_name": app.reviewed_by.full_name if app.reviewed_by else None,
-            "reviewed_at": app.reviewed_at.isoformat() if app.reviewed_at else None,
+            "reviewed_at": iso_utc(app.reviewed_at),
             "decision_notes": app.decision_notes,
             "rejection_reason": app.rejection_reason,
             "is_approval_eligible": is_eligible,
+            "allowed_actions": allowed_actions,
             "blocking_reasons": blocking_reasons,
         }
 
@@ -481,7 +516,7 @@ class QueueAndDashboardService:
                 "declaration_accurate_info": app.declaration_accurate_info,
                 "declaration_authorised_rep": app.declaration_authorised_rep,
                 "declaration_verification_consent": app.declaration_verification_consent,
-                "declaration_timestamp": app.declaration_timestamp.isoformat() if app.declaration_timestamp else None,
+                "declaration_timestamp": iso_utc(app.declaration_timestamp),
             },
         }
 
@@ -511,7 +546,7 @@ class QueueAndDashboardService:
                     "filename": v.original_filename,
                     "file_size": v.file_size_bytes,
                     "content_type": v.content_type,
-                    "created_at": v.created_at.isoformat() if v.created_at else None,
+                    "created_at": iso_utc(v.created_at),
                     "preview_url": f"/api/applications/{app.id}/documents/{d.id}/preview?version_id={v.id}",
                     "extraction": {
                         "status": ext_res.status if ext_res else "QUEUED",
@@ -580,7 +615,7 @@ class QueueAndDashboardService:
                 "warning_count": val_run.warning_count,
                 "unverified_count": val_run.unverified_count,
                 "unavailable_count": val_run.unavailable_count,
-                "created_at": val_run.created_at.isoformat() if val_run.created_at else None,
+                "created_at": iso_utc(val_run.created_at),
                 "layers": grouped_findings,
             }
 
@@ -602,7 +637,7 @@ class QueueAndDashboardService:
                     "author_role": c.author_role,
                     "is_internal": c.is_internal,
                     "message": c.message,
-                    "created_at": c.created_at.isoformat() if c.created_at else None,
+                    "created_at": iso_utc(c.created_at),
                 })
 
             corrections_list = [
@@ -612,7 +647,7 @@ class QueueAndDashboardService:
                     "previous_value": fc.previous_value,
                     "new_value": fc.new_value,
                     "vendor_explanation": fc.vendor_explanation,
-                    "created_at": fc.created_at.isoformat() if fc.created_at else None,
+                    "created_at": iso_utc(fc.created_at),
                 }
                 for fc in exc.field_corrections
             ]
@@ -625,7 +660,7 @@ class QueueAndDashboardService:
                     "actor_role": t.actor_role,
                     "reason": t.reason,
                     "notes": t.notes,
-                    "created_at": t.created_at.isoformat() if t.created_at else None,
+                    "created_at": iso_utc(t.created_at),
                 }
                 for t in exc.transitions
             ]
@@ -644,8 +679,8 @@ class QueueAndDashboardService:
                 "vendor_action_instruction": exc.vendor_action_instruction,
                 "resolution_type": exc.resolution_type,
                 "resolution_notes": exc.resolution_notes,
-                "resolved_at": exc.resolved_at.isoformat() if exc.resolved_at else None,
-                "created_at": exc.created_at.isoformat() if exc.created_at else None,
+                "resolved_at": iso_utc(exc.resolved_at),
+                "created_at": iso_utc(exc.created_at),
                 "comments": comments_list,
                 "field_corrections": corrections_list,
                 "transitions": transitions_list,
@@ -671,7 +706,7 @@ class QueueAndDashboardService:
                 "returned_attributes": json.loads(v.returned_attributes_json) if v.returned_attributes_json else {},
                 "reason": v.reason,
                 "duration_ms": v.duration_ms,
-                "created_at": v.created_at.isoformat() if v.created_at else None,
+                "created_at": iso_utc(v.created_at),
             }
             for v in verifications
         ]
@@ -696,7 +731,7 @@ class QueueAndDashboardService:
                 "event_type": a.event_type,
                 "actor_role": a.actor_role or "SYSTEM",
                 "details": details,
-                "created_at": a.created_at.isoformat() if a.created_at else None,
+                "created_at": iso_utc(a.created_at),
             })
 
         return {

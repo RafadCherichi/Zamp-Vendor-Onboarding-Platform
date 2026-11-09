@@ -93,6 +93,8 @@ with tempfile.TemporaryDirectory(prefix="zamp-scenarios-", ignore_cleanup_errors
         accepted = call("POST", f"invitations/token/{invite_token}/accept", json={"full_name": "Synthetic Vendor", "password": "Password123!"}).json()
         vendor = accepted["access_token"]
         path = "applications/" + accepted["application_id"]
+        reviewer_id = call("GET", "auth/me", reviewer).json()["id"]
+        call("POST", path + "/assign", po, json={"reviewer_user_id": reviewer_id})
         payload = dict(form, legal_name=case["legal_name"], pan=case["pan"], bank_account_number=case["bank_entered"], contact_email=email)
         if case_id == "V05":
             payload["bank_ifsc"] = "HDFC0001234"
@@ -146,7 +148,7 @@ with tempfile.TemporaryDirectory(prefix="zamp-scenarios-", ignore_cleanup_errors
             errors = submission.json().get("detail", {}).get("errors", []) if submission.status_code == 400 else []
             wrong_slot_blocked = submission.status_code == 400 and any("matching file" in error and "PAN" in error for error in errors)
             premature_approval = call("POST", path + "/approve", reviewer, json={"notes": "Wrong proof must block"}, expected=False)
-            approval_reasons = premature_approval.json().get("detail", {}).get("reasons", []) if premature_approval.status_code == 400 else []
+            approval_reasons = call("GET", path + "/details", reviewer).json()["overview"]["blocking_reasons"]
             reviewer_gate_blocked = any("wrong file type" in reason for reason in approval_reasons)
             replacement = (sandbox / "demo_documents" / "pan_tata.pdf").read_bytes()
             call("POST", f"{path}/documents/PAN_PROOF/upload", vendor, files={"file": ("pan_tata.pdf", replacement, "application/pdf")})

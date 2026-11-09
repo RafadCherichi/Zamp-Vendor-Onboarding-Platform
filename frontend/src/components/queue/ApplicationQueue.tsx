@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Search,
   Filter,
-  RotateCcw,
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
@@ -55,11 +54,13 @@ export const ApplicationQueue: React.FC<Props> = ({
 
   // Sync props changes from parent dashboard
   useEffect(() => {
-    if (initialStatus) setStatus(initialStatus);
+    setStatus(initialStatus || 'ALL');
+    setPage(1);
   }, [initialStatus]);
 
   useEffect(() => {
-    if (initialSeverity) setSeverity(initialSeverity);
+    setSeverity(initialSeverity || 'ALL');
+    setPage(1);
   }, [initialSeverity]);
 
   useEffect(() => {
@@ -67,9 +68,8 @@ export const ApplicationQueue: React.FC<Props> = ({
   }, [initialReadyForApproval]);
 
   useEffect(() => {
-    if (initialAssignedToMe && user?.id) {
-      setAssignedReviewerId(user.id);
-    }
+    setAssignedReviewerId(initialAssignedToMe && user?.id ? user.id : 'ALL');
+    setPage(1);
   }, [initialAssignedToMe, user?.id]);
 
   const fetchReviewers = async () => {
@@ -81,7 +81,9 @@ export const ApplicationQueue: React.FC<Props> = ({
     }
   };
 
+  const requestId = useRef(0);
   const fetchQueue = useCallback(async () => {
+    const activeRequest = ++requestId.current;
     try {
       setLoading(true);
       setError(null);
@@ -94,13 +96,15 @@ export const ApplicationQueue: React.FC<Props> = ({
         page,
         page_size: pageSize,
       });
+      if (activeRequest !== requestId.current) return;
       setItems(res.items);
       setTotal(res.total);
       setTotalPages(res.total_pages);
     } catch (err: any) {
+      if (activeRequest !== requestId.current) return;
       setError(err?.message || 'Failed to fetch application queue.');
     } finally {
-      setLoading(false);
+      if (activeRequest === requestId.current) setLoading(false);
     }
   }, [search, status, severity, assignedReviewerId, readyForApprovalOnly, page, pageSize]);
 
@@ -154,6 +158,7 @@ export const ApplicationQueue: React.FC<Props> = ({
   };
 
   const getStatusLabel = (st: string) => {
+    if (st === 'DRAFT' || st === 'IN_PROGRESS') return 'Draft';
     if (st === 'ACTION_REQUIRED') return 'Awaiting vendor';
     if (st === 'UNDER_REVIEW') return 'In review';
     if (st === 'SUBMITTED') return 'Submitted';
@@ -172,7 +177,7 @@ export const ApplicationQueue: React.FC<Props> = ({
 
   const renderIssue = (item: QueueItem) => (
     <>
-      {item.blocking_reasons?.length && !item.ready_for_approval && !['APPROVED', 'REJECTED'].includes(item.status) ? (
+      {item.blocking_reasons?.length && !item.ready_for_approval && !['APPROVED', 'REJECTED', 'DRAFT', 'IN_PROGRESS'].includes(item.status) ? (
         <div className="mb-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] leading-snug text-amber-950">
           <strong className="font-semibold">Approval blocked</strong>
           <span className="mt-0.5 block">{item.blocking_reasons[0]}</span>
@@ -192,7 +197,7 @@ export const ApplicationQueue: React.FC<Props> = ({
             : 'bg-amber-50 text-amber-800 border-amber-300'
         }`}>
           <AlertTriangle className="w-3 h-3" />
-          {item.open_exceptions_count} Open ({item.critical_exceptions_count} Crit)
+          {item.open_exceptions_count} open · {item.critical_exceptions_count} high priority
         </span>
       ) : item.ready_for_approval ? (
         <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
@@ -234,7 +239,7 @@ export const ApplicationQueue: React.FC<Props> = ({
   );
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden space-y-4 p-5">
+    <div data-case-queue className="scroll-mt-24 bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden space-y-4 p-5">
       {/* Header and Search Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-4">
         <div>
@@ -269,6 +274,7 @@ export const ApplicationQueue: React.FC<Props> = ({
 
         {/* Status Dropdown */}
         <select
+          aria-label="Application status"
           value={status}
           onChange={(e) => {
             setStatus(e.target.value);
@@ -277,7 +283,10 @@ export const ApplicationQueue: React.FC<Props> = ({
           className="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 text-xs font-medium focus:outline-none"
         >
           <option value="ALL">All Statuses</option>
-          <option value="AWAITING_REVIEW">Awaiting Review</option>
+          <option value="AWAITING_REVIEW">Awaiting review</option>
+          <option value="OVERDUE_REVIEW">Waiting over 3 days</option>
+          <option value="BEING_COMPLETED">Being completed</option>
+          {user?.role !== 'reviewer' && <option value="UNASSIGNED">Needs a reviewer</option>}
           <option value="SUBMITTED">Submitted</option>
           <option value="UNDER_REVIEW">Under Review</option>
           <option value="ACTION_REQUIRED">Action Required</option>
@@ -288,6 +297,7 @@ export const ApplicationQueue: React.FC<Props> = ({
 
         {/* Severity Dropdown */}
         <select
+          aria-label="Issue severity"
           value={severity}
           onChange={(e) => {
             setSeverity(e.target.value);
@@ -297,13 +307,14 @@ export const ApplicationQueue: React.FC<Props> = ({
         >
           <option value="ALL">All Severities</option>
           <option value="CRITICAL">Critical Exceptions</option>
-          <option value="HIGH">High Severity</option>
+          <option value="HIGH">High and critical</option>
           <option value="MEDIUM">Medium Severity</option>
           <option value="LOW">Low Severity</option>
         </select>
 
         {/* Assigned Reviewer Dropdown */}
-        <select
+        {user?.role !== 'reviewer' && <select
+          aria-label="Assigned reviewer"
           value={assignedReviewerId}
           onChange={(e) => {
             setAssignedReviewerId(e.target.value);
@@ -317,10 +328,10 @@ export const ApplicationQueue: React.FC<Props> = ({
               {r.full_name}
             </option>
           ))}
-        </select>
+        </select>}
 
         {/* Assigned to Me Toggle Chip */}
-        {user?.id && (
+        {user?.id && user.role !== 'reviewer' && (
           <button
             onClick={() => {
               if (assignedReviewerId === user.id) {
@@ -374,97 +385,7 @@ export const ApplicationQueue: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Applications Queue Table */}
-      <div className="hidden md:block overflow-x-auto border border-slate-200 rounded-xl">
-        <table className="w-full text-left text-xs">
-          <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 font-semibold uppercase tracking-wider">
-            <tr>
-              <th className="px-4 py-3">Vendor / Reference</th>
-              <th className="px-4 py-3">Constitution</th>
-              <th className="px-4 py-3">Submitted</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Current issue &amp; next action</th>
-              <th className="px-4 py-3">Owner / decision maker</th>
-              <th className="px-4 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {loading ? (
-              <tr>
-                <td colSpan={7} className="text-center py-8 text-slate-400">
-                  <RotateCcw className="w-5 h-5 animate-spin mx-auto text-indigo-600 mb-1" />
-                  Loading application queue...
-                </td>
-              </tr>
-            ) : items.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="text-center py-8 text-slate-400 space-y-2">
-                  <p>No applications matched the selected filters.</p>
-                  <button
-                    onClick={() => {
-                      setSearch('');
-                      setStatus('ALL');
-                      setSeverity('ALL');
-                      setReadyForApprovalOnly(false);
-                      setAssignedReviewerId('ALL');
-                      setPage(1);
-                    }}
-                    className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition"
-                  >
-                    <span>Clear All Filters</span>
-                  </button>
-                </td>
-              </tr>
-            ) : (
-              items.map((item) => (
-                <tr key={item.id} className="hover:bg-slate-50/80 transition">
-                  <td className="px-4 py-3">
-                    <span className="font-mono text-xs font-bold text-indigo-700 block">
-                      {item.reference_number}
-                    </span>
-                    <span className="font-bold text-slate-900 text-sm line-clamp-1">
-                      {item.legal_name}
-                    </span>
-                    {item.trade_name && item.trade_name !== item.legal_name && (
-                      <span className="text-[11px] text-slate-500 block">
-                        T/A: {item.trade_name}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-slate-600 font-medium">
-                    {item.constitution.replace(/_/g, ' ')}
-                  </td>
-                  <td className="px-4 py-3 text-slate-500">
-                    {item.submitted_at ? new Date(item.submitted_at).toLocaleDateString() : 'Draft'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex whitespace-nowrap px-2.5 py-1 rounded-full text-[11px] leading-none font-semibold border ${getStatusBadge(item.status)}`}>
-                      {getStatusLabel(item.status)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    {renderIssue(item)}
-                  </td>
-                  <td className="px-4 py-3">
-                    {renderOwner(item)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => onSelectApplication(item.id)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs transition"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>Inspect</span>
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="space-y-3 md:hidden" aria-label="Application cases">
+      <div className="case-collection" aria-label="Application cases">
         {loading ? <p className="py-6 text-center text-sm text-slate-500">Loading application queue...</p> : null}
         {!loading && items.length === 0 ? (
           <div className="rounded-xl border border-slate-200 p-5 text-center text-sm text-slate-600">
@@ -473,7 +394,7 @@ export const ApplicationQueue: React.FC<Props> = ({
           </div>
         ) : null}
         {!loading && items.map((item) => (
-          <article key={item.id} className="rounded-xl border border-slate-200 bg-[#fbfaf7] p-4 shadow-xs">
+          <article key={item.id} className="case-card rounded-xl border border-slate-200 bg-[#fbfaf7] p-4 shadow-xs">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <span className="font-mono text-[11px] font-semibold text-emerald-900 break-all">{item.reference_number}</span>
               <span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getStatusBadge(item.status)}`}>
@@ -509,6 +430,7 @@ export const ApplicationQueue: React.FC<Props> = ({
           <div className="flex items-center gap-1">
             <span>Per page:</span>
             <select
+              aria-label="Applications per page"
               value={pageSize}
               onChange={(e) => {
                 setPageSize(Number(e.target.value));
@@ -524,6 +446,7 @@ export const ApplicationQueue: React.FC<Props> = ({
 
           <div className="flex items-center gap-1">
             <button
+              aria-label="Previous page"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
               className="p-1 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40"
@@ -534,6 +457,7 @@ export const ApplicationQueue: React.FC<Props> = ({
               Page {page} of {totalPages || 1}
             </span>
             <button
+              aria-label="Next page"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
               className="p-1 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40"

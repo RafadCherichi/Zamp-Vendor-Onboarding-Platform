@@ -1,3 +1,4 @@
+import { useProtectedDocument } from '../../utils/useProtectedDocument';
 import React, { useState } from 'react';
 import type { Application, DocumentSlot, DocumentExtractionDetail, ProcessingProgress } from '../../types/application';
 import { hasWrongDocumentType, isAcceptedAlternative } from '../../utils/documentSlots';
@@ -44,6 +45,8 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
   const [previewDoc, setPreviewDoc] = useState<DocumentSlot | null>(null);
   const [previewError, setPreviewError] = useState<boolean>(false);
   const [inspectingDoc, setInspectingDoc] = useState<DocumentSlot | null>(null);
+  const protectedPreview = useProtectedDocument(previewDoc ? getDocumentPreviewUrl(application.id, previewDoc.id) : null, token);
+  const protectedInspection = useProtectedDocument(inspectingDoc ? getDocumentPreviewUrl(application.id, inspectingDoc.id) : null, token);
   const [extractionDetail, setExtractionDetail] = useState<DocumentExtractionDetail | null>(null);
   const [loadingExtraction, setLoadingExtraction] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
@@ -465,7 +468,7 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
               </div>
               <div className="flex items-center gap-3">
                 <a
-                  href={getDocumentPreviewUrl(application.id, previewDoc.id, token)}
+                  href={protectedPreview.url || undefined}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-white hover:bg-indigo-50 border border-indigo-200 rounded-lg shadow-2xs transition inline-flex items-center gap-1.5"
@@ -485,7 +488,8 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
 
             <div className="flex-1 bg-slate-100 p-2 overflow-auto flex items-center justify-center">
               {(() => {
-                const previewUrl = getDocumentPreviewUrl(application.id, previewDoc.id, token);
+                const previewUrl = protectedPreview.url;
+                if (!previewUrl) return <p role="status" className="p-6 text-sm">{protectedPreview.error || 'Opening document…'}</p>;
                 const filename = previewDoc.current_version?.original_filename || '';
                 const contentType = previewDoc.current_version?.content_type || '';
                 const isPdf = contentType === 'application/pdf' || filename.toLowerCase().endsWith('.pdf');
@@ -560,7 +564,7 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
               <span>Secure Document Storage &bull; Private Inline Streaming</span>
               <div className="flex items-center gap-2">
                 <a
-                  href={getDocumentPreviewUrl(application.id, previewDoc.id, token)}
+                  href={protectedPreview.url || undefined}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold inline-flex items-center gap-1"
@@ -613,7 +617,8 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
                 <span className="text-[11px] font-bold text-slate-600 mb-2">Original Document Preview</span>
                 <div className="flex-1 bg-white rounded-xl border border-slate-300 overflow-hidden flex items-center justify-center">
                   {(() => {
-                    const previewUrl = getDocumentPreviewUrl(application.id, inspectingDoc.id, token);
+                    const previewUrl = protectedInspection.url;
+                    if (!previewUrl) return <p role="status" className="p-6 text-sm">{protectedInspection.error || 'Opening document…'}</p>;
                     const filename = inspectingDoc.current_version?.original_filename || '';
                     const contentType = inspectingDoc.current_version?.content_type || '';
                     const isPdf = contentType === 'application/pdf' || filename.toLowerCase().endsWith('.pdf');

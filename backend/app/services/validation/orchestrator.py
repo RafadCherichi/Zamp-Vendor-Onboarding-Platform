@@ -354,8 +354,6 @@ class ValidationOrchestrator:
             .filter(ValidationRun.application_id == app.id, ValidationRun.is_current.is_(True))
             .all()
         )
-        for prev in previous_runs:
-            prev.is_current = False
 
         # 2. Initialize new ValidationRun
         new_run = ValidationRun(
@@ -363,7 +361,7 @@ class ValidationOrchestrator:
             organisation_id=app.organisation_id,
             run_type=run_type,
             status="IN_PROGRESS",
-            is_current=True,
+            is_current=False,
             triggered_by_user_id=user_id,
             trigger_reason=trigger_reason,
         )
@@ -491,10 +489,16 @@ class ValidationOrchestrator:
                 actor_user_id=user_id,
                 actor_role="SYSTEM" if not user_id else "USER",
                 validation_run=new_run,
+                commit=False,
             )
         except Exception as e:
             logger.exception(f"Error syncing exceptions after validation run: {e}")
+            self.db.rollback()
+            raise
 
+        for prev in previous_runs:
+            prev.is_current = False
+        new_run.is_current = True
         self.db.commit()
         self.db.refresh(new_run)
         return new_run

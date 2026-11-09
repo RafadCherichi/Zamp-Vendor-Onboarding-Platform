@@ -1,9 +1,10 @@
+from app.schemas.common import UTCResponseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field
 
 
-class DocumentVersionResponse(BaseModel):
+class DocumentVersionResponse(UTCResponseModel):
     id: str
     version_number: int
     original_filename: str
@@ -14,7 +15,7 @@ class DocumentVersionResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class DocumentSlotResponse(BaseModel):
+class DocumentSlotResponse(UTCResponseModel):
     id: str
     document_type: str
     title: str
@@ -79,7 +80,9 @@ class ApplicationDraftUpdate(BaseModel):
     declaration_verification_consent: Optional[bool] = None
 
 
-class ApplicationResponse(BaseModel):
+class ApplicationResponse(UTCResponseModel):
+    demo_profile_id: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
     id: str
     reference_number: str
     organisation_id: str
@@ -137,7 +140,7 @@ class ApplicationResponse(BaseModel):
     documents: List[DocumentSlotResponse] = []
 
 
-class ApplicationSubmitResponse(BaseModel):
+class ApplicationSubmitResponse(UTCResponseModel):
     success: bool
     reference_number: str
     status: str

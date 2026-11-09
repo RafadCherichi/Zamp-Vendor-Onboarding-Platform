@@ -1,3 +1,7 @@
+from uuid import uuid4
+from sqlalchemy import func
+from app.db.demo_profiles import demo_profile_id, initial_demo_identity
+from app.core.deps import scope_applications
 import hashlib
 import json
 import logging
@@ -7,7 +11,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, Form
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPAuthorizationCredentials
 from starlette.concurrency import run_in_threadpool
@@ -65,6 +69,19 @@ from app.schemas.review import (
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def reserve_document_version(db, document):
+    version_id = str(uuid4())
+    changed = db.query(Document).filter(
+        Document.id == document.id,
+        Document.current_version_id == document.current_version_id,
+    ).update({"current_version_id": version_id}, synchronize_session=False)
+    if changed != 1:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="This document changed during your upload. Refresh the checklist before uploading again.")
+    last_number = db.query(func.max(DocumentVersion.version_number)).filter(DocumentVersion.document_id == document.id).scalar() or 0
+    return version_id, last_number + 1
 
 
 def mask_account_number(acc: Optional[str]) -> Optional[str]:
@@ -152,6 +169,8 @@ def build_application_response(app: Application, db: Optional[Session] = None) -
         )
 
     return ApplicationResponse(
+        demo_profile_id=demo_profile_id(app),
+        reviewed_at=app.reviewed_at,
         id=app.id,
         reference_number=app.reference_number,
         organisation_id=app.organisation_id,
@@ -197,20 +216,7 @@ def build_application_response(app: Application, db: Optional[Session] = None) -
 
 
 def get_scoped_application(application_id: str, member: OrganisationMember, db: Session) -> Application:
-    query = db.query(Application).filter(
-        Application.id == application_id,
-        Application.organisation_id == member.organisation_id,
-    )
-
-    # If the user is a vendor, restrict strictly to their own application
-    if member.role == RoleEnum.VENDOR.value:
-        from sqlalchemy import or_
-        query = query.filter(
-            or_(
-                Application.created_by_user_id == member.user_id,
-                Application.vendor.has(Vendor.created_by_user_id == member.user_id),
-            )
-        )
+    query = scope_applications(db.query(Application), member).filter(Application.id == application_id)
 
     app = query.first()
     if not app:
@@ -236,8 +242,7 @@ def list_organisation_applications(
     ])),
 ) -> List[ApplicationResponse]:
     apps = (
-        db.query(Application)
-        .filter(Application.organisation_id == member.organisation_id)
+        scope_applications(db.query(Application), member)
         .order_by(Application.created_at.desc())
         .all()
     )
@@ -349,10 +354,8 @@ def reset_own_draft(
         document.current_version_id = None
         document.status = "PENDING"
 
-    app.legal_name = app.vendor.legal_name
-    app.trade_name = app.vendor.trade_name
-    app.constitution = app.vendor.constitution
-    app.pan = app.vendor.pan
+    for field, value in initial_demo_identity(app).items():
+        setattr(app, field, value)
     for field in (
         "date_of_establishment", "registered_address", "operating_address", "city", "state", "pincode",
         "gstin", "udyam_number", "cin_llpin", "contact_name", "contact_designation", "contact_mobile",
@@ -405,7 +408,7 @@ def get_dashboard_metrics(
     ])),
 ) -> DashboardMetricsResponse:
     service = QueueAndDashboardService(db)
-    return service.get_dashboard_metrics(member.organisation_id)
+    return service.get_dashboard_metrics(member.organisation_id, member.user_id if member.role == RoleEnum.REVIEWER.value else None)
 
 
 @router.get(
@@ -443,6 +446,7 @@ def query_application_queue(
         exception_severity=exception_severity,
         exception_category=exception_category,
         assigned_reviewer_id=assigned_reviewer_id,
+        reviewer_scope_id=member.user_id if member.role == RoleEnum.REVIEWER.value else None,
         unassigned_only=unassigned_only,
         ready_for_approval_only=ready_for_approval_only,
         submitted_from=submitted_from,
@@ -473,9 +477,9 @@ def list_organisation_reviewers(
         db.query(OrganisationMember)
         .filter(
             OrganisationMember.organisation_id == member.organisation_id,
+            OrganisationMember.is_active.is_(True),
             OrganisationMember.role.in_([
                 RoleEnum.REVIEWER.value,
-                RoleEnum.PROCUREMENT_OFFICER.value,
                 RoleEnum.ADMIN.value,
             ]),
         )
@@ -785,6 +789,9 @@ async def upload_document(
     application_id: str,
     document_type: str,
     file: UploadFile = File(...),
+    exception_id: Optional[str] = Form(None),
+    explanation: Optional[str] = Form(None),
+    new_field_value: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     member: OrganisationMember = Depends(get_current_member),
 ) -> DocumentSlotResponse:
@@ -810,13 +817,13 @@ async def upload_document(
                     OnboardingException.application_id == app.id,
                     OnboardingException.related_document_id == doc_slot.id,
                     OnboardingException.status == ExceptionStatusEnum.ACTION_REQUIRED_FROM_VENDOR.value,
+                    *([OnboardingException.id == exception_id] if exception_id else []),
                 )
                 .first()
             )
         if (
             not active_exc
             and member.role == RoleEnum.VENDOR.value
-            and app.status != ApplicationStatusEnum.ACTION_REQUIRED.value
         ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -828,6 +835,11 @@ async def upload_document(
             detail="Cannot upload documents to a finalized application.",
         )
 
+    if new_field_value is not None:
+        from app.services.exceptions.revalidation import PERMITTED_VENDOR_FIELDS
+        if not active_exc or active_exc.related_field_name not in PERMITTED_VENDOR_FIELDS:
+            raise HTTPException(status_code=400, detail="This request does not permit a field correction.")
+
     # 1. Validate filename and extension
     filename = file.filename or "uploaded_file"
     ext = Path(filename).suffix.lower()
@@ -838,7 +850,7 @@ async def upload_document(
         )
 
     # 2. Read content and validate size (max 15MB)
-    content = await file.read()
+    content = await file.read(settings.MAX_FILE_SIZE_BYTES + 1)
     file_size = len(content)
     max_bytes = settings.MAX_FILE_SIZE_BYTES
     if file_size > max_bytes:
@@ -887,20 +899,11 @@ async def upload_document(
     )
 
     if not doc:
-        doc = Document(
-            application_id=app.id,
-            organisation_id=app.organisation_id,
-            document_type=document_type,
-            title=document_type.replace("_", " ").title(),
-            is_required=True,
-            status="PENDING",
-        )
-        db.add(doc)
-        db.flush()
+        raise HTTPException(status_code=400, detail="Choose a document from this application's checklist.")
 
     # 6. Save in private object storage
     storage = get_storage_adapter()
-    version_num = len(doc.versions) + 1
+    version_id, version_num = reserve_document_version(db, doc)
     safe_token = secrets.token_hex(6)
     dest_path = f"org_{app.organisation_id}/app_{app.id}/{document_type}_v{version_num}_{safe_token}{ext}"
 
@@ -910,6 +913,7 @@ async def upload_document(
 
     # 7. Create immutable DocumentVersion record
     version = DocumentVersion(
+        id=version_id,
         document_id=doc.id,
         version_number=version_num,
         storage_key=storage_key,
@@ -949,10 +953,12 @@ async def upload_document(
                 exception_id=active_exc.id,
                 document_version_id=version.id,
                 user=member.user,
-                explanation="Replacement statutory document uploaded",
+                explanation=explanation or "Replacement statutory document uploaded",
+                new_field_value=new_field_value,
             )
         except Exception as e:
             logger.warning(f"Error linking replacement document to exception {active_exc.id}: {e}")
+            raise HTTPException(status_code=503, detail="Your file was received, but the response could not be recorded. Refresh the request before retrying.") from e
 
     proc_status = extraction.status if extraction else "PROCESSING"
     det_type = extraction.detected_document_type if extraction else None
@@ -1129,46 +1135,9 @@ def preview_document(
     application_id: str,
     document_id: str,
     version_id: Optional[str] = Query(None, description="Exact document version to inspect"),
-    token: Optional[str] = Query(None, description="Bearer token for authenticated inline preview in iframe/img"),
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
     db: Session = Depends(get_db),
+    member: OrganisationMember = Depends(get_current_member),
 ):
-    raw_token = credentials.credentials if credentials and credentials.credentials else token
-    if not raw_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication credentials were not provided.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    try:
-        payload = decode_access_token(raw_token)
-        user_id = payload.get("sub")
-        if not user_id:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token subject.")
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session has expired or credentials could not be validated.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or deactivated.")
-
-    token_org_id = payload.get("org_id")
-    query = db.query(OrganisationMember).filter(
-        OrganisationMember.user_id == user.id,
-        OrganisationMember.is_active == True,
-    )
-    if token_org_id:
-        member = query.filter(OrganisationMember.organisation_id == token_org_id).first()
-    else:
-        member = query.first()
-
-    if not member:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No active organisation membership.")
-
     app = get_scoped_application(application_id, member, db)
     doc = (
         db.query(Document)
@@ -1221,7 +1190,7 @@ def submit_application(
 ) -> ApplicationSubmitResponse:
     app = get_scoped_application(application_id, member, db)
 
-    if app.status == ApplicationStatusEnum.SUBMITTED.value:
+    if app.status not in [ApplicationStatusEnum.DRAFT.value, ApplicationStatusEnum.IN_PROGRESS.value]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Application has already been submitted.",
@@ -1341,6 +1310,10 @@ def submit_application(
     )
     db.add(audit_event)
 
+    # Preserve receipt even when automated processing fails.
+    db.commit()
+    checks_incomplete = False
+
     # Automatically execute deterministic validation run upon submission
     try:
         from app.services.validation.orchestrator import ValidationOrchestrator
@@ -1352,6 +1325,11 @@ def submit_application(
         )
     except Exception as e:
         logger.warning(f"Error running validation on submission: {e}")
+        db.rollback()
+        checks_incomplete = True
+        from app.models.validation import ValidationRun
+        db.query(ValidationRun).filter(ValidationRun.application_id == app.id).update({"is_current": False})
+        db.add(ValidationRun(application_id=app.id, organisation_id=app.organisation_id, status="FAILED", is_current=True, run_type="SUBMISSION_RUN", summary="Application received. Automated checks could not finish; the review team must retry.", triggered_by_user_id=member.user_id))
 
     # Validation may immediately produce a vendor-owned correction. Reflect
     # that in the application state so the vendor and staff queue agree.
@@ -1372,6 +1350,8 @@ def submit_application(
         status=app.status,
         submitted_at=app.submitted_at,
         message=(
+            "Application received. Automated checks are incomplete; the review team will retry."
+            if checks_incomplete else
             "Application received. Please review the correction request shown in your workspace."
             if has_vendor_action else
             "Application submitted successfully. It is now queued for verification and human review."

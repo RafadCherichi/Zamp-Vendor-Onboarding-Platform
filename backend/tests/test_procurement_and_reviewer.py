@@ -131,7 +131,7 @@ def test_queue_search_filter_and_pagination(db_session: Session, client: TestCli
     reviewer = User(email=f"rev-{tok}@org.com", full_name="Reviewer One", hashed_password="pw")
     db_session.add(reviewer)
     db_session.flush()
-    db_session.add(OrganisationMember(organisation_id=org.id, user_id=reviewer.id, role=RoleEnum.REVIEWER.value))
+    db_session.add(OrganisationMember(organisation_id=org.id, user_id=reviewer.id, role=RoleEnum.PROCUREMENT_OFFICER.value))
 
     # Add 4 applications with specific search keys
     names = ["Acme Engineering", "Beta Chemicals", "Acme Logistics", "Delta Power"]
@@ -317,6 +317,7 @@ def test_scenario_1_clean_application_approval(db_session: Session, client: Test
         created_by_user_id=vendor_user.id,
         legal_name="Clean Corp Private Limited",
         constitution=ConstitutionEnum.PVT_LTD.value,
+        assigned_reviewer_id=rev_user.id,
         status=ApplicationStatusEnum.UNDER_REVIEW.value,
         submitted_at=datetime.now(timezone.utc),
         pan="AAACC1234A",
@@ -416,6 +417,7 @@ def test_scenario_2_blocking_exception_prevents_approval(db_session: Session, cl
         vendor_id=vendor.id,
         legal_name="Block Corp",
         constitution=ConstitutionEnum.PVT_LTD.value,
+        assigned_reviewer_id=rev_user.id,
         status=ApplicationStatusEnum.UNDER_REVIEW.value,
         submitted_at=datetime.now(timezone.utc),
     )
@@ -481,6 +483,7 @@ def test_scenario_3_clarification_and_rejection_workflows(db_session: Session, c
         vendor_id=vendor.id,
         legal_name="WF Vendor",
         constitution=ConstitutionEnum.PVT_LTD.value,
+        assigned_reviewer_id=rev_user.id,
         status=ApplicationStatusEnum.UNDER_REVIEW.value,
         submitted_at=datetime.now(timezone.utc),
     )
@@ -644,6 +647,7 @@ def test_application_comprehensive_details_endpoint(db_session: Session, client:
     db_session.flush()
 
     app = Application(
+        assigned_reviewer_id=rev_user.id,
         reference_number=f"APP-DET-{tok}",
         organisation_id=org.id,
         vendor_id=vendor.id,

@@ -86,7 +86,7 @@ export const SubmissionConfirmation: React.FC<Props> = ({ application, token, on
 
         <div>
           <span
-            className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full border ${
+            className={`inline-flex max-w-full flex-wrap text-left text-xs leading-relaxed font-bold uppercase tracking-wide px-3 py-1 rounded-xl border ${
               isApproved
                 ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
                 : isRejected
@@ -172,6 +172,13 @@ export const SubmissionConfirmation: React.FC<Props> = ({ application, token, on
           </div>
         </div>
 
+        {(isApproved || isRejected) && application.reviewed_at && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            <p>Decision recorded: <strong>{new Date(application.reviewed_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</strong></p>
+            {isApproved && <p className="mt-1">Your onboarding application is complete. You have no further tasks in this application.</p>}
+          </div>
+        )}
+
         {/* Locked Notice */}
         {!isApproved && !isRejected && (
         <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 max-w-lg flex items-center gap-2">
@@ -242,6 +249,8 @@ export const SubmissionConfirmation: React.FC<Props> = ({ application, token, on
             <p className="text-[11px] text-slate-500 pl-8">
               {isApproved
                 ? 'Checks completed before approval'
+                : validationRun && validationRun.status !== 'COMPLETED'
+                ? 'Checks are incomplete · awaiting retry'
                 : validationRun
                 ? validationRun.failed_count + validationRun.unverified_count + validationRun.unavailable_count + validationRun.warning_count === 0
                   ? `All ${validationRun.passed_count} checks passed`

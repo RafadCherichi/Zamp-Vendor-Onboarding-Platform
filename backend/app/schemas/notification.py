@@ -1,8 +1,9 @@
+from app.schemas.common import UTCResponseModel
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 
-class NotificationResponse(BaseModel):
+class NotificationResponse(UTCResponseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str

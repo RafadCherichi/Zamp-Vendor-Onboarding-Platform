@@ -110,7 +110,7 @@ def test_mca_sample_registry_no_match_is_explained_as_unconfirmed(db_session: Se
     app = Application(
         reference_number=f"APP-MCA-COPY-{token}", organisation_id=org.id, vendor_id=vendor.id,
         created_by_user_id=user.id, legal_name=vendor.legal_name, constitution=ConstitutionEnum.LLP.value,
-        cin_llpin="AAA-1234", is_gst_registered=False, is_udyam_registered=False,
+        cin_llpin="BBB-9999", is_gst_registered=False, is_udyam_registered=False,
         contact_email=user.email, contact_mobile="9876543210", pincode="560001",
     )
     db_session.add(app)
@@ -146,8 +146,8 @@ def test_pan_constitution_aware_validation():
     assert is_valid is False
     assert "PAN 4th character must be 'C'" in err
 
-    # LLP -> 4th char 'L'
-    is_valid, err = validate_pan_structure("AAALE1234F", "LLP")
+    # LLP -> 4th char 'F'; L denotes a local authority.
+    is_valid, err = validate_pan_structure("AAAFE1234F", "LLP")
     assert is_valid is True
 
 
@@ -764,3 +764,9 @@ def test_change_aware_invalidation(db_session: Session):
 
     db_session.refresh(run_1)
     assert run_1.is_current is False
+
+
+def test_llp_pan_uses_firm_status_and_rejects_local_authority():
+    from app.services.validation.checksums import validate_pan_structure
+    assert validate_pan_structure("AABFA1234F", "LLP")[0] is True
+    assert validate_pan_structure("AABLA1234F", "LLP")[0] is False

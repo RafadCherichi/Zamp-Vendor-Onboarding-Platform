@@ -28,6 +28,19 @@ export const VendorExceptionsBanner: React.FC<VendorExceptionsBannerProps> = ({
   onCorrectionSubmitted,
 }) => {
   const [exceptions, setExceptions] = useState<OnboardingException[]>([]);
+  useEffect(() => {
+    const focusRequest = () => {
+      const id = new URLSearchParams(window.location.search).get('request');
+      if (!id) return;
+      const element = document.getElementById(`request-${id}`);
+      element?.scrollIntoView({ block: 'center', behavior: 'instant' });
+      element?.focus({ preventScroll: true });
+    };
+    focusRequest();
+    window.addEventListener('vop:open-application', focusRequest);
+    return () => window.removeEventListener('vop:open-application', focusRequest);
+  }, [exceptions]);
+
   const [loading, setLoading] = useState<boolean>(true);
 
   // Form states per exception
@@ -102,7 +115,6 @@ export const VendorExceptionsBanner: React.FC<VendorExceptionsBannerProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-slate-900">{subExc.title}</span>
-                  <span className="text-slate-400 font-mono text-[11px]">({subExc.reference_number})</span>
                 </div>
                 {subExc.description && (
                   <p className="text-slate-500 text-[11px] mt-0.5 line-clamp-1">{subExc.description}</p>
@@ -139,6 +151,11 @@ export const VendorExceptionsBanner: React.FC<VendorExceptionsBannerProps> = ({
     const exp = explanations[excId];
     const file = selectedFiles[excId];
 
+    if (exc.related_document_id && !file && !(exc.related_field_name && newVal?.trim())) {
+      setErrorMessages((prev) => ({ ...prev, [excId]: 'Upload the replacement document requested by the reviewer.' }));
+      return;
+    }
+
     if (!newVal && !exp && !file) {
       setErrorMessages((prev) => ({
         ...prev,
@@ -158,11 +175,15 @@ export const VendorExceptionsBanner: React.FC<VendorExceptionsBannerProps> = ({
         if (!requestedSlot) {
           throw new Error('The requested document slot is no longer available. Contact your procurement representative before uploading.');
         }
-        await apiUploadDocument(authToken, applicationId, requestedSlot.document_type, file);
+        await apiUploadDocument(authToken, applicationId, requestedSlot.document_type, file, {
+          exceptionId: excId,
+          explanation: exp?.trim(),
+          newFieldValue: newVal?.trim() ? newVal.trim().toUpperCase() : undefined,
+        });
       }
 
       // Submit field correction and clarification
-      await exceptionsApi.submitVendorCorrection(
+      if (!file) await exceptionsApi.submitVendorCorrection(
         excId,
         {
           field_name: exc.related_field_name,
@@ -222,15 +243,14 @@ export const VendorExceptionsBanner: React.FC<VendorExceptionsBannerProps> = ({
           return (
             <div
               key={exc.id}
+              id={`request-${exc.id}`}
+              tabIndex={-1}
               className="bg-white rounded-xl border border-amber-200/80 p-5 shadow-xs transition-all hover:border-amber-300"
             >
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
                   <span className="px-2.5 py-0.5 text-xs font-bold rounded-md bg-amber-100 text-amber-800 uppercase tracking-wide">
                     {exc.category.replace(/_/g, ' ')}
-                  </span>
-                  <span className="text-xs font-mono text-slate-400">
-                    {exc.reference_number}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-amber-700 font-medium">
@@ -386,7 +406,6 @@ export const VendorExceptionsBanner: React.FC<VendorExceptionsBannerProps> = ({
                 >
                   <div>
                     <span className="font-medium text-slate-900">{subExc.title}</span>
-                    <span className="text-slate-400 ml-2 font-mono">({subExc.reference_number})</span>
                   </div>
                   <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold text-[11px] border border-blue-200">
                     Under Compliance Review

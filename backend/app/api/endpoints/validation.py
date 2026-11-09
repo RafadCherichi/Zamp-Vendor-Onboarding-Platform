@@ -54,6 +54,7 @@ def list_validation_runs(
         .filter(
             ValidationRun.organisation_id == member.organisation_id,
             Application.organisation_id == member.organisation_id,
+            *([Application.assigned_reviewer_id == member.user_id] if member.role == RoleEnum.REVIEWER.value else []),
         )
         .order_by(ValidationRun.created_at.desc(), ValidationRun.id.desc())
         .limit(bounded_limit)
@@ -75,7 +76,7 @@ def list_validation_runs(
         else:
             outcome = "PENDING"
 
-        reason = application.rejection_reason or ""
+        reason = ""
         if not reason:
             relevant = next(
                 (
@@ -89,11 +90,7 @@ def list_validation_runs(
             if relevant:
                 reason = relevant.explanation
         if not reason:
-            if application.status == "APPROVED":
-                reason = "A reviewer approved this vendor after completing the checks."
-            elif application.status == "REJECTED":
-                reason = "A reviewer recorded a rejection decision."
-            elif run.failed_count == 0 and run.warning_count == 0 and run.unverified_count == 0 and run.unavailable_count == 0:
+            if run.failed_count == 0 and run.warning_count == 0 and run.unverified_count == 0 and run.unavailable_count == 0:
                 reason = f"All {run.passed_count} checks passed. A reviewer still needs to record the final decision."
             else:
                 reason = run.summary or "Checks are recorded. A human reviewer makes the final decision."
@@ -108,6 +105,8 @@ def list_validation_runs(
                 run_status=run.status,
                 outcome=outcome,
                 application_status=application.status,
+                check_outcome=("INCOMPLETE" if run.status != "COMPLETED" else "NEEDS_REVIEW" if run.failed_count or run.warning_count or run.unverified_count or run.unavailable_count or any(f.is_stale for f in run.findings) else "CLEAR"),
+                decision_at=application.reviewed_at,
                 summary=run.summary,
                 reason=reason,
                 passed_count=run.passed_count,
@@ -143,6 +142,7 @@ def get_validation_run_history_detail(
     ).first()
     if not run:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Validation run not found.")
+    get_scoped_application(run.application_id, member, db)
     return run
 
 

@@ -38,6 +38,8 @@ class QueueItemResponse(BaseModel):
     open_exceptions_count: int
     critical_exceptions_count: int
     ready_for_approval: bool
+    blocking_reasons: List[str] = Field(default_factory=list)
+    vendor_replied: bool = False
     next_action: str
 
 

@@ -1,3 +1,4 @@
+from browser_support import launch_browser
 """Take a new vendor through the actual browser form and reviewer decision."""
 
 import json
@@ -78,7 +79,7 @@ with tempfile.TemporaryDirectory(prefix="zamp-fresh-ui-", ignore_cleanup_errors=
         time.sleep(0.05)
     try:
         with sync_playwright() as pw:
-            browser = pw.chromium.launch(executable_path=str(Path(os.environ["LOCALAPPDATA"]) / "ms-playwright/chromium-1234/chrome-win64/chrome.exe"), headless=True, args=["--disable-gpu", "--no-sandbox"])
+            browser = launch_browser(pw, headless=True, args=["--disable-gpu", "--no-sandbox"])
             page = browser.new_page(viewport={"width": 1440, "height": 900})
             page.set_default_timeout(15000)
             def wait_for_step(label):
