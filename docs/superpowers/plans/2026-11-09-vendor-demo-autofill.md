@@ -64,5 +64,5 @@
 
 - [x] Document the one-click flow and its limits.
 - [x] Run backend suite, frontend build, and Playwright verification. Frontend build and Playwright passed; backend suite ran with 102 passed and 16 failures caused by the pre-existing missing `document_processing_jobs.stage` test schema column.
-- [ ] Commit and push to the configured repository; confirm the hosted page exposes the new action.
+- [x] Commit and push to the configured repository; confirm the hosted page exposes the new action and serves a sample PDF.
 
