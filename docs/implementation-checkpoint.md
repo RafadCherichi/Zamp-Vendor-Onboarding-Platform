@@ -16,6 +16,15 @@ This section supersedes the historical pause and older test totals below.
 
 Final result for this pass: **158 backend tests passed**, 1 warning, 63.37 seconds; 9 isolated browser checks passed; frontend production build passed; git diff whitespace check passed. The PAN source-document/version metadata addition was made during the full run; its specific linkage should be included in the next focused browser/evidence refresh. All changes remain local and uncommitted.
 
+## Release status — 9 November 2026
+
+- Scenario manifest refreshed against the release: 14 case IDs, 15 outcomes including the correction sequence, all passed. Workbook refreshed from current manifest/results using the bundled spreadsheet runtime.
+- Latest isolated browser suite: 9/9 passed at 320, 767, 768 and 1440 widths, including reviewer access, admin/procurement queue, protected document, exact notification focus/reload and company-matched autofill/reset.
+- Commit `2be8ede` was pushed to GitHub `main`, the branch configured in Render. Render health is HTTP 200. Its deployed JavaScript SHA-256 matches the local release bundle exactly.
+- Hosted reviewer queue smoke check returned 3/3 currently assigned cases: clean case ready; correction and registry-risk cases blocked. No decision or data changes were made by the hosted smoke check.
+- Remaining work: the demo video only (per user request) and later top-level folder organization (user requested defer until project is finished). Narrated recording export has not yet succeeded.
+- All release changes are committed. Working tree was clean at push; generated workbook inspect output is ignored.
+
 ## Completed changes with focused verification
 - One responsive case collection; queue response preserves blocker/reply fields; stale search responses discarded.
 - Existing invite acceptance verifies current password and preserves credentials; incompatible membership rejected.
