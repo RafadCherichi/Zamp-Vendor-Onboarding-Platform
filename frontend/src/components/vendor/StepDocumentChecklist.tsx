@@ -6,6 +6,7 @@ import {
   apiUploadDocument,
   getDocumentPreviewUrl,
   apiFetchDocumentExtraction,
+  apiCorrectExtractedField,
   apiReprocessDocument,
   apiFetchProcessingProgress,
 } from '../../api/applications';
@@ -51,6 +52,11 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
   const [loadingExtraction, setLoadingExtraction] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
   const [revealedFields, setRevealedFields] = useState<Record<string, boolean>>({});
+  const [correctionValues, setCorrectionValues] = useState<Record<string, string>>({});
+  const [correctionReasons, setCorrectionReasons] = useState<Record<string, string>>({});
+  const [savingCorrectionId, setSavingCorrectionId] = useState<string | null>(null);
+  const [correctionMessage, setCorrectionMessage] = useState<string | null>(null);
+  const [correctionError, setCorrectionError] = useState<string | null>(null);
 
   const handleFileUpload = async (documentType: string, file: File, afterVersion: number) => {
     setUploadingType(documentType);
@@ -87,10 +93,45 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
     try {
       const data = await apiFetchDocumentExtraction(token, application.id, slot.id);
       setExtractionDetail(data);
+      setCorrectionValues(Object.fromEntries(data.fields.map((field) => [field.id, field.vendor_corrected_value ?? field.extracted_value])));
+      setCorrectionReasons(Object.fromEntries(data.fields.map((field) => [field.id, field.vendor_correction_reason ?? ''])));
     } catch (err: any) {
       setUploadError(err?.message || 'Failed to load extraction details');
     } finally {
       setLoadingExtraction(false);
+    }
+  };
+
+  const handleSaveCorrection = async (fieldId: string) => {
+    if (!inspectingDoc || !extractionDetail) return;
+    const field = extractionDetail.fields.find((item) => item.id === fieldId);
+    if (!field) return;
+    setSavingCorrectionId(fieldId);
+    setCorrectionError(null);
+    setCorrectionMessage(null);
+    try {
+      const result = await apiCorrectExtractedField(
+        token,
+        application.id,
+        inspectingDoc.id,
+        fieldId,
+        correctionValues[fieldId] ?? '',
+        correctionReasons[fieldId] ?? '',
+      );
+      setExtractionDetail((current) => current ? {
+        ...current,
+        fields: current.fields.map((item) => item.id === fieldId ? result.field : item),
+      } : current);
+      setCorrectionValues((current) => ({ ...current, [fieldId]: result.field.vendor_corrected_value ?? result.field.extracted_value }));
+      setCorrectionReasons((current) => ({ ...current, [fieldId]: result.field.vendor_correction_reason ?? '' }));
+      setCorrectionMessage(result.validation_rerun
+        ? 'Correction saved. Checks have been rerun; a reviewer still makes the final decision.'
+        : 'Correction saved. The checks will run again when you submit your application.');
+      onRefresh();
+    } catch (err: any) {
+      setCorrectionError(err?.message || 'Could not save your correction.');
+    } finally {
+      setSavingCorrectionId(null);
     }
   };
 
@@ -117,6 +158,7 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
   const uploadedDocs = documents.filter((d) => d.status === 'UPLOADED');
   const uploadedMandatory = mandatoryDocs.filter((d) => d.status === 'UPLOADED');
   const allMandatoryUploaded = mandatoryDocs.length > 0 && uploadedMandatory.length === mandatoryDocs.length;
+  const canCorrectOcr = application.status === 'DRAFT' || application.status === 'IN_PROGRESS';
 
   const needsAttentionDocs = documents.filter(
     (d) =>
@@ -706,7 +748,9 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
                               <div className="text-sm font-semibold font-mono text-indigo-950 flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                   <span>
-                                    {revealedFields[f.id] ? f.extracted_value : f.normalized_value || f.extracted_value}
+                                    {revealedFields[f.id]
+                                      ? (f.vendor_corrected_value || f.extracted_value)
+                                      : (f.vendor_corrected_value || f.normalized_value || f.extracted_value)}
                                   </span>
                                   {(f.field_name.includes('pan') || f.field_name.includes('account')) && (
                                     <button
@@ -733,6 +777,41 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
                               <div className="text-[10px] text-slate-400">
                                 Method: <span className="font-semibold">{f.extraction_method}</span>
                               </div>
+                              {canCorrectOcr && (
+                                <div className="mt-3 border-t border-slate-100 pt-3 space-y-2">
+                                  <p className="text-xs font-semibold text-slate-800">Check this against your document</p>
+                                  <p className="text-[11px] text-slate-600">If OCR misread the source, you can correct the value here. The original reading stays in the record for the reviewer.</p>
+                                  <label className="block text-xs font-medium text-slate-700">
+                                    Value from your document
+                                    <input
+                                      value={correctionValues[f.id] ?? f.vendor_corrected_value ?? f.extracted_value}
+                                      onChange={(event) => setCorrectionValues((current) => ({ ...current, [f.id]: event.target.value }))}
+                                      maxLength={2000}
+                                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono font-normal text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-700"
+                                    />
+                                  </label>
+                                  <label className="block text-xs font-medium text-slate-700">
+                                    Why did you change it?
+                                    <textarea
+                                      value={correctionReasons[f.id] ?? ''}
+                                      onChange={(event) => setCorrectionReasons((current) => ({ ...current, [f.id]: event.target.value }))}
+                                      rows={2}
+                                      maxLength={1000}
+                                      placeholder="For example: I checked the PAN card preview; OCR missed one character."
+                                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-700"
+                                    />
+                                  </label>
+                                  <button
+                                    type="button"
+                                    disabled={savingCorrectionId !== null || !(correctionValues[f.id] ?? '').trim() || (correctionReasons[f.id] ?? '').trim().length < 3}
+                                    onClick={() => handleSaveCorrection(f.id)}
+                                    className="inline-flex rounded-lg bg-emerald-800 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    {savingCorrectionId === f.id ? 'Saving and checking…' : f.vendor_corrected_value ? 'Save updated correction' : 'Save correction & rerun checks'}
+                                  </button>
+                                  {f.vendor_corrected_value && <p className="text-[11px] text-emerald-800">You corrected this field{f.vendor_corrected_at ? ` on ${new Date(f.vendor_corrected_at).toLocaleString()}` : ''}. Original OCR: {f.extracted_value}</p>}
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -744,6 +823,9 @@ export const StepDocumentChecklist: React.FC<StepProps> = ({ token, application,
                 )}
               </div>
             </div>
+
+            {correctionMessage && <p role="status" className="px-6 py-2 border-t border-emerald-100 bg-emerald-50 text-xs text-emerald-900">{correctionMessage}</p>}
+            {correctionError && <p role="alert" className="px-6 py-2 border-t border-rose-100 bg-rose-50 text-xs text-rose-900">{correctionError}</p>}
 
             <div className="px-6 py-3 border-t border-slate-200 bg-white flex justify-between items-center text-xs text-slate-500">
               <button

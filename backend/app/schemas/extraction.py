@@ -12,8 +12,23 @@ class ExtractedFieldResponse(BaseModel):
     page_number: int = 1
     evidence_text: Optional[str] = None
     extraction_method: str
+    vendor_corrected_value: Optional[str] = None
+    vendor_correction_reason: Optional[str] = None
+    vendor_corrected_by_name: Optional[str] = None
+    vendor_corrected_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class VendorExtractionCorrectionRequest(BaseModel):
+    corrected_value: str = Field(min_length=1, max_length=2000)
+    reason: str = Field(min_length=3, max_length=1000)
+
+
+class VendorExtractionCorrectionResponse(BaseModel):
+    field: ExtractedFieldResponse
+    message: str
+    validation_rerun: bool = False
 
 
 class DocumentExtractionResponse(BaseModel):

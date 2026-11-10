@@ -25,6 +25,8 @@ import {
   apiAssignReviewer,
   apiGetOrganisationReviewers,
 } from '../../api/queue';
+import { apiFetchDocumentExtraction } from '../../api/applications';
+import type { DocumentExtractionDetail } from '../../types/application';
 import type {
   ApplicationComprehensiveDetails,
   ReviewerUser,
@@ -77,6 +79,8 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const protectedPreview = useProtectedDocument(previewUrl, token);
   const [previewTitle, setPreviewTitle] = useState<string>('');
+  const [previewExtraction, setPreviewExtraction] = useState<DocumentExtractionDetail | null>(null);
+  const [previewExtractionLoading, setPreviewExtractionLoading] = useState(false);
 
   // Modals for Decision Actions
   const [activeModal, setActiveModal] = useState<
@@ -115,6 +119,23 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
       setReviewers(data);
     } catch {
       // Ignore
+    }
+  };
+
+  const openReviewerDocument = async (doc: ApplicationComprehensiveDetails['documents'][number], ver: ApplicationComprehensiveDetails['documents'][number]['versions'][number]) => {
+    setPreviewUrl(ver.preview_url);
+    setPreviewTitle(`${doc.title} (v${ver.version_number})`);
+    setPreviewExtraction(null);
+    if (ver.id !== doc.current_version_id) return;
+
+    setPreviewExtractionLoading(true);
+    try {
+      const extraction = await apiFetchDocumentExtraction(token, applicationId, doc.id);
+      setPreviewExtraction(extraction);
+    } catch (err: any) {
+      setError(err?.message || 'Could not load OCR extraction details.');
+    } finally {
+      setPreviewExtractionLoading(false);
     }
   };
 
@@ -774,10 +795,7 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
                         </div>
 
                         <button
-                          onClick={() => {
-                            setPreviewUrl(ver.preview_url);
-                            setPreviewTitle(`${doc.title} (v${ver.version_number})`);
-                          }}
+                          onClick={() => openReviewerDocument(doc, ver)}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium text-xs transition self-start md:self-auto"
                         >
                           <Eye className="w-3.5 h-3.5 text-indigo-600" />
@@ -1191,15 +1209,40 @@ export const ApplicationDetailsWorkspace: React.FC<Props> = ({
       {/* Safe Document Preview Drawer / Modal */}
       {previewUrl && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-2xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-4xl h-[85vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+          <div className={`bg-white rounded-2xl w-full ${previewExtraction || previewExtractionLoading ? 'max-w-7xl' : 'max-w-4xl'} h-[88vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden`}>
             <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <span className="font-bold text-slate-900 text-sm">{previewTitle}</span>
-              <button onClick={() => setPreviewUrl(null)} className="p-1 rounded text-slate-400 hover:text-slate-700">
+              <div>
+                <span className="font-bold text-slate-900 text-sm">{previewTitle}</span>
+                {previewExtraction && <p className="text-xs text-slate-500 mt-1">Compare the document with the original OCR and any value the applicant corrected. A reviewer still owns the final decision.</p>}
+              </div>
+              <button onClick={() => { setPreviewUrl(null); setPreviewExtraction(null); }} className="p-1 rounded text-slate-400 hover:text-slate-700">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex-1 bg-slate-100 p-2">
-              {protectedPreview.url ? <iframe src={protectedPreview.url} className="w-full h-full rounded border border-slate-200 bg-white" title={previewTitle} /> : <p role="status" className="p-6 text-sm">{protectedPreview.error || 'Opening document…'}</p>}
+            <div className={`flex-1 min-h-0 bg-slate-100 p-2 grid ${previewExtraction || previewExtractionLoading ? 'grid-cols-1 lg:grid-cols-2 gap-3' : 'grid-cols-1'}`}>
+              <div className="min-h-0 bg-slate-200 rounded overflow-hidden">
+                {protectedPreview.url ? <iframe src={protectedPreview.url} className="w-full h-full rounded border border-slate-200 bg-white" title={previewTitle} /> : <p role="status" className="p-6 text-sm">{protectedPreview.error || 'Opening document…'}</p>}
+              </div>
+              {(previewExtraction || previewExtractionLoading) && (
+                <div className="min-h-0 overflow-y-auto rounded border border-slate-200 bg-white p-4 space-y-3">
+                  <div>
+                    <h3 className="font-semibold text-slate-900">What OCR read</h3>
+                    <p className="text-xs text-slate-500 mt-1">Applicant corrections are shown alongside the original OCR reading and their explanation. Check both against the source document.</p>
+                  </div>
+                  {previewExtractionLoading && <p role="status" className="text-sm text-slate-500 py-8 text-center">Loading extracted fields…</p>}
+                  {previewExtraction?.fields.map((field) => (
+                    <section key={field.id} className="rounded-xl border border-slate-200 p-3 space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h4 className="text-sm font-semibold text-slate-900">{humanLabel(field.field_name)}</h4>
+                        <span className="text-xs rounded-full bg-slate-100 px-2 py-1 text-slate-700">{Math.round(field.confidence_score * 100)}% confidence · page {field.page_number}</span>
+                      </div>
+                      <p className="text-xs text-slate-600"><span className="font-medium">Original OCR:</span> {field.extracted_value}</p>
+                      {field.vendor_corrected_value && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 space-y-1"><p className="text-xs text-emerald-950"><span className="font-semibold">Applicant correction:</span> {field.vendor_corrected_value}</p><p className="text-xs text-emerald-900"><span className="font-semibold">Applicant explanation:</span> {field.vendor_correction_reason || 'No explanation provided'}</p><p className="text-[11px] text-emerald-800">Submitted by {field.vendor_corrected_by_name || 'the applicant'}{field.vendor_corrected_at ? ` · ${new Date(field.vendor_corrected_at).toLocaleString()}` : ''}</p></div>}
+                      {field.evidence_text && <p className="text-xs rounded bg-slate-50 p-2 text-slate-600">Source text: “{field.evidence_text}”</p>}
+                    </section>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

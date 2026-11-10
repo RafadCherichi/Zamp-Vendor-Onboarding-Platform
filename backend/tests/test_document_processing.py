@@ -7,6 +7,9 @@ from reportlab.lib.pagesizes import letter
 
 from app.database import SessionLocal
 from app.models.document import Document, DocumentVersion, DocumentTypeEnum
+from app.models.application import Application
+from app.models.audit import AuditEvent
+from app.models.user import User
 from app.models.extraction import (
     DocumentProcessingJob,
     DocumentExtractionResult,
@@ -32,6 +35,33 @@ def get_token(client, email: str, password: str = "Password123!") -> str:
     resp = client.post("/api/auth/login", json={"email": email, "password": password})
     assert resp.status_code == 200, f"Login failed for {email}: {resp.text}"
     return resp.json()["access_token"]
+
+
+def create_vendor_document(client, tmp_path, suffix: str = "vendor"):
+    proc_token = get_token(client, "procurement@apex.com")
+    vendor_email = f"ocr_{suffix}_{secrets.token_hex(4)}@testpipe.in"
+    inv_resp = client.post(
+        "/api/invitations",
+        headers={"Authorization": f"Bearer {proc_token}"},
+        json={"vendor_name": "OCR Correction Test Corp", "vendor_email": vendor_email, "days_valid": 5},
+    )
+    assert inv_resp.status_code == 201, inv_resp.text
+    raw_token = inv_resp.json()["demo_invitation_url"].replace("/invite/", "")
+    acc_resp = client.post(f"/api/invitations/token/{raw_token}/accept", json={"password": "Password123!"})
+    assert acc_resp.status_code == 200, acc_resp.text
+    vendor_token = acc_resp.json()["access_token"]
+    app_id = acc_resp.json()["application_id"]
+
+    pan_file = str(tmp_path / f"pan-{suffix}.pdf")
+    generate_synthetic_pan_pdf(pan_file)
+    with open(pan_file, "rb") as f:
+        up_resp = client.post(
+            f"/api/applications/{app_id}/documents/PAN_PROOF/upload",
+            headers={"Authorization": f"Bearer {vendor_token}"},
+            files={"file": ("pan.pdf", f, "application/pdf")},
+        )
+    assert up_resp.status_code == 200, up_resp.text
+    return vendor_token, app_id, up_resp.json()["id"]
 
 
 # -------------------------------------------------------------
@@ -333,3 +363,129 @@ def test_cross_tenant_extraction_isolation(client, tmp_path):
     )
     # Must be 404 or 403 due to organisation scoping
     assert leak_resp.status_code in [403, 404]
+
+
+def test_vendor_can_correct_ocr_field_and_preserves_original_with_audit(client, tmp_path):
+    vendor_token, app_id, document_id = create_vendor_document(client, tmp_path, "owner")
+    headers = {"Authorization": f"Bearer {vendor_token}"}
+    extraction = client.get(
+        f"/api/applications/{app_id}/documents/{document_id}/extraction", headers=headers
+    ).json()
+    field = next(item for item in extraction["fields"] if item["field_name"] == "pan_number")
+    original = field["extracted_value"]
+
+    response = client.put(
+        f"/api/applications/{app_id}/documents/{document_id}/extraction-fields/{field['id']}/correction",
+        headers=headers,
+        json={"corrected_value": "AAPFU1234F", "reason": "I checked the PAN card preview; OCR missed one character."},
+    )
+
+    assert response.status_code == 200, response.text
+    result = response.json()["field"]
+    assert result["extracted_value"] == original
+    assert result["vendor_corrected_value"] == "AAPFU1234F"
+    assert result["vendor_correction_reason"].startswith("I checked the PAN card")
+    assert result["vendor_corrected_by_name"]
+    assert result["vendor_corrected_at"]
+    assert response.json()["validation_rerun"] is True
+    with SessionLocal() as db:
+        saved_audit = db.query(AuditEvent).filter_by(
+            application_id=app_id,
+            entity_id=field["id"],
+            event_type="VENDOR_OCR_FIELD_CORRECTED",
+        ).one()
+        audit_details = json.loads(saved_audit.details_json)
+        assert audit_details["document_version_id"] == extraction["document_version_id"]
+        assert audit_details["original_ocr_value"]
+        assert audit_details["corrected_value"]
+        assert audit_details["reason"].startswith("I checked the PAN card")
+
+    refreshed = client.get(
+        f"/api/applications/{app_id}/documents/{document_id}/extraction", headers=headers
+    ).json()
+    saved = next(item for item in refreshed["fields"] if item["id"] == field["id"])
+    assert saved["extracted_value"] == original
+    assert saved["vendor_corrected_value"] == "AAPFU1234F"
+
+    reviewer_token = get_token(client, "reviewer@apex.com")
+    with SessionLocal() as db:
+        app = db.get(Application, app_id)
+        reviewer = db.query(User).filter_by(email="reviewer@apex.com").one()
+        app.assigned_reviewer_id = reviewer.id
+        db.commit()
+    reviewer_view = client.get(
+        f"/api/applications/{app_id}/documents/{document_id}/extraction",
+        headers={"Authorization": f"Bearer {reviewer_token}"},
+    )
+    assert reviewer_view.status_code == 200, reviewer_view.text
+    reviewer_field = next(item for item in reviewer_view.json()["fields"] if item["id"] == field["id"])
+    assert reviewer_field["extracted_value"] == original
+    assert reviewer_field["vendor_corrected_value"] == "AAPFU1234F"
+    assert reviewer_field["vendor_correction_reason"].startswith("I checked the PAN card")
+
+
+def test_ocr_correction_is_vendor_only_and_scoped_to_own_application(client, tmp_path):
+    owner_token, app_id, document_id = create_vendor_document(client, tmp_path, "scope")
+    extraction = client.get(
+        f"/api/applications/{app_id}/documents/{document_id}/extraction",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    ).json()
+    field = extraction["fields"][0]
+    body = {"corrected_value": "Corrected", "reason": "Confirmed against my source document."}
+    path = f"/api/applications/{app_id}/documents/{document_id}/extraction-fields/{field['id']}/correction"
+
+    for email in ("reviewer@apex.com", "admin@apex.com"):
+        response = client.put(path, headers={"Authorization": f"Bearer {get_token(client, email)}"}, json=body)
+        assert response.status_code == 403, response.text
+
+    other_token, _, _ = create_vendor_document(client, tmp_path, "other")
+    response = client.put(path, headers={"Authorization": f"Bearer {other_token}"}, json=body)
+    assert response.status_code in (403, 404), response.text
+
+
+def test_ocr_correction_rejects_empty_values_and_stale_document_version(client, tmp_path):
+    vendor_token, app_id, document_id = create_vendor_document(client, tmp_path, "stale")
+    headers = {"Authorization": f"Bearer {vendor_token}"}
+    extraction = client.get(
+        f"/api/applications/{app_id}/documents/{document_id}/extraction", headers=headers
+    ).json()
+    field = extraction["fields"][0]
+    path = f"/api/applications/{app_id}/documents/{document_id}/extraction-fields/{field['id']}/correction"
+
+    invalid = client.put(path, headers=headers, json={"corrected_value": "  ", "reason": "  "})
+    assert invalid.status_code == 422
+
+    pan_file = str(tmp_path / "pan-replaced.pdf")
+    generate_synthetic_pan_pdf(pan_file)
+    with open(pan_file, "rb") as f:
+        replaced = client.post(
+            f"/api/applications/{app_id}/documents/PAN_PROOF/upload",
+            headers=headers,
+            files={"file": ("pan-replaced.pdf", f, "application/pdf")},
+        )
+    assert replaced.status_code == 200, replaced.text
+    stale = client.put(
+        path,
+        headers=headers,
+        json={"corrected_value": "AAPFU1234F", "reason": "Attempted correction on replaced proof."},
+    )
+    assert stale.status_code == 404, stale.text
+
+
+def test_vendor_cannot_correct_ocr_after_submission(client, tmp_path):
+    vendor_token, app_id, document_id = create_vendor_document(client, tmp_path, "submitted")
+    headers = {"Authorization": f"Bearer {vendor_token}"}
+    extraction = client.get(
+        f"/api/applications/{app_id}/documents/{document_id}/extraction", headers=headers
+    ).json()
+    field = extraction["fields"][0]
+    with SessionLocal() as db:
+        app = db.get(Application, app_id)
+        app.status = "SUBMITTED"
+        db.commit()
+    response = client.put(
+        f"/api/applications/{app_id}/documents/{document_id}/extraction-fields/{field['id']}/correction",
+        headers=headers,
+        json={"corrected_value": "Updated", "reason": "I checked the source document."},
+    )
+    assert response.status_code == 409, response.text

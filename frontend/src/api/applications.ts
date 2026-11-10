@@ -172,6 +172,33 @@ export async function apiReprocessDocument(
   return res.json();
 }
 
+export async function apiCorrectExtractedField(
+  token: string,
+  applicationId: string,
+  documentId: string,
+  fieldId: string,
+  correctedValue: string,
+  reason: string
+): Promise<{ field: DocumentExtractionDetail['fields'][number]; message: string; validation_rerun: boolean }> {
+  const res = await fetch(
+    `${API_BASE}/applications/${applicationId}/documents/${documentId}/extraction-fields/${fieldId}/correction`,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({ corrected_value: correctedValue, reason }),
+    }
+  );
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || 'Could not save the corrected OCR value.');
+  }
+  return res.json();
+}
+
 export async function apiSubmitApplication(
   token: string,
   applicationId: string

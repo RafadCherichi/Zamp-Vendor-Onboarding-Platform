@@ -55,6 +55,8 @@ from app.schemas.application import (
 from app.schemas.extraction import (
     DocumentExtractionResponse,
     ExtractedFieldResponse,
+    VendorExtractionCorrectionRequest,
+    VendorExtractionCorrectionResponse,
 )
 from app.schemas.review import (
     DashboardMetricsResponse,
@@ -144,7 +146,7 @@ def build_application_response(app: Application, db: Optional[Session] = None) -
                         except Exception:
                             review_flags = []
                     for f in extraction.fields:
-                        fields_summary[f.field_name] = mask_sensitive_value(f.field_name, f.normalized_value or f.extracted_value)
+                        fields_summary[f.field_name] = mask_sensitive_value(f.field_name, f.vendor_corrected_value or f.normalized_value or f.extracted_value)
                 else:
                     proc_status = "QUEUED"
 
@@ -973,7 +975,7 @@ async def upload_document(
             except Exception:
                 flags = []
         for f in extraction.fields:
-            fields_summary[f.field_name] = mask_sensitive_value(f.field_name, f.normalized_value or f.extracted_value)
+            fields_summary[f.field_name] = mask_sensitive_value(f.field_name, f.vendor_corrected_value or f.normalized_value or f.extracted_value)
 
     return DocumentSlotResponse(
         id=doc.id,
@@ -1046,6 +1048,10 @@ def get_document_extraction(
             page_number=f.page_number,
             evidence_text=f.evidence_text,
             extraction_method=f.extraction_method,
+            vendor_corrected_value=f.vendor_corrected_value,
+            vendor_correction_reason=f.vendor_correction_reason,
+            vendor_corrected_by_name=f.vendor_corrected_by.full_name if f.vendor_corrected_by else None,
+            vendor_corrected_at=f.vendor_corrected_at,
         )
         for f in extraction.fields
     ]
@@ -1064,6 +1070,95 @@ def get_document_extraction(
         review_flags=flags,
         fields=fields_resp,
         created_at=extraction.created_at,
+    )
+
+
+@router.put(
+    "/{application_id}/documents/{document_id}/extraction-fields/{field_id}/correction",
+    response_model=VendorExtractionCorrectionResponse,
+    summary="Correct a document field read by OCR",
+    description="Allow the applicant to correct a misread field before submitting, while preserving the original OCR reading and audit trail.",
+)
+def correct_vendor_extracted_field(
+    application_id: str,
+    document_id: str,
+    field_id: str,
+    request: VendorExtractionCorrectionRequest,
+    db: Session = Depends(get_db),
+    member: OrganisationMember = Depends(require_roles([RoleEnum.VENDOR])),
+) -> VendorExtractionCorrectionResponse:
+    app = get_scoped_application(application_id, member, db)
+    if app.status not in {ApplicationStatusEnum.DRAFT.value, ApplicationStatusEnum.IN_PROGRESS.value}:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="OCR values can only be corrected before the application is submitted. Use the clarification request if a reviewer has asked for a change.")
+    doc = db.query(Document).filter(Document.id == document_id, Document.application_id == app.id).first()
+    if not doc or not doc.current_version_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Current document version not found.")
+
+    extraction = db.query(DocumentExtractionResult).filter_by(document_version_id=doc.current_version_id).first()
+    field = db.query(ExtractedField).filter_by(id=field_id, extraction_result_id=extraction.id).first() if extraction else None
+    if not field:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="OCR field not found on the current document version.")
+
+    corrected_value = request.corrected_value.strip()
+    reason = request.reason.strip()
+    if not corrected_value or len(corrected_value) > 2000 or len(reason) < 3 or len(reason) > 1000:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Enter a corrected value and a short reason for the change.")
+
+    previous_value = field.vendor_corrected_value
+    field.vendor_corrected_value = corrected_value
+    field.vendor_correction_reason = reason
+    field.vendor_corrected_by_user_id = member.user_id
+    field.vendor_corrected_at = datetime.now(timezone.utc)
+    db.add(AuditEvent(
+        organisation_id=app.organisation_id,
+        application_id=app.id,
+        actor_user_id=member.user_id,
+        actor_role=member.role,
+        event_type="VENDOR_OCR_FIELD_CORRECTED",
+        entity_type="EXTRACTED_FIELD",
+        entity_id=field.id,
+        details_json=json.dumps({
+            "document_id": doc.id,
+            "document_version_id": doc.current_version_id,
+            "field_name": field.field_name,
+            "original_ocr_value": mask_sensitive_value(field.field_name, field.extracted_value),
+            "previous_corrected_value": mask_sensitive_value(field.field_name, previous_value) if previous_value else None,
+            "corrected_value": mask_sensitive_value(field.field_name, corrected_value),
+            "reason": reason,
+        }),
+    ))
+    db.commit()
+    db.refresh(field)
+    validation_rerun = False
+    try:
+        from app.services.validation.orchestrator import ValidationOrchestrator
+        ValidationOrchestrator(db).run_full_validation(
+            application_id=app.id,
+            user_id=member.user_id,
+            run_type="VENDOR_OCR_CORRECTION",
+            trigger_reason=f"Applicant corrected OCR field: {field.field_name}",
+        )
+        validation_rerun = True
+    except Exception:
+        logger.exception("OCR correction was saved but pre-submission validation rerun failed for application %s", app.id)
+    db.refresh(field)
+    return VendorExtractionCorrectionResponse(
+        field=ExtractedFieldResponse(
+            id=field.id,
+            field_name=field.field_name,
+            extracted_value=field.extracted_value,
+            normalized_value=mask_sensitive_value(field.field_name, field.normalized_value or field.extracted_value),
+            confidence_score=field.confidence_score,
+            page_number=field.page_number,
+            evidence_text=field.evidence_text,
+            extraction_method=field.extraction_method,
+            vendor_corrected_value=field.vendor_corrected_value,
+            vendor_correction_reason=field.vendor_correction_reason,
+            vendor_corrected_by_name=member.user.full_name if member.user else None,
+            vendor_corrected_at=field.vendor_corrected_at,
+        ),
+        message="Your correction is saved. The original OCR reading is preserved.",
+        validation_rerun=validation_rerun,
     )
 
 

@@ -42,7 +42,9 @@ def get_extracted_fields_by_doc_type(app: Application) -> Dict[str, Dict[str, An
         }
 
         for fld in ext_result.fields:
-            fields_dict[fld.field_name] = fld.extracted_value
+            # Applicant-confirmed corrections take precedence for future checks;
+            # the original OCR value remains available for evidence and audit.
+            fields_dict[fld.field_name] = fld.vendor_corrected_value or fld.normalized_value or fld.extracted_value
 
         doc_data[doc.document_type] = fields_dict
 

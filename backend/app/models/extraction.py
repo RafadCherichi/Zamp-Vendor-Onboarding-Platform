@@ -89,6 +89,12 @@ class ExtractedField(Base, TimestampMixin):
     normalized_value = Column(Text, nullable=True)
     confidence_score = Column(Float, default=1.0, nullable=False)
 
+    # Vendor corrections are stored separately so the source OCR reading remains intact.
+    vendor_corrected_value = Column(Text, nullable=True)
+    vendor_correction_reason = Column(Text, nullable=True)
+    vendor_corrected_by_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    vendor_corrected_at = Column(DateTime(timezone=True), nullable=True)
+
     page_number = Column(Integer, default=1, nullable=False)
     evidence_text = Column(Text, nullable=True)
     bounding_box_json = Column(Text, nullable=True)
@@ -96,3 +102,4 @@ class ExtractedField(Base, TimestampMixin):
 
     # Relationships
     extraction_result = relationship("DocumentExtractionResult", back_populates="fields")
+    vendor_corrected_by = relationship("User", foreign_keys=[vendor_corrected_by_user_id])

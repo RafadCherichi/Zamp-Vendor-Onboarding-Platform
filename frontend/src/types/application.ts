@@ -28,6 +28,10 @@ export interface ExtractedFieldDetail {
   page_number: number;
   evidence_text?: string | null;
   extraction_method: string;
+  vendor_corrected_value?: string | null;
+  vendor_correction_reason?: string | null;
+  vendor_corrected_by_name?: string | null;
+  vendor_corrected_at?: string | null;
 }
 
 export interface DocumentExtractionDetail {
