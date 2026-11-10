@@ -8,7 +8,7 @@
 
 **Tech Stack:** React 19, TypeScript, Vite, Tailwind CSS v4, Lucide; FastAPI, SQLAlchemy, Pydantic; existing Pytest and Playwright acceptance infrastructure.
 
-**Spec:** `ASA Case Study — Candidate Guide.pdf`, especially pages 1–2, 4 and 6–7. The PS-2 requirements in that guide take precedence for evaluator scope. `Final_Consolidated_Product_Specification_Vendor_Onboarding_Platform.docx` supplies implementation detail where it does not expand or conflict with the assignment.
+**Spec:** `docs/case-study/candidate-guide.pdf`, especially pages 1–2, 4 and 6–7. The PS-2 requirements in that guide take precedence for evaluator scope. `docs/product/consolidated-product-specification.docx` supplies implementation detail where it does not expand or conflict with the assignment.
 
 ## Case-study requirements (source of truth)
 
@@ -67,7 +67,7 @@ Score each evidence line full / half / zero / untested. Unknowns remain a range.
 - `frontend/src/components/vendor/SubmissionConfirmation.tsx`: show saved validation counts instead of implying that a generic live human review is underway; state the next owner and decision path plainly.
 - `frontend/src/index.css`, shared UI primitives, and affected screen files: deliberate visual system and alignment fixes.
 - Existing backend unit and browser acceptance tests plus focused history, tenant-scope, exact-run, notification-count, and result-copy coverage.
-- `PROTOTYPE_GRADING_RUBRIC.md`, `PROTOTYPE_GRADE.md`, `DEMO_SCRIPT.md`, and `DEMO_RUNBOOK.md`: update to PS-specific assessment and a <=5-minute live narrative.
+- `docs/product/grading-rubric.md`, `docs/product/prototype-grade.md`, `docs/demo/walkthrough-script.md`, and `docs/demo/runbook.md`: update to PS-specific assessment and a <=5-minute live narrative.
 
 ## Execution tasks
 
@@ -76,7 +76,7 @@ Score each evidence line full / half / zero / untested. Unknowns remain a range.
 - Record the current UI and workflow in a fresh local browser run at 1440×900 and 390px.
 - Run the existing backend and frontend suites; save full outputs with the plan ledger.
 - Execute the happy path and each prepared edge case with expected outcomes written before each run.
-- Grade every PS-specific check; record exact evidence and unknowns in `PROTOTYPE_GRADE.md`.
+- Grade every PS-specific check; record exact evidence and unknowns in `docs/product/prototype-grade.md`.
 - Treat the previous 100-point prototype rubric score as historical; do not translate it mechanically.
 
 ### Task 2 — Make the real process inspectable as runs

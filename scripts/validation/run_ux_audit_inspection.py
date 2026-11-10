@@ -1,11 +1,13 @@
 import os
 import sys
 import time
+from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 CHROME_PATH = r"C:\Users\91994\AppData\Local\ms-playwright\chromium-1234\chrome-win64\chrome.exe"
 BASE_URL = "http://127.0.0.1:5173"
-SCREENSHOT_DIR = "audit_screenshots"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SCREENSHOT_DIR = str(REPO_ROOT / "docs" / "evidence" / "ux-audit-screenshots")
 os.makedirs(SCREENSHOT_DIR, exist_ok=True)
 
 def login(page, email, password="Password123!"):

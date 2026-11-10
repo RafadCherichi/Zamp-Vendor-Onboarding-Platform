@@ -1,0 +1,140 @@
+{
+  "duration_seconds": 297.34,
+  "source": "real browser UI in isolated seeded database",
+  "format": "silent MP4 with selectable English subtitles plus separate editable SRT",
+  "fresh_clean_submission": true,
+  "supplier_approval_notice": true,
+  "vendor_ocr_correction_saved": true,
+  "gstin_pan_conflict_submitted_live": true,
+  "gstin_correction_response_submitted": true,
+  "reviewer_reply_visible": true,
+  "registry_timeout_contrast_visible": true,
+  "scenes": [
+    {
+      "title": "Introduction and demo profiles",
+      "start": 0.0,
+      "end": 32.0,
+      "action_seconds": 9.59
+    },
+    {
+      "title": "Choose the supplier demo profile",
+      "start": 32.0,
+      "end": 38.11,
+      "action_seconds": 6.11
+    },
+    {
+      "title": "Supplier business identity",
+      "start": 38.11,
+      "end": 51.12,
+      "action_seconds": 5.77
+    },
+    {
+      "title": "Supplier tax registration",
+      "start": 51.12,
+      "end": 63.14,
+      "action_seconds": 3.98
+    },
+    {
+      "title": "Supplier authorised contact",
+      "start": 63.14,
+      "end": 70.16,
+      "action_seconds": 3.97
+    },
+    {
+      "title": "Supplier banking details",
+      "start": 70.16,
+      "end": 78.17,
+      "action_seconds": 3.98
+    },
+    {
+      "title": "Supplier business classification",
+      "start": 78.17,
+      "end": 85.19,
+      "action_seconds": 3.97
+    },
+    {
+      "title": "Supplier document checklist",
+      "start": 85.19,
+      "end": 95.2,
+      "action_seconds": 4.03
+    },
+    {
+      "title": "OCR review and applicant correction",
+      "start": 95.2,
+      "end": 113.2,
+      "action_seconds": 8.69
+    },
+    {
+      "title": "Supplier reviews and declares",
+      "start": 113.2,
+      "end": 120.39,
+      "action_seconds": 7.19
+    },
+    {
+      "title": "Live submission and check result",
+      "start": 120.39,
+      "end": 133.39,
+      "action_seconds": 11.89
+    },
+    {
+      "title": "Procurement assigns the reviewer",
+      "start": 133.39,
+      "end": 146.41,
+      "action_seconds": 10.5
+    },
+    {
+      "title": "Reviewer examines the evidence",
+      "start": 146.41,
+      "end": 163.8,
+      "action_seconds": 17.39
+    },
+    {
+      "title": "Reviewer records the decision",
+      "start": 163.8,
+      "end": 172.81,
+      "action_seconds": 5.3
+    },
+    {
+      "title": "Supplier receives the decision",
+      "start": 172.81,
+      "end": 184.83,
+      "action_seconds": 11.91
+    },
+    {
+      "title": "Live GSTIN and PAN conflict",
+      "start": 184.84,
+      "end": 206.86,
+      "action_seconds": 15.64
+    },
+    {
+      "title": "Supplier corrects the GSTIN",
+      "start": 206.86,
+      "end": 228.86,
+      "action_seconds": 18.83
+    },
+    {
+      "title": "Reviewer sees the supplier's reply",
+      "start": 228.86,
+      "end": 243.45,
+      "action_seconds": 14.59
+    },
+    {
+      "title": "Conflict run remains traceable",
+      "start": 243.45,
+      "end": 257.33,
+      "action_seconds": 13.88
+    },
+    {
+      "title": "Registry timeout means unknown",
+      "start": 257.33,
+      "end": 266.33,
+      "action_seconds": 5.19
+    },
+    {
+      "title": "Thank you and close on the sign-in page",
+      "start": 266.33,
+      "end": 297.34,
+      "action_seconds": 7.51
+    }
+  ]
+}

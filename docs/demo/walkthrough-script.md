@@ -2,8 +2,8 @@
 
 **Audience:** procurement lead, risk reviewer and case-study evaluator
 **Target length:** 4:40, leaving 20 seconds for screen transitions
-**Status:** script prepared; timed narration and recording still required
-**Evidence:** [scenario workbook](testdata/vendor_scenario_dataset.xlsx), [current scenario results](testdata/scenario_results.json), [fresh browser results](testdata/fresh_browser_results.json), [decision note](CASE_STUDY_DECISION_NOTE.md)
+**Status:** the final human-narrated walkthrough is in [`submission/demo/`](../../submission/demo/); this file remains a detailed live-demo guide
+**Evidence:** [scenario workbook](../../testdata/vendor_scenario_dataset.xlsx), [current scenario results](../../testdata/scenario_results.json), [fresh browser results](../../testdata/fresh_browser_results.json), [decision note](../case-study/decision-note.md)
 
 ## Before starting
 
@@ -29,4 +29,4 @@
 - Ask a first-time viewer what the vendor supplied, what the product decided, who acts next and why the buyer should care. Record their unaided answer before explaining.
 - Verify the evaluator-facing URL in a clean browser and confirm that the demo data is present or that reset/setup instructions work.
 - Keep synthetic documents and identifiers in the public demo. Do not claim a simulated provider is an official integration.
-- Do not claim turnaround improvements, fraud prevention, zero human error or reviewer-time savings as measured results. Any value estimate is an explicitly labelled planning assumption in [the decision note](CASE_STUDY_DECISION_NOTE.md).
+- Do not claim turnaround improvements, fraud prevention, zero human error or reviewer-time savings as measured results. Any value estimate is an explicitly labelled planning assumption in [the decision note](../case-study/decision-note.md).

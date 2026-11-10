@@ -9,7 +9,7 @@ I recommend one coordinated release, with the queue, identity and decision fixes
 
 ## What the case study asks us to prove
 
-Page 4 of the candidate guide asks a buyer to judge completeness, consistency and credibility of a vendor submission, receive an explained approved, pending or rejected result, and communicate the next requirement. Pages 2–3 also require a live process, visible stages, history and outputs. The five-minute recording must show a happy path and an edge case. This makes an unexplained pending case as much a product failure as a broken button. The rubric gives 44 points to the working process and safe decisions, 16 to edge cases, 25 to visibility and history, and 15 to UI, judgment and demo collectively. [Candidate guide](../ASA%20Case%20Study%20%E2%80%94%20Candidate%20Guide.pdf) · [Existing rubric](../PROTOTYPE_GRADING_RUBRIC.md)
+Page 4 of the candidate guide asks a buyer to judge completeness, consistency and credibility of a vendor submission, receive an explained approved, pending or rejected result, and communicate the next requirement. Pages 2–3 also require a live process, visible stages, history and outputs. The five-minute recording must show a happy path and an edge case. This makes an unexplained pending case as much a product failure as a broken button. The rubric gives 44 points to the working process and safe decisions, 16 to edge cases, 25 to visibility and history, and 15 to UI, judgment and demo collectively. [Candidate guide](./case-study/candidate-guide.pdf) · [Existing rubric](./product/grading-rubric.md)
 
 ## Scope and confidence
 

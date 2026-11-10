@@ -8,7 +8,7 @@
 
 ## 1. Summary of Implemented Improvements
 
-Based on the findings from `PRODUCT_UX_AUDIT.md`, targeted improvements were implemented to eliminate friction in live demonstrations, improve responsive viewport ergonomics, provide immediate feedback on statutory gates, and reduce vendor cognitive load during exception correction.
+Based on the findings from `docs/product/ux-audit.md`, targeted improvements were implemented to eliminate friction in live demonstrations, improve responsive viewport ergonomics, provide immediate feedback on statutory gates, and reduce vendor cognitive load during exception correction.
 
 ---
 
@@ -68,5 +68,5 @@ In accordance with specification governance:
 
 Following these improvements:
 - **Backend Test Suite:** `pytest backend/tests` — **70 / 70 passed in 38.74s**.
-- **Real Browser Automation:** `run_acceptance_browser.py` — **21 / 21 milestones passed**.
+- **Real Browser Automation:** `scripts/validation/run_acceptance_browser.py` — **21 / 21 milestones passed**.
 - **Demo Reproducibility:** 1-Click Demo Reset restored all 3 cases cleanly.

@@ -1,10 +1,10 @@
-<#
+﻿<#
 .SYNOPSIS
     Starts the India-Focused Vendor Onboarding Platform on any Windows machine.
 #>
 
 $ErrorActionPreference = "Stop"
-$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$ScriptDir = (Resolve-Path (Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Definition) "..\..")).Path
 Set-Location $ScriptDir
 
 Write-Host "=====================================================================" -ForegroundColor Cyan

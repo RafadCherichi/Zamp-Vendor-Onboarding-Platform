@@ -272,7 +272,7 @@ A dedicated pytest test file was created to test all Increment 2 backend enhance
 
 ## 16. Real Browser Acceptance Test Journey Results
 
-Acceptance test script `run_increment2_acceptance.py` executed across both Desktop (1440x900) and Mobile (390x844) viewports:
+Acceptance test script `scripts/validation/run_increment2_acceptance.py` executed across both Desktop (1440x900) and Mobile (390x844) viewports:
 
 | # | Acceptance Journey Tested | Viewport | Status | Evidence Screenshot |
 | :---: | :--- | :---: | :---: | :--- |
@@ -359,9 +359,9 @@ Acceptance test script `run_increment2_acceptance.py` executed across both Deskt
 
 ### Files Created:
 - `backend/tests/test_increment2_ux_and_consistency.py`
-- `run_increment2_acceptance.py`
-- `acceptance_screenshots/inc2_01_step1_about_business.png` through `inc2_17_mobile_progress_tracker.png` (23 screenshot artifacts)
-- `INCREMENT_2_COMPLETION_REPORT.md`
+- `scripts/validation/run_increment2_acceptance.py`
+- `docs/evidence/acceptance-screenshots/inc2_01_step1_about_business.png` through `inc2_17_mobile_progress_tracker.png` (23 screenshot artifacts)
+- `docs/reports/increment-2-completion-report.md`
 
 ### Files Deleted:
 - None.

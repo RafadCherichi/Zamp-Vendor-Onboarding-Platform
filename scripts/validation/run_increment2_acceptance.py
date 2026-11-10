@@ -1,4 +1,3 @@
-from testdata.browser_support import launch_browser
 import os
 import sys
 import time
@@ -6,13 +5,17 @@ import json
 import shutil
 import urllib.request
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent / "backend"))
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(REPO_ROOT / "backend"))
+from testdata.browser_support import launch_browser
 from playwright.sync_api import sync_playwright
 
 CHROME_PATH = os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE", "Playwright default / installed Chrome")
 BASE_URL = os.environ.get("ZAMP_PREVIEW_URL", "http://127.0.0.1:8017")
-SCREENSHOTS_DIR = Path("acceptance_screenshots")
-ARTIFACT_SCREENSHOTS_DIR = Path(os.environ.get("ZAMP_EVIDENCE_DIR", str(Path(__file__).resolve().parent / "grade_evidence" / "acceptance_screenshots")))
+SCREENSHOTS_DIR = REPO_ROOT / "docs" / "evidence" / "acceptance-screenshots"
+ARTIFACT_SCREENSHOTS_DIR = Path(os.environ.get("ZAMP_EVIDENCE_DIR", str(REPO_ROOT / "grade_evidence" / "acceptance_screenshots")))
 
 SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
 ARTIFACT_SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)

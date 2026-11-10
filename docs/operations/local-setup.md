@@ -9,10 +9,10 @@ This guide explains how to run the prototype on your current computer or any oth
 Simply double-click the included batch script in the root directory:
 
 ```text
-start_prototype.bat
+scripts/local/start_prototype.bat
 ```
 
-*(Or right-click `start_prototype.ps1` and select **Run with PowerShell**)*
+*(Or right-click `scripts/local/start_prototype.ps1` and select **Run with PowerShell**)*
 
 ### What the script does automatically:
 1. Detects your Python and Node.js installations.
@@ -35,7 +35,7 @@ If you zip or copy this folder to another PC or laptop, here are the simple requ
 
 ### First-Time Run:
 1. Copy the project folder to the target machine.
-2. Double-click `start_prototype.bat`.
+2. Double-click `scripts/local/start_prototype.bat`.
 3. The script will automatically detect that dependencies are missing, install them, seed the database, and launch the platform.
 
 ---

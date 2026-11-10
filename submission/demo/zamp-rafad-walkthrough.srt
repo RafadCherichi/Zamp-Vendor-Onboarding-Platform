@@ -1,0 +1,319 @@
+1
+00:00:00,000 --> 00:00:03,606
+Hi, I'm Rafad Abdul Rasheed. A buyer may
+
+2
+00:00:03,606 --> 00:00:07,211
+need to review many suppliers, but each application
+
+3
+00:00:07,211 --> 00:00:09,915
+arrives with different details and documents.
+
+4
+00:00:09,915 --> 00:00:13,521
+The challenge is to make the process clear
+
+5
+00:00:13,521 --> 00:00:17,127
+for suppliers, useful for reviewers, and safe for
+
+6
+00:00:17,127 --> 00:00:20,732
+the buyer. I'll show one application from start
+
+7
+00:00:20,732 --> 00:00:23,887
+to decision, then a tax identity mismatch.
+
+8
+00:00:23,887 --> 00:00:27,493
+These are fictional demo profiles. Zoya works for
+
+9
+00:00:27,493 --> 00:00:30,197
+another buyer company and can only
+
+10
+00:00:30,197 --> 00:00:32,000
+see that company's cases.
+
+11
+00:00:32,000 --> 00:00:38,110
+I'll choose Vikram's supplier profile for Apex Components.
+
+12
+00:00:38,110 --> 00:00:43,588
+This sample profile belongs to Vikram's own company,
+
+13
+00:00:43,588 --> 00:00:48,381
+Apex Components. He can enter its legal
+
+14
+00:00:48,381 --> 00:00:51,120
+identity and address here.
+
+15
+00:00:51,120 --> 00:00:55,127
+Here Vikram enters tax and business registrations.
+
+16
+00:00:55,127 --> 00:00:59,706
+Zamp checks their format and later compares related
+
+17
+00:00:59,706 --> 00:01:03,140
+values with the documents he provides.
+
+18
+00:01:03,140 --> 00:01:06,650
+This section gives the buyer a named contact
+
+19
+00:01:06,650 --> 00:01:10,160
+and records who can act for the supplier.
+
+20
+00:01:10,160 --> 00:01:13,073
+The banking details will later be compared with
+
+21
+00:01:13,073 --> 00:01:15,621
+the uploaded bank proof before payment setup.
+
+22
+00:01:15,621 --> 00:01:18,170
+Sensitive values are masked in staff views.
+
+23
+00:01:18,170 --> 00:01:21,474
+Business activity helps the buyer understand what this
+
+24
+00:01:21,474 --> 00:01:23,538
+supplier provides and which documents
+
+25
+00:01:23,538 --> 00:01:25,190
+apply to the case.
+
+26
+00:01:25,190 --> 00:01:28,672
+The checklist adapts to the supplier's business type.
+
+27
+00:01:28,672 --> 00:01:32,153
+Each document can be previewed, and Zamp shows
+
+28
+00:01:32,153 --> 00:01:35,200
+what it read before the supplier submits.
+
+29
+00:01:35,200 --> 00:01:38,629
+This prepared example starts with one OCR misread.
+
+30
+00:01:38,629 --> 00:01:42,057
+Vikram compares the PAN card preview with Zamp's
+
+31
+00:01:42,057 --> 00:01:45,486
+reading, corrects it himself, and explains the change.
+
+32
+00:01:45,486 --> 00:01:48,914
+The original reading and his correction stay on
+
+33
+00:01:48,914 --> 00:01:51,486
+record. Checks rerun, but a person
+
+34
+00:01:51,486 --> 00:01:53,200
+still makes the decision.
+
+35
+00:01:53,200 --> 00:01:57,625
+Vikram reviews the completed details and makes the
+
+36
+00:01:57,625 --> 00:02:00,390
+required declarations himself before submitting.
+
+37
+00:02:00,390 --> 00:02:04,550
+On submission, the document checks run and the
+
+38
+00:02:04,550 --> 00:02:07,670
+supplier gets a reference and status.
+
+39
+00:02:07,670 --> 00:02:10,270
+These checks prepare the review;
+
+40
+00:02:10,270 --> 00:02:13,390
+they do not approve the supplier.
+
+41
+00:02:13,390 --> 00:02:20,334
+Pooja assigns the case to Rajesh, giving the
+
+42
+00:02:20,334 --> 00:02:26,410
+review a clear owner and recorded handoff.
+
+43
+00:02:26,410 --> 00:02:31,482
+Rajesh signs in to his assigned queue.
+
+44
+00:02:31,482 --> 00:02:37,279
+He opens the submitted documents and validation findings.
+
+45
+00:02:37,279 --> 00:02:40,902
+Zamp brings the evidence together
+
+46
+00:02:40,902 --> 00:02:43,800
+for a human review.
+
+47
+00:02:43,800 --> 00:02:48,605
+After confirming nothing blocks approval, Rajesh records the
+
+48
+00:02:48,605 --> 00:02:52,810
+decision. The reviewer makes the final call.
+
+49
+00:02:52,810 --> 00:02:57,181
+Vikram sees the approval notice and can open
+
+50
+00:02:57,181 --> 00:03:01,552
+the decision. He knows onboarding is complete and
+
+51
+00:03:01,552 --> 00:03:04,830
+no task remains in this application.
+
+52
+00:03:04,840 --> 00:03:08,294
+Now a second supplier submits a separate case.
+
+53
+00:03:08,294 --> 00:03:11,748
+A GSTIN carries the business PAN inside it:
+
+54
+00:03:11,748 --> 00:03:15,202
+characters three through twelve are that ten-character PAN.
+
+55
+00:03:15,202 --> 00:03:17,793
+Zamp compares it with the form.
+
+56
+00:03:17,793 --> 00:03:21,247
+They don't match, so approval pauses and the
+
+57
+00:03:21,247 --> 00:03:24,701
+supplier is asked to check the right entity's
+
+58
+00:03:24,701 --> 00:03:26,860
+details. These records are synthetic.
+
+59
+00:03:26,860 --> 00:03:33,629
+The supplier checks the GST certificate, enters the
+
+60
+00:03:33,629 --> 00:03:40,398
+number that matches the declared PAN, and explains
+
+61
+00:03:40,398 --> 00:03:45,475
+the change. Zamp keeps the original
+
+62
+00:03:45,475 --> 00:03:48,860
+request and response together.
+
+63
+00:03:48,860 --> 00:03:55,243
+The reply does not approve the case.
+
+64
+00:03:55,243 --> 00:03:59,802
+A person still needs to
+
+65
+00:03:59,802 --> 00:04:03,450
+review the updated evidence.
+
+66
+00:04:03,450 --> 00:04:11,992
+The run history preserves the GST mismatch and
+
+67
+00:04:11,992 --> 00:04:17,330
+the reason approval was held.
+
+68
+00:04:17,330 --> 00:04:19,753
+A different case has a registry timeout.
+
+69
+00:04:19,753 --> 00:04:22,522
+That result is unknown, not a supplier failure.
+
+70
+00:04:22,522 --> 00:04:24,945
+The team can retry; the supplier does
+
+71
+00:04:24,945 --> 00:04:26,330
+not need to resubmit.
+
+72
+00:04:26,330 --> 00:04:30,033
+Zamp brings supplier details, documents and review into
+
+73
+00:04:30,033 --> 00:04:33,735
+one traceable process. It helps teams catch mismatches
+
+74
+00:04:33,735 --> 00:04:37,438
+early, gives suppliers a clear next step, and
+
+75
+00:04:37,438 --> 00:04:40,678
+keeps the final decision with a person.
+
+76
+00:04:40,678 --> 00:04:44,381
+The records and registry results in this demo
+
+77
+00:04:44,381 --> 00:04:48,083
+are synthetic. In a pilot, we'd measure decision
+
+78
+00:04:48,083 --> 00:04:51,786
+time and make sure valid suppliers are not
+
+79
+00:04:51,786 --> 00:04:55,489
+held unnecessarily. Thank you for your time, and
+
+80
+00:04:55,489 --> 00:04:57,340
+for watching our walkthrough.

@@ -7,7 +7,7 @@ echo    India-Focused Vendor Onboarding Platform - Local Launcher
 echo =====================================================================
 echo.
 
-set ROOT_DIR=%~dp0
+for %%I in ("%~dp0..\..") do set "ROOT_DIR=%%~fI"
 cd /d "%ROOT_DIR%"
 
 :: 1. Locate Python

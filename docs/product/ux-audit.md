@@ -1,10 +1,10 @@
 # Comprehensive Product UX, Design and Usability Audit
 
-**Platform:** India-Focused Vendor Onboarding Platform  
-**Evaluation Mode:** Autonomous Product Quality & Heuristic Evaluation  
-**Auditor:** Autonomous Product Assurance & UX Agent  
-**Date:** November 5, 2026  
-**Screenshots Evaluated:** 24 live browser screen captures in `audit_screenshots/` (Desktop 1440x900, Mobile 375x812)  
+**Platform:** India-Focused Vendor Onboarding Platform
+**Evaluation Mode:** Autonomous Product Quality & Heuristic Evaluation
+**Auditor:** Autonomous Product Assurance & UX Agent
+**Date:** November 5, 2026
+**Screenshots Evaluated:** 24 live browser screen captures in `docs/evidence/ux-audit-screenshots/` (Desktop 1440x900, Mobile 375x812)
 
 ---
 
@@ -46,53 +46,53 @@ Every observed issue has been classified according to severity:
 ## 3. Part 3 — Role-Based Usability Walkthroughs
 
 ### 1. Vendor Persona Walkthrough
-- **Can a first-time vendor understand the invitation?**  
+- **Can a first-time vendor understand the invitation?**
   **Yes.** Opening `/invite/demo-invitation-token-apex-2026` clearly displays the inviting organization (*"Apex Enterprises Ltd."*), the invited entity name (*"Apex Components & Fasteners"*), validity, and instructions to create credentials and start onboarding.
-- **Can they complete the form without confusion?**  
+- **Can they complete the form without confusion?**
   **Yes.** The multi-step wizard breaks the submission into Company Profile, Tax & Statutory IDs, Banking, Signatories, and Documents, with inline format validation.
-- **Do they understand why documents are required?**  
+- **Do they understand why documents are required?**
   **Yes.** Selecting entity constitution (*"Private Limited Company"*) dynamically adjusts the checklist, explicitly labeling required documents with statutory context (e.g. *"Mandatory proof of incorporation under Companies Act 2013"*).
-- **Can they upload the right documents?**  
+- **Can they upload the right documents?**
   **Yes.** Upload dropzones restrict formats to PDF/PNG/JPEG and enforce a 10 MB limit with clear drag-and-drop feedback.
-- **Do they understand processing progress?**  
+- **Do they understand processing progress?**
   **Yes.** After submission, the vendor lands on a submission confirmation terminal showing status (`SUBMITTED` / `UNDER_REVIEW`), reference ID, and estimated turnaround.
-- **Can they understand validation failures and correct mistakes?**  
+- **Can they understand validation failures and correct mistakes?**
   **Yes.** When placed in `ACTION_REQUIRED`, an amber banner renders at the top of the wizard detailing the exact reviewer instruction, highlighting the affected field, allowing inline correction, and selectively revalidating upon submission.
-- **Can they resume an incomplete application?**  
+- **Can they resume an incomplete application?**
   **Yes.** Unsubmitted drafts persist in the database and re-populate whenever the vendor logs in.
 
 ### 2. Procurement Officer Persona Walkthrough
-- **Can a procurement officer understand the dashboard immediately?**  
+- **Can a procurement officer understand the dashboard immediately?**
   **Yes.** Top KPI cards display Total Applications, Under Review, Open Exceptions, Awaiting Vendor, and Approved.
-- **Can they identify pending work?**  
+- **Can they identify pending work?**
   **Yes.** Amber and red indicators clearly surface applications requiring immediate review or vendor action.
-- **Can they find a specific vendor?**  
+- **Can they find a specific vendor?**
   **Yes.** The real-time search bar filters applications instantly by legal name, trade name, or reference ID.
-- **Can they assign reviewers?**  
+- **Can they assign reviewers?**
   **Yes.** An inline dropdown in the queue allows assigning applications directly to available reviewers.
-- **Can they track invitation progress?**  
+- **Can they track invitation progress?**
   **Yes.** The **Invitation Register** tab lists dispatched tokens, recipient emails, active/accepted statuses, and allows revoking tokens.
 
 ### 3. Reviewer / Approver Persona Walkthrough
-- **Can a reviewer find assigned applications?**  
+- **Can a reviewer find assigned applications?**
   **Yes.** The priority metric cards allow 1-click filtering: *"Ready to Approve"*, *"Under Review"*, *"High Severity Issues"*, *"Clarification Pending"*, and a toggle for *"Assigned to Me"*.
-- **Can they understand why an application requires review?**  
+- **Can they understand why an application requires review?**
   **Yes.** The queue displays open exception counts and statutory block tags before opening the workspace.
-- **Can they compare submitted vs extracted values?**  
+- **Can they compare submitted vs extracted values?**
   **Yes.** **Tab E (Exceptions)** provides a side-by-side diff comparing the vendor form entry against the OCR-extracted document text.
-- **Can they find supporting document evidence?**  
+- **Can they find supporting document evidence?**
   **Yes.** **Tab C (Documents)** displays all uploaded files with extracted key-value pairs, confidence scores, and preview triggers.
-- **Can they distinguish failed verification from unavailable verification?**  
+- **Can they distinguish failed verification from unavailable verification?**
   **Yes.** **Tab F (Registries)** explicitly renders `UNAVAILABLE (HTTP 504 Timeout)` with clear diagnostic explanations, distinguishing external downtime from fraudulent/failed records.
-- **Can they understand exception severity?**  
+- **Can they understand exception severity?**
   **Yes.** Color-coded tags (Red: Critical/High, Amber: Medium, Slate: Low) indicate which exceptions block policy gates.
-- **Can they make decisions confidently?**  
+- **Can they make decisions confidently?**
   **Yes.** The Statutory Compliance Policy Gate provides a formal checklist verifying zero blocking exceptions before enabling approval.
 
 ### 4. Administrator Persona Walkthrough
-- **Can an administrator understand organization-level activity?**  
+- **Can an administrator understand organization-level activity?**
   **Yes.** The Admin Control Center summarizes multi-tenant settings, audit logs, and user roles.
-- **Can they manage demo data safely and reset without ambiguity?**  
+- **Can they manage demo data safely and reset without ambiguity?**
   **Yes.** The **"Reset & Re-Seed Demo"** action requires explicit confirmation, executes within 5 seconds, and restores the 3 benchmark demonstration cases cleanly.
 
 ---
@@ -114,7 +114,7 @@ Every observed issue has been classified according to severity:
 ### Responsive Design Findings (Desktop vs Mobile)
 - **Tables:** Application queue and document checklist have horizontal scroll wrappers (`overflow-x-auto`) to prevent table clipping on mobile viewports.
 - **Modals:** Centered dialogs use `max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto`, ensuring usability on small screens.
-- **Tab Navigation:** On mobile viewports, the Reviewer Workspace tab bar requires horizontal scrolling to avoid wrapping into 3 vertical tiers (addressed in `DESIGN_IMPROVEMENTS.md`).
+- **Tab Navigation:** On mobile viewports, the Reviewer Workspace tab bar requires horizontal scrolling to avoid wrapping into 3 vertical tiers (addressed in `docs/product/design-improvements.md`).
 
 ---
 

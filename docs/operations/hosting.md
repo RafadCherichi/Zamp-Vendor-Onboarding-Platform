@@ -1,6 +1,6 @@
 # Hosting the evaluator demo for free
 
-The public source repository is [RafadCherichi/Zamp-Vendor-Onboarding-Platform](https://github.com/RafadCherichi/Zamp-Vendor-Onboarding-Platform). The checked-in [`render.yaml`](render.yaml) describes one Render web service built from the root Dockerfile, using Render's free plan.
+The public source repository is [RafadCherichi/Zamp-Vendor-Onboarding-Platform](https://github.com/RafadCherichi/Zamp-Vendor-Onboarding-Platform). The checked-in [`render.yaml`](../../render.yaml) describes one Render web service built from the root Dockerfile, using Render's free plan.
 
 ## What the Blueprint sets up
 

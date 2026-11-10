@@ -211,7 +211,7 @@ Open `http://127.0.0.1:5173` in any modern web browser (Chrome, Edge, Firefox).
 
 - **Backend Pytest Suite:** 70 / 70 tests passing (`pytest backend/tests` — 35.86s).
 - **Frontend Build:** 0 errors, production build verified (`tsc -b && vite build` — 2.29s).
-- **End-to-End Browser Suite:** 21 / 21 milestones passing with 26 captured evidence screenshots (`run_acceptance_browser.py`).
+- **End-to-End Browser Suite:** 21 / 21 milestones passing with 26 captured evidence screenshots (`scripts/validation/run_acceptance_browser.py`).
 - **Demo Reset Reproducibility:** Confirmed pristine after reset.
 
 **Status:** The Vendor Onboarding Platform meets all architectural, functional, UX, and security requirements of the Final Consolidated Product Specification and is approved for final demonstration.

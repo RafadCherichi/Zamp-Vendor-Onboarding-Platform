@@ -8,7 +8,7 @@
 
 **Tech Stack:** React 19, TypeScript, Vite 8, FastAPI, SQLAlchemy, Alembic, SQLite, Docker, GitHub, Render, Playwright or existing browser acceptance scripts, pytest, oxlint.
 
-**Spec:** [Approved rubric](../../../PROTOTYPE_GRADING_RUBRIC.md), [iteration 2 grade](../../../ITERATION_2_GRADE.md), [case-study decision note](../../../CASE_STUDY_DECISION_NOTE.md), and `ASA Case Study — Candidate Guide.pdf` in the repository root.
+**Spec:** [Approved rubric](../../product/grading-rubric.md), [iteration 2 grade](../../reports/iteration-2-grade.md), [case-study decision note](../../case-study/decision-note.md), and `docs/case-study/candidate-guide.pdf` in the repository root.
 
 ## Score target and honest limit
 
@@ -45,7 +45,7 @@ The candidate guide sets two submission gates apart from the numerical score: an
 | Live run | `backend/app/services/extraction/pipeline.py`, `backend/app/api/endpoints/applications.py`, `frontend/src/components/vendor/OnboardingWizard.tsx` | a processing-status schema/endpoint or event model and a small status component |
 | Reviewer evidence | `frontend/src/components/review/ApplicationDetailsWorkspace.tsx`, `frontend/src/components/queue/ApplicationQueue.tsx`, `backend/app/schemas/application.py` | focused submitted/extracted/provenance component and browser check |
 | Language and presentation | vendor status/correction components, `frontend/src/index.css` | task script, observation sheet, contrast/keyboard evidence |
-| Submission proof | `DEMO_SCRIPT.md`, `DEMO_RUNBOOK.md`, `ITERATION_2_GRADE.md` | final grade, public smoke log, recording link and evaluator handoff note |
+| Submission proof | `docs/demo/walkthrough-script.md`, `docs/demo/runbook.md`, `docs/reports/iteration-2-grade.md` | final grade, public smoke log, recording link and evaluator handoff note |
 
 ---
 
@@ -138,7 +138,7 @@ The candidate guide sets two submission gates apart from the numerical score: an
 
 ### Task 5.1: Quantify the cost of acting or waiting
 
-- [ ] Extend `CASE_STUDY_DECISION_NOTE.md` with a small, clearly labelled assumption model: monthly applications, share blocked, staff minutes per clarification, elapsed waiting days, buyer operating consequence, owner of the next action, and low/base/high cases.
+- [ ] Extend `docs/case-study/decision-note.md` with a small, clearly labelled assumption model: monthly applications, share blocked, staff minutes per clarification, elapsed waiting days, buyer operating consequence, owner of the next action, and low/base/high cases.
 - [ ] Separate measured facts from hypotheses. Do not convert elapsed waiting time into staff hours or money without an explicit rate and mechanism.
 - [ ] State the recommended action, the cost of unnecessary action, the cost of waiting, and which pilot observations would overturn the recommendation.
 - [ ] Ask one nontechnical reader to recount the trade-off; simplify the explanation if they cannot.
@@ -203,7 +203,7 @@ The candidate guide sets two submission gates apart from the numerical score: an
 
 ### Task 9.1: Rehearse a focused run
 
-- [ ] Update `DEMO_SCRIPT.md` to use only a prepared clean case and one bank mismatch or registry outage, with a short buyer explanation and explicit “simulated” label.
+- [ ] Update `docs/demo/walkthrough-script.md` to use only a prepared clean case and one bank mismatch or registry outage, with a short buyer explanation and explicit “simulated” label.
 - [ ] Target a 4:30–4:50 rehearsal: problem and buyer (0:00–0:30); vendor input and documents (0:30–1:35); visible processing/result (1:35–2:15); reviewer decision (2:15–3:00); edge, owner and recovery (3:00–4:10); value, trade-off and metric (4:10–4:45).
 - [ ] Rehearse on the deployed public URL, not a local shortcut. Ensure the screen is readable at the recording resolution and all promised actions execute.
 

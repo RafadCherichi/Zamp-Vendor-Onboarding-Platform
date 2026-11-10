@@ -8,7 +8,7 @@ Decision brief for review · 9 November 2026 · Proposed work, not a release rep
 
 ## Evidence and scope
 
-The [candidate guide](../ASA%20Case%20Study%20%E2%80%94%20Candidate%20Guide.pdf) asks PS-2 to take a realistic vendor submission, assess completeness, consistency and credibility, and produce an explained decision. It requires an actual live run, history and outputs, two to four deliberate edge cases, and a five-minute demo including a happy path and an edge case. It does not prescribe a staffing model. The consolidated local product specification explicitly includes assigning reviewers among procurement duties.
+The [candidate guide](./case-study/candidate-guide.pdf) asks PS-2 to take a realistic vendor submission, assess completeness, consistency and credibility, and produce an explained decision. It requires an actual live run, history and outputs, two to four deliberate edge cases, and a five-minute demo including a happy path and an edge case. It does not prescribe a staffing model. The consolidated local product specification explicitly includes assigning reviewers among procurement duties.
 
 I reviewed the four supplied screenshots (the first two show the same receipt), the supplied registry output, the application and exception workflows, and the published design references below. A read-only check on the hosted demo confirmed that APP-2026-PROP-001 was under review, with a resolved potential-duplicate exception and a current duplicate-check blocker. No live decision was changed. The specific missing vendor reply has not been independently replayed; its storage, delivery and presentation need separate checks.
 

@@ -60,7 +60,7 @@
 ### Task 3: Ship and verify
 
 **Files:**
-- Modify: `DEMO_SETUP.md`
+- Modify: `docs/demo/setup.md`
 
 - [x] Document the one-click flow and its limits.
 - [x] Run backend suite, frontend build, and Playwright verification. Frontend build and Playwright passed; backend suite ran with 102 passed and 16 failures caused by the pre-existing missing `document_processing_jobs.stage` test schema column.

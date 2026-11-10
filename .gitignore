@@ -62,3 +62,13 @@ backend/.verify_portal_*/
 grade_evidence/page@*.webm
 grade_evidence/narration/
 *.xlsx.inspect.ndjson
+# Keep local captures, caches, and previous video iterations out of the repository
+/archive/
+/output/
+/grade_evidence/human_walkthrough/
+/grade_evidence/**/page@*.webm
+/grade_evidence/**/*.webm
+/grade_evidence/**/*.wav
+/grade_evidence/**/*.mp3
+/vendor_onboarding.db
+/zamp-vendor-onboarding-voiceover-script.pdf
